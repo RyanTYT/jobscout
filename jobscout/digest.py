@@ -15,6 +15,7 @@ def _esc(s: str | None) -> str:
 def write_daily(
     digest_date: str,
     *,
+    discovery: dict | None = None,
     coverage: list[dict],
     new: list[sqlite3.Row],
     excluded_count: int,
@@ -57,6 +58,47 @@ def write_daily(
             lines.append(
                 f"| {_esc(row['title'])} | {_esc(row['company_id'])} | {row['last_seen'][:10]} |"
             )
+        lines.append("")
+
+    if discovery:
+        lines.append("## Discovery")
+        lines.append("")
+        for c in (discovery.get("candidates") or [])[:12]:
+            lines.append(f"- candidate: {_esc(c)}")
+        for m in list(dict.fromkeys(discovery.get("matched") or []))[:12]:
+            lines.append(f"- signal: {_esc(m)}")
+        rss_s = discovery.get("rss") or {}
+        if rss_s:
+            if rss_s.get("error"):
+                lines.append(f"- rss: error — {_esc(rss_s['error'])}")
+            else:
+                lines.append(
+                    f"- rss: {rss_s.get('feeds', 0)} feeds / {rss_s.get('entries', 0)} entries / "
+                    f"{rss_s.get('signals_new', 0)} new signals"
+                )
+                for u in (rss_s.get("unknown") or [])[:6]:
+                    lines.append(f"- unresolved mention: {_esc(u)} (no domain — resolve via agent)")
+        hn_s = discovery.get("hn") or {}
+        if hn_s:
+            if hn_s.get("error"):
+                lines.append(f"- hn: error — {_esc(hn_s['error'])}")
+            elif hn_s.get("skipped"):
+                lines.append(f"- hn: {_esc(hn_s['skipped'])}")
+            else:
+                lines.append(
+                    f"- hn: {_esc(hn_s.get('story'))} — {hn_s.get('comments_seen', 0)} comments, "
+                    f"{hn_s.get('comments_matched', 0)} matched keywords"
+                )
+        cse_s = discovery.get("cse") or {}
+        if cse_s:
+            if cse_s.get("error"):
+                lines.append(f"- cse: error — {_esc(cse_s['error'])}")
+            elif cse_s.get("skipped"):
+                lines.append(f"- cse: {_esc(cse_s['skipped'])}")
+            else:
+                lines.append(
+                    f"- cse: {cse_s.get('queries', 0)} queries / {cse_s.get('results', 0)} results"
+                )
         lines.append("")
 
     lines.append("## Watchlist coverage")

@@ -7,6 +7,7 @@ Later-phase verbs exist as stubs pointing at the PLAN so the surface is discover
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
@@ -224,8 +225,52 @@ def digest(today: bool = typer.Option(True, "--today", help="Show the latest dig
 
 @app.command()
 def agent(morning: bool = typer.Option(False, "--morning")):
-    """Execute the Morning Brief discovery agent (P5)."""
-    _stub("agent", "P5", "harness + tools + caps + the discovery-mode switch")
+    """Run the deterministic discovery sweep (RSS + HN + CSE).
+
+    The full Morning Brief — web search + judgment + research notes behind
+    the mode switch — lands in P5. This runs the same deterministic sweep
+    the daily pipeline runs, on demand.
+    """
+    import os
+
+    from jobscout import watchlist as wlmod
+    from jobscout.core import db as dbmod
+    from jobscout.core.config import load_env, load_profile, load_settings
+    from jobscout.sources import discovery
+    from jobscout.sources.ats.base import make_client
+
+    settings = load_settings()
+    if settings.discovery.mode == "off":
+        console.print("[yellow]discovery.mode == off[/] — nothing to do (config/settings.yaml)")
+        return
+    profile = load_profile()
+    wl = wlmod.load()
+    dbmod.init_db()
+    conn = dbmod.connect()
+    client = make_client()
+    try:
+        stats = discovery.run_sweep(
+            client, conn, wl, profile, settings, {**os.environ, **load_env()}
+        )
+        if stats.get("watchlist_changed"):
+            wlmod.save(wl)
+    finally:
+        client.close()
+        conn.close()
+
+    for c in (stats.get("candidates") or []):
+        console.print(f"  [green]+ candidate[/] {c}")
+    for m in (stats.get("matched") or [])[:10]:
+        console.print(f"  [cyan]· signal[/] {m}")
+    for key in ("rss", "hn", "cse"):
+        part = stats.get(key) or {}
+        if part.get("skipped"):
+            console.print(f"  [yellow]{key}: skipped[/] — {part['skipped']}")
+        elif part.get("error"):
+            console.print(f"  [red]{key}: error[/] — {part['error']}")
+        else:
+            console.print(f"  {key}: {json.dumps({k: v for k, v in part.items() if k not in ('matched', 'unknown')}, default=str)}")
+    console.print("[dim]full agent Morning Brief (query generation + judgment + research notes) lands in P5[/]")
 
 
 @app.command()

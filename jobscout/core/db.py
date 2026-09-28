@@ -15,7 +15,7 @@ from pathlib import Path
 
 from jobscout.core.paths import db_path, ensure_runtime_dirs
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -94,6 +94,12 @@ CREATE TABLE IF NOT EXISTS runs (
     ok          INTEGER NOT NULL DEFAULT 1
 );
 
+CREATE TABLE IF NOT EXISTS state (
+    key         TEXT PRIMARY KEY,            -- e.g. 'hn_last_story'
+    value       TEXT NOT NULL,
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS llm_calls (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     tier              TEXT NOT NULL,         -- bulk | agent | quality
@@ -114,7 +120,7 @@ CREATE TABLE IF NOT EXISTS llm_cache (
 );
 """
 
-_COUNTED_TABLES = ("companies", "postings", "signals", "packets", "runs", "llm_cache", "llm_calls")
+_COUNTED_TABLES = ("companies", "postings", "signals", "packets", "runs", "llm_cache", "llm_calls", "state")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -450,7 +456,8 @@ def company_summary(conn: sqlite3.Connection) -> list[sqlite3.Row]:
         SELECT c.*, 
                (SELECT COUNT(*) FROM postings p WHERE p.company_id = c.id) AS postings_total,
                (SELECT COUNT(*) FROM postings p WHERE p.company_id = c.id AND p.status = 'new'
-                  AND p.rule_pass = 1) AS rule_pass_new
+                  AND p.rule_pass = 1) AS rule_pass_new,
+               (SELECT COUNT(*) FROM signals s WHERE s.company_id = c.id) AS signal_count
         FROM companies c
         ORDER BY CASE c.tier WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 ELSE 3 END, c.name
         """
@@ -474,3 +481,56 @@ def recent_runs(conn: sqlite3.Connection, limit: int = 10) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,)
     ).fetchall()
+
+
+# ── P4: signals + state ──────────────────────────────────────────────────────
+
+
+def upsert_signal(
+    conn: sqlite3.Connection,
+    *,
+    kind: str,
+    key: str,
+    company_id: str | None = None,
+    payload: dict | None = None,
+    note: str | None = None,
+) -> bool:
+    """Idempotent by (kind, key). Returns True when a NEW signal was stored."""
+    sid = sha256(f"{kind}|{key}")
+    cur = conn.execute(
+        "INSERT OR IGNORE INTO signals (id, company_id, kind, payload, note) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (sid, company_id, kind, json.dumps(payload or {}), note),
+    )
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def recent_signals(conn: sqlite3.Connection, limit: int = 30) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT s.*, c.name AS company_name FROM signals s "
+        "LEFT JOIN companies c ON s.company_id = c.id "
+        "ORDER BY s.seen_at DESC, s.id LIMIT ?",
+        (limit,),
+    ).fetchall()
+
+
+def signals_for_company(conn: sqlite3.Connection, company_id: str) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM signals WHERE company_id = ? ORDER BY seen_at DESC LIMIT 20",
+        (company_id,),
+    ).fetchall()
+
+
+def get_state(conn: sqlite3.Connection, key: str) -> str | None:
+    row = conn.execute("SELECT value FROM state WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def set_state(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        "INSERT INTO state (key, value, updated_at) VALUES (?, ?, datetime('now')) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        (key, value),
+    )
+    conn.commit()

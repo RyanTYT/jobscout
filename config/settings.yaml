@@ -20,6 +20,7 @@ discovery:
     careers_crawl: true
     cse_queries_per_day: 10
     rss: true
+    rss_feeds: []             # empty -> defaults (techcrunch funding/fintech, coindesk)
 
 dashboard:
   host: 127.0.0.1

@@ -56,6 +56,7 @@ def run_daily(force: bool = False) -> int:
     errors: list[str] = []
     postings_seen = 0
     wl_changed = False
+    discovery_stats: dict | None = None
 
     client = make_client()
     try:
@@ -133,6 +134,23 @@ def run_daily(force: bool = False) -> int:
         if wl_changed:
             watchlist.save(wl)
             print("watchlist self-healed: ATS boards discovered via careers pages (see git diff)")
+
+        # ── deterministic discovery (P4): RSS + HN + CSE → signals + candidates ──
+        if settings.discovery.mode != "off":
+            try:
+                import os as _os
+
+                from jobscout.core.config import load_env as _load_env
+                from jobscout.sources import discovery as discovery_mod
+
+                env = {**_os.environ, **_load_env()}
+                discovery_stats = discovery_mod.run_sweep(client, conn, wl, profile, settings, env)
+                if discovery_stats.get("watchlist_changed"):
+                    watchlist.save(wl)
+                    n_new = len(discovery_stats.get("candidates") or [])
+                    print(f"watchlist grew: +{n_new} candidate(s) from discovery (see git diff)")
+            except Exception as e:  # noqa: BLE001 — discovery must never break the run
+                errors.append(f"discovery: {e}")
     finally:
         client.close()
 
@@ -180,6 +198,7 @@ def run_daily(force: bool = False) -> int:
         excluded_count=excluded,
         errors=errors,
         closing=closing,
+        discovery=discovery_stats,
         run_meta={
             "run_id": run_id,
             "companies": len(entries),
@@ -198,6 +217,7 @@ def run_daily(force: bool = False) -> int:
             "rule_pass": len(filtered),
             "errors": len(errors),
             "scoring": scored_stats,
+            "discovery": _discovery_summary(discovery_stats),
         },
         cost_usd=(scored_stats or {}).get("cost", 0.0),
         ok=True,
@@ -219,3 +239,21 @@ def _hours_since(iso: str) -> float | None:
     except ValueError:
         return None
     return (datetime.now(UTC) - started).total_seconds() / 3600
+
+
+def _discovery_summary(d: dict | None) -> dict:
+    """Compact run-stats summary of a discovery sweep (full detail in digest)."""
+    if not d:
+        return {}
+    out: dict = {}
+    for src_key in ("rss", "hn", "cse"):
+        part = d.get(src_key)
+        if isinstance(part, dict) and "error" not in part and "skipped" not in part:
+            out[src_key] = {
+                k: part[k] for k in ("feeds", "entries", "signals_new", "comments_matched",
+                                     "candidates", "queries", "results")
+                if k in part
+            }
+    if d.get("candidates"):
+        out["candidates"] = d["candidates"]
+    return out

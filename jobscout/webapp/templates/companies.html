@@ -3,7 +3,7 @@
 <h1>companies — the living substrate</h1>
 <p class="dim">watchlist.yaml mirrors this table; discovery appends candidates daily (PLAN §5.9)</p>
 <table>
-  <thead><tr><th>company</th><th>tier</th><th>domain</th><th>boards</th><th>careers page</th><th>postings</th><th>new (rule-pass)</th><th>note</th></tr></thead>
+  <thead><tr><th>company</th><th>tier</th><th>domain</th><th>boards</th><th>careers page</th><th>postings</th><th>new (rule-pass)</th><th>signals</th><th>note</th></tr></thead>
   <tbody>
   {% for r in rows %}
   <tr>
@@ -20,9 +20,26 @@
     <td>{% if r.career_url %}<a href="{{ r.career_url }}" rel="noopener" target="_blank">link</a>{% else %}<span class="dim">—</span>{% endif %}</td>
     <td class="num">{{ r.postings_total }}</td>
     <td class="num">{{ r.rule_pass_new }}</td>
+    <td class="num">{{ r.signal_count }}</td>
     <td class="dim">{{ r.notes or "" }}</td>
   </tr>
   {% endfor %}
   </tbody>
 </table>
+{% if signals %}
+<h2>Recent signals</h2>
+<table>
+  <thead><tr><th>when</th><th>kind</th><th>company</th><th>note</th></tr></thead>
+  <tbody>
+  {% for s in signals %}
+  <tr>
+    <td class="dim">{{ (s.seen_at or "")[:16] }}</td>
+    <td><span class="chip">{{ s.kind }}</span></td>
+    <td>{{ s.company_name or "— (unresolved)" }}</td>
+    <td class="dim">{{ (s.note or "") | truncate(110) }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
 {% endblock %}

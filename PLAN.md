@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Version** | 2.0 (pinned 2026-09-28) |
-| **Status** | P3 complete — careers crawler live: 3 hidden boards discovered + watchlist self-healed (Five Rings, Headlands, Kraken — 98 postings), 10 true dark-pool companies honestly flagged JS-rendered (P7) · **Next: P4 — deterministic discovery (CSE, HN, RSS) + signals** |
+| **Status** | P4 complete — deterministic discovery live: 11 companies entered the watchlist without owner action (HN Who-is-hiring + RSS funding), 164 signals recorded, Companies page shows timelines · **Next: P5 — agent harness + Morning Brief + the discovery-mode switch** |
 | **Repo** | `/Users/user/Downloads/Personal Project/jobscout` (local only, no remote yet) |
 | **Sibling repos** | `../JobPilot` (the "hands", see §6) · `../rusty_trader` (unrelated) |
 | **Dev Mac rule** | This Mac develops only. **Never run `bootstrap.sh` here** — it installs launchd and belongs on the target/deployment Mac. |
@@ -502,14 +502,17 @@ Citadel Sec, DRW, Optiver, SIG, XTX, Radix, Wintermute, GSR) — sidecar render 
 - [x] `companies` table fully populated (ATS tokens, career_url, non_ats, tier); dashboard companies page shows career links
 - [x] Dark-pool classification: no ATS + no static postings → flagged (signals arrive in P4/P5 to light them up)
 
-### P4 — Deterministic discovery (CSE, HN, RSS) + signals
-Done when: new companies enter the watchlist without owner action.
+### P4 — Deterministic discovery (CSE, HN, RSS) + signals ✅ (2026-09-28)
+Done when: new companies enter the watchlist without owner action —
+**satisfied live: 11 candidates added from HN Who-is-hiring + RSS in the
+first runs (Adyen, 10X Genomics, AMEX, Skool, causaLens, IOMED, ...),
+164 signals, known-company light-ups (Ramp/Stripe/Kraken/Datadog).**
 
-- [ ] `sources/discovery/cse.py` (Google Programmable Search, 100 q/day, query bank + rotation)
-- [ ] `sources/discovery/hn.py` (Algolia, Who-is-hiring)
-- [ ] `sources/discovery/rss.py` (funding + niche feeds → `signals` table)
-- [ ] Signal → company resolution; Companies dashboard page (tiers, timelines)
-- [ ] `jobscout agent --morning` stub → runs pipeline-mode sweep only
+- [x] `sources/discovery/cse.py` — date-rotated query bank (no stored state), aggregator blocklist, domain → candidates; activates when `JOBSCOUT_CSE_*` keys land in .env
+- [x] `sources/discovery/hn.py` — Algolia Who-is-hiring: keyword filter, company + domain extraction (http links, emails, bare mentions — HN comments rarely hyperlink), role-name guard, per-run candidate cap
+- [x] `sources/discovery/rss.py` — funding feeds → signals on known companies + unresolved mentions (company-NULL signals for the P5 agent to resolve)
+- [x] Signal → company resolution (name matching); Companies page: signals column + recent-signals timeline; digest Discovery section; schema v3 (state kv + dedup-by-(kind,key) signals)
+- [x] `jobscout agent` runs the deterministic sweep on demand (full Morning Brief lands in P5)
 
 ### P5 — Agent harness + Morning Brief + the mode switch
 Done when: a headless agent run writes a morning report with auditable DB diff, under caps.
@@ -583,6 +586,7 @@ Done when: [Fill for me] fills a real form headfully and returns an auditable fi
 | 2026-09-28 | Probe rule: a board hit requires live postings — SmartRecruiters returns 200-empty for wrong ids (e.g. "JaneStreet"); Optiver's greenhouse board exists but is empty (they moved on) |
 | 2026-09-28 | Bulk scoring: cache key (profile_version, content_hash); per-tier daily caps in models.yaml degrade to rule-only; no-key runs are rule-only by design; first-run baseline scores only within cap (backfill via `jobscout score`) |
 | 2026-09-28 | Careers ladder (P3): board-link scan beats page scraping — discovered tokens are live-verified, then the standard ATS connector owns future pulls (watchlist self-heals); JS-rendered careers pages are honest dark-pool, not failures (sidecar render is P7) |
+| 2026-09-28 | Discovery (P4): HN comments rarely hyperlink — domains come from emails + bare mentions; discovered companies enter `candidates` with live ATS probing and domain-level dedup (name variants don't duplicate); unresolved RSS mentions stay company-NULL signals for the P5 agent |
 | OPEN | Private remote vs local-only |
 | OPEN | Final name |
 

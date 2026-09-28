@@ -28,7 +28,15 @@ import httpx
 
 from jobscout.core.db import slugify
 from jobscout.sources.ats import FETCHERS
-from jobscout.sources.ats.base import RawPosting, SourceError, SourceNotFound, strip_html
+from jobscout.sources.ats.base import (
+    RawPosting,
+    SourceError,
+    SourceNotFound,
+    strip_html,
+)
+from jobscout.sources.ats.base import (
+    soft_get as _get,
+)
 
 _JSONLD_RE = re.compile(
     r"<script[^>]*type=[\"']application/ld\+json[\"'][^>]*>(.*?)</script>", re.S | re.I
@@ -59,17 +67,6 @@ _BAD_TOKENS = {"embed", "jobs", "job", "job_board", "embed_job_board"}
 
 
 # ── HTTP helper ──────────────────────────────────────────────────────────────
-
-
-def _get(client: httpx.Client, url: str) -> httpx.Response | None:
-    """GET with soft failure (None on network error / non-200)."""
-    try:
-        r = client.get(url)
-    except httpx.HTTPError:
-        return None
-    if r.status_code != 200 or not r.text:
-        return None
-    return r
 
 
 def _looks_like_careers(html: str) -> bool:

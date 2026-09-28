@@ -192,4 +192,71 @@ B:
     greenhouse: anthropic
   note: ''
 C: []
-candidates: []
+candidates:
+- name: DiaMonTech AG
+  domain: diamontech.de
+  ats: {}
+  note: 'HN Who-is-hiring: DiaMonTech AG | Software Engineer | Berlin, Germany | Full-time
+    | ONSITE &#x2F; PARTIAL REMOTE<p>We '
+  found_via: hn-whoishiring
+- name: IOMED
+  domain: iomed.health
+  ats: {}
+  note: 'HN Who-is-hiring: IOMED | Data Engineer | Barcelona, Spain | Full Time |
+    Onsite<p>Are you looking for a job with a dir'
+  found_via: hn-whoishiring
+- name: AMEX
+  domain: aexp.com
+  ats: {}
+  note: 'HN Who-is-hiring: AMEX | Senior Backend Engineer (Rails) | Full-time | 6-12
+    Month Contract | REMOTE due to COVID-19 - '
+  found_via: hn-whoishiring
+- name: National Robotics Engineering Center
+  domain: nrec.ri.cmu.edu
+  ats:
+    smartrecruiters: nrec
+  note: 'HN Who-is-hiring: National Robotics Engineering Center | Software, Computer
+    Vision, Machine Learning, UI | Pittsburgh,'
+  found_via: hn-whoishiring
+- name: Skool
+  domain: skool.com
+  ats: {}
+  note: 'HN Who-is-hiring: Skool | Software Engineers | Los Angeles (LA) | Full Time
+    | Onsite | <a href="https:&#x2F;&#x2F;www.'
+  found_via: hn-whoishiring
+- name: 10X Genomics
+  domain: 10xgenomics.com
+  ats: {}
+  note: HN Who-is-hiring (role-first comment, domain extracted from email)
+- name: Holmusk
+  domain: holmusk.com
+  ats: {}
+  note: 'HN Who-is-hiring: Holmusk | Europe, REMOTE | Haskell Backend | Full-time
+    | send your cv to [careers@holmusk.com](mailt'
+  found_via: hn-whoishiring
+- name: Coefficient
+  domain: coefficient.io
+  ats:
+    greenhouse: coefficient
+  note: 'HN Who-is-hiring: Coefficient | Sr. Backend Engineer | Remote From India&#x2F;North
+    America | Remote Only | coefficien'
+  found_via: hn-whoishiring
+- name: causaLens
+  domain: causalens.com
+  ats: {}
+  note: 'HN Who-is-hiring: causaLens |Python Engineer | Data Scientist (Commercial)
+    | Data Scientist (Research) | Full-time | L'
+  found_via: hn-whoishiring
+- name: Adyen
+  domain: adyen.com
+  ats:
+    greenhouse: adyen
+  note: 'HN Who-is-hiring: Adyen | Amsterdam | Onsite | Software Engineers (Java)
+    &amp; Infrastructure | Relocation and Visa su'
+  found_via: hn-whoishiring
+- name: Interos, Inc
+  domain: interos.ai
+  ats: {}
+  note: 'HN Who-is-hiring: Interos, Inc. | Haskell Engineer | ONSITE Arlington, VA
+    | Full-Time<p>My team at Interos is hiring H'
+  found_via: hn-whoishiring

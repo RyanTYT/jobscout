@@ -63,5 +63,16 @@ def make_client() -> httpx.Client:
     )
 
 
+def soft_get(client: httpx.Client, url: str, params: dict | None = None) -> httpx.Response | None:
+    """GET with soft failure: None on network error / non-200 / empty body."""
+    try:
+        r = client.get(url, params=params)
+    except httpx.HTTPError:
+        return None
+    if r.status_code != 200 or not r.text:
+        return None
+    return r
+
+
 def polite(min_seconds: float = 0.25) -> None:
     time.sleep(min_seconds)
