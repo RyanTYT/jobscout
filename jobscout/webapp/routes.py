@@ -118,10 +118,10 @@ def create_app() -> FastAPI:
         conn = db.connect()
         try:
             rows = db.company_summary(conn)
+            signals = db.recent_signals(conn, 25)
         finally:
             conn.close()
         boards = {r["id"]: _boards(r) for r in rows}
-        signals = db.recent_signals(conn, 25)
         return TEMPLATES.TemplateResponse(
             request,
             "companies.html",
