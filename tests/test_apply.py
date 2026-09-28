@@ -256,3 +256,34 @@ def test_open_assisted_chrome(monkeypatch, tmp_path):
     assert "--window-position=10,20" in calls[0]
     assert "--window-size=640,400" in calls[0]
     assert calls[0][-1] == "https://acme.com/apply"
+
+
+# ── packaged-app relocation (Tauri shell sets these env vars) ───────────────
+
+
+def test_jobscout_home_relocates_runtime(monkeypatch, tmp_path):
+    from jobscout.core import paths
+
+    home = tmp_path / "appdata"
+    monkeypatch.setattr(paths.os, "environ", {"JOBSCOUT_HOME": str(home)})
+    assert paths.repo_root() == home.resolve()
+    assert paths.db_path() == home.resolve() / "data" / "jobscout.db"
+    assert paths.applications_dir() == home.resolve() / "applications"
+
+
+def test_jobscout_home_unset_uses_repo(monkeypatch):
+    from jobscout.core import paths
+
+    monkeypatch.delenv("JOBSCOUT_HOME", raising=False)
+    root = paths.repo_root()
+    assert (root / "PLAN.md").is_file()      # the real checkout resolves
+    assert root / "pyproject.toml"
+
+
+def test_sidecar_env_override(monkeypatch, tmp_path):
+    from jobscout.sidecar import SidecarClient
+
+    fake = tmp_path / "bundled-sidecar.js"
+    fake.write_text("// sidecar")
+    monkeypatch.setenv("JOBSCOUT_SIDECAR_BIN", str(fake))
+    assert SidecarClient._default_path() == fake

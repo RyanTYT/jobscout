@@ -45,6 +45,38 @@ app.add_typer(resume_app, name="resume")
 
 
 @app.command()
+def init_home() -> None:
+    """Bootstrap a relocated runtime (JOBSCOUT_HOME, packaged desktop app).
+
+    Seeds config/settings.yaml + master_resume/resume.yaml from the
+    bundled defaults (snapshot taken at build time) when missing, then
+    initialises the database. Idempotent — safe on every start.
+    """
+    import shutil
+
+    from jobscout.core.db import init_db
+    from jobscout.core.paths import config_dir, master_resume_dir, repo_root
+
+    defaults = Path(__file__).resolve().parent / "defaults"
+    seeds = [
+        (defaults / "settings.yaml", config_dir() / "settings.yaml"),
+        (defaults / "resume.yaml", master_resume_dir() / "resume.yaml"),
+    ]
+    for src, dst in seeds:
+        if not dst.is_file():
+            if not src.is_file():
+                console.print(f"[red]default missing: {src}[/]")
+                raise typer.Exit(1)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, dst)
+            console.print(f"  seeded [green]{dst}[/] from defaults")
+        else:
+            console.print(f"  keep existing [dim]{dst}[/]")
+    init_db()
+    console.print(f"  home ready: [bold]{repo_root()}[/]")
+
+
+@app.command()
 def doctor() -> None:
     """Health-check the whole stack. Exit 1 on any failure."""
     from jobscout.doctor import run_checks

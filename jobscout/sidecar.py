@@ -53,6 +53,11 @@ class SidecarClient:
 
     @staticmethod
     def _default_path() -> Path:
+        import os
+
+        env_bin = os.environ.get("JOBSCOUT_SIDECAR_BIN")
+        if env_bin:
+            return Path(env_bin).expanduser()
         repo = core_paths.repo_root()
         return repo / ".." / "JobPilot" / "scraper" / "dist" / "index.js"
 

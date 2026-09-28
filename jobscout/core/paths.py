@@ -3,13 +3,22 @@ location (not the CWD), so CLI verbs work from anywhere."""
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 _PACKAGE_DIR = Path(__file__).resolve().parent  # jobscout/core
 
 
 def repo_root() -> Path:
-    """Walk upward from this file to the repo root (marked by PLAN.md + pyproject.toml)."""
+    """JOBSCOUT_HOME relocates the entire runtime (data/, config/,
+    master_resume/, applications/, …) — the Tauri shell sets it to the
+    OS app-data dir for packaged builds. Unset (repo checkouts, dev):
+    walk upward from this file to the repo root."""
+    env_home = os.environ.get("JOBSCOUT_HOME")
+    if env_home:
+        return Path(env_home).expanduser().resolve()
+
+    # walk upward from this file to the repo root (marked by PLAN.md + pyproject.toml)
     for candidate in _PACKAGE_DIR.parents:
         if (candidate / "PLAN.md").is_file() and (candidate / "pyproject.toml").is_file():
             return candidate

@@ -1,0 +1,23 @@
+[package]
+name = "jobscout-desktop"
+version = "0.1.0"
+description = "jobscout — daily AI job-hunt pipeline (Tauri shell over the Python backend)"
+authors = ["jobscout"]
+edition = "2021"
+
+[lib]
+name = "jobscout_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = { version = "0.4", features = ["alloc"] }
+
+[profile.release]
+strip = true
+lto = true
