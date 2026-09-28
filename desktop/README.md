@@ -60,6 +60,47 @@ Deploying the .dmg to another Mac: no signing needed for personal use
 (right-click → Open the first time). For distribution beyond your own
 machines you'd add a Developer ID + notarization.
 
+## Copying to another Mac + building from source there
+
+The complete source is the git-tracked tree — 188 files, ~2.3 MB:
+
+| area | files | what it is |
+|---|---|---|
+| `jobscout/` | 73 | the Python application (core, sources, scoring, packets, agent, webapp, defaults) |
+| `desktop/` | 68 | the Tauri shell (Rust, config, icons, freeze entry, build script) |
+| `tests/` | 9 | pytest suite |
+| `config/` | 4 | settings.yaml, profile.yaml (hunting profile), watchlist.yaml, models.yaml |
+| `master_resume/` | 3 | the single source of truth |
+| `applications/` | 12 | generated packets |
+| `pyproject.toml`, `bootstrap.sh`, … | rest | packaging + docs |
+
+The one-command export (exactly those files, nothing generated):
+
+```sh
+git archive --format=tar.gz -o /tmp/jobscout-source.tar.gz HEAD
+```
+
+Copy `jobscout-source.tar.gz` over (AirDrop/rsync/scp), plus — only if
+you want continuity — the untracked runtime state: `data/jobscout.db`
+(your postings/signals), and `.env` (LLM key; NEVER commit it).
+
+On the other Mac (toolchain: [rustup], Node ≥ 18, Python ≥ 3.11):
+
+```sh
+tar xzf jobscout-source.tar.gz -C ~/Personal\ Project/   # or wherever
+cd jobscout
+python3 -m venv .venv && .venv/bin/pip install -e ".[web,dev]" pyinstaller
+.venv/bin/jobscout db init && .venv/bin/jobscout init-home   # if JOBSCOUT_HOME used
+cd desktop
+npm install
+npm run dev              # dev: repo backend + window
+npm run build:release    # or: jobscout.app + jobscout_*.dmg (~2 min)
+```
+
+Quickest alternative — skip all of the above: just AirDrop the built
+`desktop/src-tauri/target/release/bundle/dmg/jobscout_0.1.0_aarch64.dmg`
+(25 MB, self-contained, seeds its own runtime on first launch).
+
 ## JobPilot (optional, not bundled yet)
 
 The automated apply path needs the JobPilot sidecar. In dev it resolves
