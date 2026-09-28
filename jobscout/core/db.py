@@ -397,17 +397,33 @@ FROM postings p LEFT JOIN companies c ON p.company_id = c.id
 """
 
 
-def list_postings(
-    conn: sqlite3.Connection,
+# sorting options for list_postings (webapp inbox)
+_SORTS = {
+    "newest": "p.first_seen DESC, COALESCE(p.posted_at, '') DESC",
+    "score": "COALESCE(p.final_score, -1) DESC, p.first_seen DESC",
+    "posted": "COALESCE(p.posted_at, '') DESC",
+    "company": "c.name COLLATE NOCASE, p.first_seen DESC",
+    "title": "p.title COLLATE NOCASE",
+}
+
+
+def _posting_filters(
     *,
-    status: str | None = "new",
-    tier: str | None = None,
-    q: str | None = None,
-    min_score: float | None = None,
-    only_rule_pass: bool = True,
-    limit: int = 200,
-    offset: int = 0,
-) -> list[sqlite3.Row]:
+    status: str | None,
+    tier: str | None,
+    q: str | None,
+    min_score: float | None,
+    only_rule_pass: bool,
+    level: str | None,
+    location: str | None,
+    company: str | None,
+    source: str | None,
+    remote: str | None,
+) -> tuple[str, list]:
+    """Shared WHERE builder for list_postings and count_postings.
+
+    Returns ("WHERE ... " or "", params). Parameterised — no injection.
+    """
     where, params = [], []
     if status and status != "all":
         where.append("p.status = ?")
@@ -424,12 +440,122 @@ def list_postings(
         where.append("(p.title LIKE ? OR c.name LIKE ?)")
         like = f"%{q}%"
         params.extend([like, like])
-    sql = _POSTING_SELECT
-    if where:
-        sql += "WHERE " + " AND ".join(where) + " "
-    sql += "ORDER BY COALESCE(p.final_score, -1) DESC, p.first_seen DESC LIMIT ? OFFSET ?"
+    if level:
+        if level == "unknown":
+            where.append("COALESCE(p.seniority, '') = ''")
+        else:
+            where.append("p.seniority = ?")
+            params.append(level)
+    if location:
+        where.append("p.location LIKE ?")
+        params.append(f"%{location}%")
+    if company:
+        where.append("p.company_id = ?")
+        params.append(company)
+    if source:
+        if source == "careers":
+            where.append("p.source NOT LIKE 'ats:%'")
+        else:
+            where.append("p.source LIKE ?")
+            params.append(f"ats:{source}%")
+    if remote == "1":
+        where.append("p.remote = 1")
+    elif remote == "0":
+        where.append("COALESCE(p.remote, 0) = 0")
+    clause = ("WHERE " + " AND ".join(where) + " ") if where else ""
+    return clause, params
+
+
+def list_postings(
+    conn: sqlite3.Connection,
+    *,
+    status: str | None = "new",
+    tier: str | None = None,
+    q: str | None = None,
+    min_score: float | None = None,
+    only_rule_pass: bool = True,
+    level: str | None = None,
+    location: str | None = None,
+    company: str | None = None,
+    source: str | None = None,
+    remote: str | None = None,
+    sort: str = "score",
+    limit: int = 50,
+    offset: int = 0,
+) -> list[sqlite3.Row]:
+    """Filtered posting list. `source` takes an ATS name (greenhouse, lever,
+    ashby, smartrecruiters) or 'careers' for crawled postings; sort is one of
+    _SORTS; level 'unknown' selects rows without a seniority guess."""
+    clause, params = _posting_filters(
+        status=status, tier=tier, q=q, min_score=min_score,
+        only_rule_pass=only_rule_pass, level=level, location=location,
+        company=company, source=source, remote=remote,
+    )
+    order = _SORTS.get(sort, _SORTS["score"])
+    sql = _POSTING_SELECT + clause
+    sql += f"ORDER BY {order} LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     return conn.execute(sql, params).fetchall()
+
+
+def count_postings(
+    conn: sqlite3.Connection,
+    *,
+    status: str | None = "new",
+    tier: str | None = None,
+    q: str | None = None,
+    min_score: float | None = None,
+    only_rule_pass: bool = True,
+    level: str | None = None,
+    location: str | None = None,
+    company: str | None = None,
+    source: str | None = None,
+    remote: str | None = None,
+    sort: str = "score",
+) -> int:
+    """Count of postings matching the same filters as list_postings.
+
+    `sort` is accepted so the same kwargs dict can drive both calls; the
+    ordering is irrelevant for a count.
+    """
+    clause, params = _posting_filters(
+        status=status, tier=tier, q=q, min_score=min_score,
+        only_rule_pass=only_rule_pass, level=level, location=location,
+        company=company, source=source, remote=remote,
+    )
+    sql = ("SELECT COUNT(*) FROM postings p JOIN companies c ON c.id = p.company_id "
+           + clause)
+    return conn.execute(sql, params).fetchone()[0]
+
+
+def filter_options(conn: sqlite3.Connection) -> dict:
+    """Distinct filter values with counts, for the inbox filter panel."""
+    levels = conn.execute(
+        "SELECT COALESCE(NULLIF(p.seniority, ''), 'unknown') AS lvl, COUNT(*) AS n "
+        "FROM postings p WHERE p.rule_pass = 1 GROUP BY lvl ORDER BY n DESC"
+    ).fetchall()
+    companies = conn.execute(
+        "SELECT c.id, c.name, c.tier, COUNT(p.id) AS n "
+        "FROM companies c JOIN postings p ON p.company_id = c.id "
+        "WHERE p.rule_pass = 1 "
+        "GROUP BY c.id ORDER BY c.name COLLATE NOCASE"
+    ).fetchall()
+    sources = conn.execute(
+        "SELECT CASE WHEN source LIKE 'ats:%' THEN substr(source, 5, "
+        "instr(substr(source, 5) || ':', ':') - 1) ELSE 'careers' END AS src, "
+        "COUNT(*) AS n FROM postings p WHERE p.rule_pass = 1 "
+        "GROUP BY src ORDER BY n DESC"
+    ).fetchall()
+    statuses = conn.execute(
+        "SELECT status, COUNT(*) AS n FROM postings WHERE rule_pass = 1 "
+        "GROUP BY status ORDER BY n DESC"
+    ).fetchall()
+    return {
+        "levels": [(r["lvl"], r["lvl"], r["n"]) for r in levels],
+        "companies": [(r["id"], r["name"], r["n"]) for r in companies],
+        "sources": [(r["src"], r["src"], r["n"]) for r in sources],
+        "statuses": [(r["status"], r["status"], r["n"]) for r in statuses],
+    }
 
 
 def get_posting(conn: sqlite3.Connection, posting_id: str) -> sqlite3.Row | None:

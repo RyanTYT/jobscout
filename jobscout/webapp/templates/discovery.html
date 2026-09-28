@@ -1,61 +1,145 @@
 {% extends "base.html" %}
-{% block content %}
-<h1>discovery</h1>
+{% import "components/macros.html" as m %}
 
-<h2>mode switch</h2>
-<form method="post" action="/discovery/mode" class="filters">
-  <label>discovery mode
-    <select name="mode" onchange="this.form.submit()">
-      {% for m, desc in [
-        ("off", "nothing runs automatically"),
-        ("pipeline", "deterministic sources + cheap LLM scoring only (~$1/mo)"),
-        ("agent", "morning agent rides on top of the always-running pipeline"),
-        ("hybrid", "agent N days/week + on-demand runs on signal spikes"),
-      ] %}
-      <option value="{{ m }}" {% if settings.discovery.mode == m %}selected{% endif %}>{{ m }} — {{ desc }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <noscript><button type="submit">set mode</button></noscript>
-</form>
-<p class="dim">
-  schedule: {{ settings.discovery.agent.schedule }} ·
-  step cap: {{ settings.discovery.agent.max_steps }} ·
-  cost cap: ${{ "%.2f" | format(settings.discovery.agent.max_cost_usd) }}/day ·
-  run on signal: {{ "on" if settings.discovery.agent.run_on_signal else "off" }}
-  (launchd: com.jobscout.agent 07:00 — installed via bootstrap --with-agent)
+{% block title %}discovery · jobscout{% endblock %}
+{% block topbar_title %}Discovery{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+  <div class="page-head__title">
+    <h1>Discovery &amp; agent</h1>
+    <span class="page-head__sub">
+      how much autonomy the pipeline gets — deterministic sources always run in
+      <em>pipeline</em>, <em>agent</em> and <em>hybrid</em> modes
+    </span>
+  </div>
+  <div class="page-head__actions">
+    <form method="post" action="/discovery/run" data-busy-submit>
+      <button class="btn btn--primary" type="submit">
+        <span class="spinner spinner--light" style="display: none" data-run-spinner></span>
+        {{ m.icon("bolt", 14) }} Run agent now
+      </button>
+    </form>
+  </div>
+</div>
+
+<p class="dim" style="font-size: var(--fs-xs)">
+  runs the deterministic sweep + agent harness (if key present) as a subprocess,
+  bounded by the caps below — the button stays busy while it runs (up to 15 min)
 </p>
 
-<div class="actions-page">
-  <form method="post" action="/discovery/run">
-    <button type="submit">Run agent now</button>
-  </form>
-  <span class="dim">runs the deterministic sweep + agent harness (if key present) as a subprocess, bounded by caps</span>
+{# ── mode switch: segmented control ───────────────────────────────────── #}
+<div class="card">
+  <header class="card__header">
+    <h2 class="card__title">Mode</h2>
+    <span class="dim" style="font-size: var(--fs-xs)">persists to settings.yaml</span>
+  </header>
+  <div class="card__body">
+    <form method="post" action="/discovery/mode" id="mode-form">
+      <input type="hidden" name="mode" value="{{ settings.discovery.mode }}"
+             id="mode-value">
+      <div class="segmented" role="radiogroup" aria-label="Discovery mode">
+        {% for mkey, mdesc in [
+          ("off", "nothing runs automatically"),
+          ("pipeline", "deterministic + cheap LLM (~$1/mo)"),
+          ("agent", "morning agent on top"),
+          ("hybrid", "agent N days + on spikes"),
+        ] %}
+        <button type="button" class="segmented__item{% if settings.discovery.mode == mkey %} segmented__item--active{% endif %}"
+                data-mode="{{ mkey }}" title="{{ mdesc }}">
+          {{ mkey }}
+        </button>
+        {% endfor %}
+        <button type="submit" class="segmented__item" style="display: none"
+                id="mode-submit">save</button>
+      </div>
+      <noscript>
+        <select class="select" name="mode" onchange="this.form.submit()">
+          {% for mkey, mdesc in [
+            ("off", "nothing runs automatically"),
+            ("pipeline", "deterministic + cheap LLM only (~$1/mo)"),
+            ("agent", "morning agent rides on top"),
+            ("hybrid", "agent N days/week + on-demand"),
+          ] %}
+          <option value="{{ mkey }}" {% if settings.discovery.mode == mkey %}selected{% endif %}>{{ mkey }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn--secondary btn--sm" type="submit">set mode</button>
+      </noscript>
+    </form>
+
+    <div class="kv" style="margin-top: var(--sp-5)">
+      <span class="kv__key">schedule</span>
+      <span class="kv__value">{{ settings.discovery.agent.schedule }}</span>
+      <span class="kv__key">step cap</span>
+      <span class="kv__value">{{ settings.discovery.agent.max_steps }} steps</span>
+      <span class="kv__key">cost cap</span>
+      <span class="kv__value">${{ "%.2f" | format(settings.discovery.agent.max_cost_usd) }}/day</span>
+      <span class="kv__key">on signal</span>
+      <span class="kv__value">{{ "on" if settings.discovery.agent.run_on_signal else "off" }}</span>
+      <span class="kv__key">launchd</span>
+      <span class="kv__value">com.jobscout.agent 07:00 (bootstrap --with-agent)</span>
+    </div>
+  </div>
+</div>
+
+{# ── agent spend ──────────────────────────────────────────────────────── #}
+<div class="stats card">
+  {{ m.stat("agent calls (30d)", agent_spend["calls"] | string) }}
+  {{ m.stat("tokens", "{:,}".format(agent_spend["tokens"])) }}
+  {{ m.stat("spend", "$%.4f" | format(agent_spend["cost"]),
+            hint="metered in llm_calls · capped per tier in models.yaml") }}
 </div>
 
 {% if run_output %}
-<h2>last run output</h2>
-<pre class="desc">{{ run_output }}</pre>
+<div class="card">
+  <header class="card__header"><h2 class="card__title">Last run output</h2></header>
+  <div class="card__body"><pre>{{ run_output }}</pre></div>
+</div>
 {% endif %}
 
-<h2>agent spend (30 days)</h2>
-<p class="dim">
-  {{ agent_spend["calls"] }} calls · {{ "{:,}".format(agent_spend["tokens"]) }} tokens · ${{ "%.4f" | format(agent_spend["cost"]) }}
-  — metered in llm_calls, capped per tier in config/models.yaml
-</p>
+{# ── morning reports ──────────────────────────────────────────────────── #}
+<div class="card">
+  <header class="card__header">
+    <h2 class="card__title">Morning reports</h2>
+    {% if reports %}<span class="dim" style="font-size: var(--fs-xs)">{{ reports | length }} archived</span>{% endif %}
+  </header>
+  {% if latest_report %}
+  <div class="card__body">
+    <div class="row" style="margin-bottom: var(--sp-4)">
+      {% for r in reports %}
+      <span class="badge badge--neutral">{{ r[:10] }}</span>
+      {% endfor %}
+    </div>
+    <pre>{{ latest_report.content }}</pre>
+  </div>
+  {% else %}
+  <div class="card__body">
+    {{ m.empty("No morning reports yet",
+               "Run `jobscout agent --morning` from a terminal, or press Run agent now.",
+               "doc") }}
+  </div>
+  {% endif %}
+</div>
 
-<h2>morning reports</h2>
-{% if reports %}
-<ul>
-  {% for r in reports %}
-  <li class="dim">{{ r }}</li>
-  {% endfor %}
-</ul>
-{% if latest_report %}
-<h2>{{ latest_report.name }}</h2>
-<pre class="desc">{{ latest_report.content }}</pre>
-{% endif %}
-{% else %}
-<p class="dim">no morning reports yet — run `jobscout agent --morning` (or press Run agent now)</p>
-{% endif %}
+<script>
+  // segmented mode switch → hidden input + submit (no-JS fallback above)
+  (function () {
+    var form = document.getElementById("mode-form");
+    var hidden = document.getElementById("mode-value");
+    form.querySelectorAll("[data-mode]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        form.querySelectorAll("[data-mode]").forEach(function (b) {
+          b.classList.remove("segmented__item--active");
+        });
+        btn.classList.add("segmented__item--active");
+        hidden.value = btn.getAttribute("data-mode");
+        // submit immediately via the hidden real submit button
+        document.getElementById("mode-submit").click();
+      });
+    });
+  })();
+</script>
+
 {% endblock %}

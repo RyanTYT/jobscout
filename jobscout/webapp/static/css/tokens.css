@@ -1,0 +1,253 @@
+/* ============================================================================
+   tokens.css — THE single source of truth for every design decision.
+   All other stylesheets reference these variables exclusively; no raw
+   colors, sizes, shadows, or durations may appear anywhere else.
+   Change the design here — the whole app re-skins.
+   ========================================================================== */
+
+:root {
+  /* ── raw palette ────────────────────────────────────────────────────── */
+  /* neutral ramp (slate) */
+  --c-slate-50:  #f8fafc;
+  --c-slate-100: #f1f5f9;
+  --c-slate-150: #e9eef5;
+  --c-slate-200: #e2e8f0;
+  --c-slate-300: #cbd5e1;
+  --c-slate-400: #94a3b8;
+  --c-slate-500: #64748b;
+  --c-slate-600: #475569;
+  --c-slate-700: #334155;
+  --c-slate-800: #1e293b;
+  --c-slate-850: #172033;
+  --c-slate-900: #0f172a;
+  --c-slate-950: #0a1220;
+
+  /* accent ramp (indigo) */
+  --c-indigo-50:  #eef2ff;
+  --c-indigo-100: #e0e7ff;
+  --c-indigo-200: #c7d2fe;
+  --c-indigo-300: #a5b4fc;
+  --c-indigo-400: #818cf8;
+  --c-indigo-500: #6366f1;
+  --c-indigo-600: #4f46e5;
+  --c-indigo-700: #4338ca;
+
+  /* feedback ramps */
+  --c-green-50:  #f0fdf4;
+  --c-green-100: #dcfce7;
+  --c-green-500: #22c55e;
+  --c-green-600: #16a34a;
+  --c-green-700: #15803d;
+
+  --c-amber-50:  #fffbeb;
+  --c-amber-100: #fef3c7;
+  --c-amber-500: #f59e0b;
+  --c-amber-700: #b45309;
+
+  --c-red-50:    #fef2f2;
+  --c-red-100:   #fee2e2;
+  --c-red-500:   #ef4444;
+  --c-red-600:   #dc2626;
+  --c-red-700:   #b91c1c;
+
+  --c-blue-50:   #eff6ff;
+  --c-blue-100:  #dbeafe;
+  --c-blue-500:  #3b82f6;
+  --c-blue-600:  #2563eb;
+  --c-blue-700:  #1d4ed8;
+
+  --c-violet-50: #f5f3ff;
+  --c-violet-100:#ede9fe;
+  --c-violet-500:#8b5cf6;
+  --c-violet-600:#7c3aed;
+
+  /* ── semantic: surfaces & text ──────────────────────────────────────── */
+  --bg-app:        var(--c-slate-100);   /* page background          */
+  --bg-raised:     var(--c-slate-50);    /* cards, panels            */
+  --bg-sunken:     var(--c-slate-150);   /* wells, table headers     */
+  --bg-inset:      var(--c-slate-200);   /* hover fill on rows       */
+  --bg-overlay:    rgba(10, 18, 32, calc(var(--dim-overlay) * 1%));
+
+  --bg-nav:        var(--c-slate-900);   /* sidebar                  */
+  --bg-nav-hover:  var(--c-slate-800);
+  --bg-nav-active: var(--c-slate-850);
+
+  --text-1:        var(--c-slate-900);   /* primary                  */
+  --text-2:        var(--c-slate-600);   /* secondary                */
+  --text-3:        var(--c-slate-400);   /* muted / meta             */
+  --text-inverse:  var(--c-slate-50);
+  --text-nav:      var(--c-slate-300);
+  --text-nav-dim:  var(--c-slate-500);
+
+  --border:        var(--c-slate-200);
+  --border-strong: var(--c-slate-300);
+  --border-nav:    var(--c-slate-800);
+  --w-border:      1px;
+
+  /* ── semantic: accent & feedback ────────────────────────────────────── */
+  --accent:        var(--c-indigo-600);
+  --accent-hover:  var(--c-indigo-700);
+  --accent-soft:   var(--c-indigo-50);
+  --accent-border: var(--c-indigo-200);
+  --on-accent:     #ffffff;
+
+  --success:       var(--c-green-600);
+  --success-soft:  var(--c-green-50);
+  --success-text:  var(--c-green-700);
+
+  --warning:       var(--c-amber-500);
+  --warning-soft:  var(--c-amber-50);
+  --warning-text:  var(--c-amber-700);
+
+  --danger:        var(--c-red-600);
+  --danger-hover:  var(--c-red-700);
+  --danger-soft:   var(--c-red-50);
+  --danger-text:   var(--c-red-700);
+
+  --info:          var(--c-blue-600);
+  --info-soft:     var(--c-blue-50);
+  --info-text:     var(--c-blue-700);
+
+  --neutral-soft:  var(--c-slate-150);
+  --neutral-text:  var(--c-slate-600);
+
+  --special:       var(--c-violet-500);  /* interested / dark-pool   */
+  --special-soft:  var(--c-violet-50);
+
+  /* ── spacing scale (px) ─────────────────────────────────────────────── */
+  --sp-0:  0px;
+  --sp-1:  2px;
+  --sp-2:  4px;
+  --sp-3:  8px;
+  --sp-4:  12px;
+  --sp-5:  16px;
+  --sp-6:  20px;
+  --sp-7:  24px;
+  --sp-8:  32px;
+  --sp-9:  48px;
+  --sp-10: 64px;
+
+  /* ── typography ─────────────────────────────────────────────────────── */
+  --font-sans: "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont,
+               "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas,
+               monospace;
+
+  --fs-2xs: 10px;
+  --fs-xs:  11px;
+  --fs-sm:  12px;
+  --fs-md:  13px;
+  --fs-lg:  15px;
+  --fs-xl:  18px;
+  --fs-2xl: 24px;
+
+  --lh-tight:   1.25;
+  --lh-normal:  1.5;
+  --lh-relaxed: 1.65;
+
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  --tracking-caps: 0.08em;   /* small-caps labels */
+
+  /* ── radii ──────────────────────────────────────────────────────────── */
+  --r-sm:   4px;
+  --r-md:   8px;
+  --r-lg:   12px;
+  --r-round: 999px;
+
+  /* ── shadows ────────────────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.14);
+
+  /* ── motion ─────────────────────────────────────────────────────────── */
+  --tr-fast: 120ms;
+  --tr-base: 200ms;
+  --tr-slow: 400ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --spin-duration: 0.8s;
+  --pulse-duration: 1.6s;
+  --flash-duration: 1s;
+
+  /* ── layout dimensions ──────────────────────────────────────────────── */
+  --bp-narrow:      900px;   /* below: sidebar collapses to top bar      */
+  --bp-wide:        1100px;  /* above: two-column page grids            */
+  --nav-w:          236px;
+  --topbar-h:       60px;
+  --content-max:    1280px;
+  --content-pad:    var(--sp-8);
+  --row-h:          52px;
+
+  /* ── z-index scale ──────────────────────────────────────────────────── */
+  --z-base:   1;
+  --z-sticky: 10;
+  --z-nav:    100;
+  --z-toast:  1000;
+
+  /* ── misc ───────────────────────────────────────────────────────────── */
+  --dim-overlay: 40;              /* % darkness for modal scrims          */
+  --focus-ring: 0 0 0 3px var(--c-indigo-100);
+  --skeleton-base: var(--c-slate-200);
+  --skeleton-shine: var(--c-slate-50);
+}
+
+/* ── dark theme: only semantic tokens are redefined; components follow ── */
+[data-theme="dark"] {
+  --bg-app:        var(--c-slate-950);
+  --bg-raised:     var(--c-slate-900);
+  --bg-sunken:     var(--c-slate-850);
+  --bg-inset:      var(--c-slate-850);
+  --bg-nav:        var(--c-slate-900);
+  --bg-nav-hover:  var(--c-slate-800);
+  --bg-nav-active: var(--c-slate-850);
+
+  --text-1:        var(--c-slate-50);
+  --text-2:        var(--c-slate-300);
+  --text-3:        var(--c-slate-500);
+  --text-nav:      var(--c-slate-300);
+  --text-nav-dim:  var(--c-slate-600);
+
+  --border:        var(--c-slate-800);
+  --border-strong: var(--c-slate-700);
+  --border-nav:    var(--c-slate-850);
+
+  --accent:        var(--c-indigo-400);
+  --accent-hover:  var(--c-indigo-300);
+  --accent-soft:   var(--c-slate-850);
+  --accent-border: var(--c-indigo-700);
+  --on-accent:     var(--c-slate-950);
+
+  --success-soft:  rgba(34, 197, 94, calc(var(--dim-success-soft) * 1%));
+  --warning-soft:  rgba(245, 158, 11, calc(var(--dim-warning-soft) * 1%));
+  --danger-soft:   rgba(239, 68, 68, calc(var(--dim-danger-soft) * 1%));
+  --info-soft:     rgba(59, 130, 246, calc(var(--dim-info-soft) * 1%));
+  --neutral-soft:  var(--c-slate-850);
+  --special-soft:  rgba(139, 92, 246, calc(var(--dim-special-soft) * 1%));
+
+  --skeleton-base: var(--c-slate-850);
+  --skeleton-shine: var(--c-slate-800);
+}
+
+/* alpha-channel helpers used by the dark theme above (kept here so all
+   numbers live in one file) */
+:root {
+  --dim-success-soft: 12;
+  --dim-warning-soft: 12;
+  --dim-danger-soft:  12;
+  --dim-info-soft:    12;
+  --dim-special-soft: 12;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --tr-fast: 0ms;
+    --tr-base: 0ms;
+    --tr-slow: 0ms;
+    --spin-duration: 0s;
+    --pulse-duration: 0s;
+    --flash-duration: 0s;
+  }
+}

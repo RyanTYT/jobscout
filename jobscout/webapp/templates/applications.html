@@ -1,34 +1,93 @@
 {% extends "base.html" %}
+{% import "components/macros.html" as m %}
+
+{% block title %}applications · jobscout{% endblock %}
+{% block topbar_title %}Applications{% endblock %}
+
 {% block content %}
-<h1>applications — packet board</h1>
-<p class="dim">packets live in applications/ · status flow: drafting → needs_input → ready → filled → applied</p>
+
+<div class="page-head">
+  <div class="page-head__title">
+    <h1>Packet board</h1>
+    <span class="page-head__sub">
+      packets live in applications/ · status flow:
+      drafting → needs_input → ready → filled → applied
+    </span>
+  </div>
+</div>
+
+{% set stages = [
+  ("packet:needs_input", "Needs input"),
+  ("packet:ready", "Ready to fill"),
+  ("filled", "Filled"),
+  ("applied", "Applied"),
+] %}
+
 {% if packets %}
-<table>
-  <thead><tr><th>packet</th><th>posting</th><th>company</th><th>status</th><th>cost</th><th>reasons</th><th>updated</th></tr></thead>
-  <tbody>
-  {% for item in packets %}
-  {% set pk = item.row %}
-  {% set m = item.manifest %}
-  <tr>
-    <td class="title"><a href="/packet/{{ pk.id }}">{{ pk.id }}</a></td>
-    <td class="dim">{{ (pk.posting_title or "") | truncate(40) }}</td>
-    <td>{{ pk.company_name or pk.company_id or "—" }}
-      {% if pk.tier %}<span class="chip tier-{{ pk.tier | lower }}">{{ pk.tier }}</span>{% endif %}
-    </td>
-    <td>
-      {% if pk.status == "ready" %}<span class="chip int">{{ pk.status }}</span>
-      {% elif pk.status == "applied" %}<span class="chip dis">{{ pk.status }}</span>
-      {% else %}<span class="chip">{{ pk.status }}</span>{% endif %}
-      {% if m.dry_run %}<span class="chip">dry-run</span>{% endif %}
-    </td>
-    <td class="num">${{ "%.4f" | format(pk.cost_usd or 0) }}</td>
-    <td class="dim">{{ ((m.reasons or []) | join("; ")) | truncate(70) }}</td>
-    <td class="dim">{{ (pk.updated_at or "")[:16] }}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p class="dim">no packets yet — mark a posting interested, then press [prepare application] on its detail page, or run `jobscout prepare --posting &lt;id&gt; --dry-run`</p>
+
+{% for stage, label in stages %}
+{% set stage_rows = packets | selectattr("row.status", "equalto", stage) | list %}
+{% if stage_rows %}
+<div class="card">
+  <header class="card__header">
+    <h2 class="card__title">{{ label }}</h2>
+    <span class="dim" style="font-size: var(--fs-xs)">{{ stage_rows | length }}</span>
+  </header>
+  <div class="table-wrap" style="border: none; box-shadow: none; border-radius: 0">
+    <table class="table">
+      <thead>
+        <tr><th>posting</th><th>company</th><th>cost</th><th>updated</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for item in stage_rows %}
+        {% set pk = item.row %}
+        {% set man = item.manifest %}
+        <tr>
+          <td class="table__cell--main">
+            <a href="/packet/{{ pk.id }}" class="truncate">
+              {{ pk.posting_title or pk.id }}
+            </a>
+            {% if man.dry_run %}{{ m.badge("dry-run", "outline") }}{% endif %}
+          </td>
+          <td class="dim-2">
+            {{ pk.company_name or pk.company_id or "—" }}
+            {% if pk.tier %}{{ m.badge(pk.tier, "outline") }}{% endif %}
+          </td>
+          <td class="table__cell--mono dim">${{ "%.4f" | format(pk.cost_usd or 0) }}</td>
+          <td class="table__cell--dim table__cell--mono">{{ (pk.updated_at or "")[:16] | replace("T", " ") }}</td>
+          <td class="table__cell--actions">
+            <a class="btn btn--secondary btn--sm" href="/packet/{{ pk.id }}">
+              open {{ m.icon("arrow-right", 11) }}
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endif %}
+{% endfor %}
+
+{% set other = packets | rejectattr("row.status", "in", ["packet:needs_input", "packet:ready", "filled", "applied"]) | list %}
+{% if other %}
+<div class="card">
+  <header class="card__header"><h2 class="card__title">Other</h2></header>
+  <div class="card__body" style="display: flex; flex-direction: column; gap: var(--sp-3)">
+    {% for item in other %}
+    {% set pk = item.row %}
+    <a href="/packet/{{ pk.id }}">{{ pk.posting_title or pk.id }} — {{ pk.status }}</a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+{{ m.empty(
+     "No packets yet",
+     "Mark a posting interested, then press “Prepare application” on its detail page — "
+     "or run `jobscout prepare --posting <id> --dry-run`.",
+     "doc") }}
+{% endif %}
+
 {% endblock %}

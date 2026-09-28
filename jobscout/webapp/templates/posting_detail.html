@@ -1,60 +1,155 @@
 {% extends "base.html" %}
-{% block content %}
-<p><a href="/">← back to inbox</a></p>
+{% import "components/macros.html" as m %}
 
-<h1>{{ p.title or "(untitled)" }}</h1>
-<p class="sub">
-  {{ p.company_name or p.company_id }}
-  {% if p.tier %}<span class="chip tier-{{ p.tier | lower }}">tier {{ p.tier }}</span>{% endif %}
-  {% if p.non_ats %}<span class="chip dark">dark-pool company (no public board)</span>{% endif %}
+{% block title %}{{ p.title or "posting" }} · jobscout{% endblock %}
+{% block topbar_title %}Posting{% endblock %}
+
+{% block content %}
+
+<a class="btn btn--ghost btn--sm" href="/">{{ m.icon("arrow-left", 12) }} back to inbox</a>
+
+<div class="page-head">
+  <div class="page-head__title">
+    <h1>{{ p.title or "(untitled)" }}</h1>
+    <span class="page-head__sub">
+      {{ p.company_name or p.company_id }}
+      {% if p.tier %} · tier {{ p.tier }}{% endif %}
+      {% if p.non_ats %} · {{ m.badge("dark-pool", "special", "no public ATS board") }}{% endif %}
+      {{ m.status(p.status) }}
+    </span>
+  </div>
+
+  <div class="page-head__actions">
+    {% if p.status == "new" %}
+    <button class="btn btn--secondary" hx-post="/posting/{{ p.id }}/status"
+            hx-vals='{"status":"interested"}' hx-swap="none">
+      {{ m.icon("check", 14) }} Mark interested
+    </button>
+    {% endif %}
+    {% if packet %}
+    <a class="btn btn--primary" href="/packet/{{ packet.id }}">
+      {{ m.icon("doc", 14) }} Open application packet
+    </a>
+    {% else %}
+    <form method="post" action="/posting/{{ p.id }}/prepare" data-busy-submit
+          style="display: contents">
+      <input type="hidden" name="dry_run" value="false">
+      <button class="btn btn--primary btn--lg" type="submit">
+        {{ m.icon("spark", 14) }} Prepare application
+      </button>
+    </form>
+    <form method="post" action="/posting/{{ p.id }}/prepare" data-busy-submit
+          style="display: contents">
+      <input type="hidden" name="dry_run" value="true">
+      <button class="btn btn--secondary" type="submit" data-confirm="Dry-run uses scripted fake models — continue?">
+        dry-run
+      </button>
+    </form>
+    {% endif %}
+    <a class="btn btn--ghost btn--icon" href="{{ p.url }}" target="_blank"
+       rel="noopener" title="Open original posting">
+      {{ m.icon("external", 14) }}
+    </a>
+  </div>
+</div>
+
+<p class="dim" style="font-size: var(--fs-xs)">
+  dry-run uses scripted fake models — full tailoring needs the LLM key in .env
 </p>
 
 {% if p.final_score is not none %}
-<div class="scores">
-  <div class="scorebox"><span class="big {{ 'good' if p.final_score >= 75 else ('ok' if p.final_score >= 50 else 'low') }}">{{ "%.0f" | format(p.final_score) }}</span> final</div>
-  <div class="scorebox"><span class="big">{{ "%.0f" | format(p.fit_score) }}</span> fit</div>
-  <div class="scorebox"><span class="big">{{ "%.0f" | format(p.company_score) }}</span> company</div>
-  <div class="scorebox"><span class="big">{{ "%.0f" | format(p.opportunity) }}</span> opportunity</div>
+<div class="stats card">
+  {{ m.stat("final", "%.0f" | format(p.final_score),
+            hint="fit×.6 + company×.25 + opportunity×.15",
+            tone="success" if p.final_score >= 75 else "") }}
+  {{ m.stat("fit", "%.0f" | format(p.fit_score or 0)) }}
+  {{ m.stat("company", "%.0f" | format(p.company_score or 0)) }}
+  {{ m.stat("opportunity", "%.0f" | format(p.opportunity or 0)) }}
 </div>
 {% else %}
-<p class="dim">not scored yet — run `jobscout score` (needs an API key in .env)</p>
+{{ m.callout("Not scored yet — add an LLM key to .env, then run `jobscout score`. "
+             "The rule filter has already vetted this posting.", "info") }}
 {% endif %}
 
-{% if llm.rationale %}<blockquote>{{ llm.rationale }}</blockquote>{% endif %}
-{% if llm.red_flags %}
-<h2>red flags</h2>
-<ul>{% for f in llm.red_flags %}<li class="red">{{ f }}</li>{% endfor %}</ul>
-{% endif %}
-{% if llm.stack %}<p class="dim">stack: {{ llm.stack | join(", ") }}</p>{% endif %}
-{% if llm.flags %}<p class="dim">flags: {{ llm.flags | join(", ") }}</p>{% endif %}
+<div class="grid grid--sidebar">
 
-<table class="meta">
-  <tr><th>link</th><td><a href="{{ p.url }}" rel="noopener" target="_blank">{{ p.url }}</a></td></tr>
-  <tr><th>location</th><td>{{ p.location or "—" }}{% if p.remote %} · remote{% endif %}</td></tr>
-  <tr><th>level</th><td>{{ p.seniority or "—" }}{% if llm.seniority %} · LLM read: {{ llm.seniority }}{% endif %}</td></tr>
-  <tr><th>source</th><td>{{ p.source }}</td></tr>
-  <tr><th>posted</th><td>{{ p.posted_at or "—" }}</td></tr>
-  <tr><th>first seen</th><td>{{ p.first_seen }}</td></tr>
-  <tr><th>last seen</th><td>{{ p.last_seen }}</td></tr>
-  <tr><th>status</th><td>{{ p.status }} · rule_pass {{ "yes" if p.rule_pass else "no" }}</td></tr>
-</table>
+  <div class="stack">
 
-<div class="actions-page">
-  <button class="yes" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"interested"}' hx-target="#row-{{ p.id }}">mark interested</button>
-  <button class="no" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"dismissed"}'>dismiss</button>
-  <form method="post" action="/posting/{{ p.id }}/prepare" style="display:inline">
-    <input type="hidden" name="dry_run" value="false">
-    <button class="yes" type="submit">prepare application</button>
-  </form>
-  <form method="post" action="/posting/{{ p.id }}/prepare" style="display:inline">
-    <input type="hidden" name="dry_run" value="true">
-    <button type="submit">prepare (dry-run)</button>
-  </form>
-  <span class="dim">dry-run uses scripted fake models — full tailoring needs the LLM key</span>
+    {% if llm.rationale %}
+    <div class="card"><div class="card__body">
+      <div class="caps" style="margin-bottom: var(--sp-3)">LLM rationale</div>
+      <div class="description"><p>{{ llm.rationale }}</p></div>
+      {% if llm.stack %}<p class="dim">stack: {{ llm.stack | join(", ") }}</p>{% endif %}
+      {% if llm.flags %}<p class="dim">flags: {{ llm.flags | join(", ") }}</p>{% endif %}
+    </div></div>
+    {% endif %}
+
+    {% if llm.red_flags %}
+    <div class="card">
+      <header class="card__header"><h2 class="card__title">Red flags</h2></header>
+      <div class="card__body" style="display: flex; flex-direction: column; gap: var(--sp-3)">
+        {% for f in llm.red_flags %}
+        {{ m.callout(f, "danger") }}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if p.description %}
+    <div class="card">
+      <header class="card__header"><h2 class="card__title">Description</h2>
+        <span class="dim">source: {{ (p.source or "") | replace("ats:", "") }}</span>
+      </header>
+      <div class="card__body">
+        <div class="description">
+        {% set cleaned = p.description | replace("<br>", "\n") | replace("<br/>", "\n") | replace("<br />", "\n") %}
+        {% for para in cleaned.split("\n") if para.strip() %}
+        <p>{{ para | striptags }}</p>
+        {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <div class="stack stack--sm">
+    <div class="card">
+      <header class="card__header"><h2 class="card__title">Details</h2></header>
+      <div class="card__body">
+        <div class="kv">
+          <span class="kv__key">link</span>
+          <span class="kv__value"><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.url | truncate(60) }}</a></span>
+          <span class="kv__key">location</span>
+          <span class="kv__value">{{ p.location or "—" }}{% if p.remote %} · remote{% endif %}</span>
+          <span class="kv__key">level</span>
+          <span class="kv__value">{{ p.seniority or "—" }}{% if llm.seniority %} · LLM read: {{ llm.seniority }}{% endif %}</span>
+          <span class="kv__key">source</span>
+          <span class="kv__value">{{ p.source }}</span>
+          <span class="kv__key">posted</span>
+          <span class="kv__value">{{ (p.posted_at or "—")[:10] }}</span>
+          <span class="kv__key">first seen</span>
+          <span class="kv__value">{{ (p.first_seen or "—")[:19] | replace("T", " ") }}</span>
+          <span class="kv__key">last seen</span>
+          <span class="kv__value">{{ (p.last_seen or "—")[:19] | replace("T", " ") }}</span>
+          <span class="kv__key">rule filter</span>
+          <span class="kv__value">{{ m.badge("passed", "success") if p.rule_pass else m.badge("excluded", "neutral") }}</span>
+        </div>
+      </div>
+    </div>
+
+    {% if boards %}
+    <div class="card">
+      <header class="card__header"><h2 class="card__title">ATS boards</h2></header>
+      <div class="card__body" style="display: flex; gap: var(--sp-2); flex-wrap: wrap">
+        {% for prov, tok in boards %}
+        {{ m.badge(prov, "accent", tok) }}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
 </div>
 
-{% if p.description %}
-<h2>description</h2>
-<pre class="desc">{{ p.description }}</pre>
-{% endif %}
 {% endblock %}

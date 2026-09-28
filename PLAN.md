@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Version** | 2.0 (pinned 2026-09-28) |
-| **Status** | P7 + P8 dark-pool extension live: sidecar integration verified + 5 new monitoring/discovery sources (careers page change detector, sitemap diff, GitHub org activity, Google News RSS, HN company-mention search) — 207 news + 199 sitemap + 3 GitHub + 2 HN-mention signals accumulated on first run · **ALL 8 PHASES + EXTENSIONS COMPLETE** |
+| **Status** | P7 + P8 dark-pool extension + UI overhaul complete: 5 monitoring/discovery signal sources live (207 news + 199 sitemap + 3 GitHub + 2 HN-mention signals on first run); dashboard rebuilt on the tokens.css design system (single source of every style decision, zero hardcoded values), Jinja2 component macros, sidebar nav, server-side pagination over ALL postings, full filter panel, skeleton loading, toasts, dark mode ·  · **ALL 8 PHASES + EXTENSIONS COMPLETE** |
 | **Repo** | `/Users/user/Downloads/Personal Project/jobscout` (local only, no remote yet) |
 | **Sibling repos** | `../JobPilot` (the "hands", see §6) · `../rusty_trader` (unrelated) |
 | **Dev Mac rule** | This Mac develops only. **Never run `bootstrap.sh` here** — it installs launchd and belongs on the target/deployment Mac. |
@@ -583,6 +583,43 @@ Five new signal sources, all deterministic, all free, all feeding the existing
 First live run: 207 news signals, 199 sitemap job URLs, 3 GitHub pushes,
 2 HN mentions, 9 careers pages baselined. Digest gained a `## Monitoring`
 section. 51/51 tests.
+
+### P8 extension II — Dashboard UI overhaul (2026-09-28)
+
+Full frontend rebuild on three architectural rules:
+
+1. **Design tokens only.** `static/css/tokens.css` defines every value
+   (color ramps, semantic aliases, spacing scale, typography, radii,
+   shadows, motion, breakpoints, layout, z-index). `base.css` +
+   `components.css` reference exclusively `var(--…)`. Dark theme is one
+   `[data-theme=dark]` block re-mapping the semantic tokens. No hex/px
+   anywhere else.
+2. **Components, not pages.** `templates/components/macros.html` is the
+   component library (badge, button, card, stat, table, filter, select,
+   pagination, signal item, callout, empty state, icons). Pages compose;
+   they don't duplicate markup. (Stack stays deliberately no-build:
+   Jinja2 macros play the role of React components — a JS build step
+   would break the portable bootstrap mandate.)
+3. **Thin routes.** `webapp/ui.py` owns the view-model: InboxFilters
+   parsing/validation, Pagination window math, nav counts, filter option
+   lists. Routes parse → query → render, nothing else.
+
+User-visible: sidebar nav with live counts, full filter panel (status,
+company, level, location search, source, tier, sort, per-page, remote
+only, min score), server-side pagination so ALL postings are reachable
+(previously silently capped at 200), HTMX partial swaps with skeleton
+loading, server-driven toasts (X-Toast headers), dark mode toggle,
+segmented mode switch on Discovery, clear CTAs (Prepare application /
+Run agent now / Open packet), packet board grouped by stage.
+
+Fixed a latent P2 bug found by tests: the HTMX header check used set
+membership ("hx-" in {header names}) which never matched — row-status
+POSTs had always fallen through to full-page redirects instead of
+swapping the row. Now prefix-matched; row swap + toast verified live.
+
+DB additions (no migration): `_posting_filters()` shared WHERE builder,
+`count_postings()`, `filter_options()`; `list_postings()` gained
+level/location/company/source/remote/sort params. 74/74 tests.
 
 ### P8 — Polish + agent-generated plugins
 - [ ] Agent-generated ScraperPlugins for new watchlist companies (JobPilot plugin interface)

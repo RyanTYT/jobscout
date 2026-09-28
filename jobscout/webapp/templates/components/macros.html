@@ -1,0 +1,225 @@
+{# ============================================================================
+   macros.html — the component library. Every page composes from these;
+   no page template may duplicate this markup. Server-rendered components
+   (the stack is deliberately no-build: Jinja2 macros play the role of
+   component functions).
+   ============================================================================ #}
+
+{# ── icons: single source of 16px stroke icons ─────────────────────────── #}
+{% macro icon(name, size=16) -%}
+<svg class="icon icon--{{ name }}" width="{{ size }}" height="{{ size }}"
+     viewBox="0 0 16 16" fill="none" stroke="currentColor"
+     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+     aria-hidden="true">
+  {%- if name == "inbox" -%}
+    <path d="M2 8.5 3 3h10l1 5.5M2 8.5V13h12V8.5M2 8.5h3.5L6 10h4l.5-1.5H14"/>
+  {%- elif name == "building" -%}
+    <path d="M3 2h7v12H3zM6 4.5h1.5M6 7h1.5M6 9.5h1.5M10 6h3v8h-3M11.5 8h.01M11.5 10h.01"/>
+  {%- elif name == "radar" -%}
+    <circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3"/>
+    <path d="M8 8 12.5 4.5"/><circle cx="8" cy="8" r=".5" fill="currentColor"/>
+  {%- elif name == "doc" -%}
+    <path d="M4 1.5h5l3 3V14.5H4zM9 1.5v3h3M6 8h4M6 10.5h4"/>
+  {%- elif name == "pulse" -%}
+    <path d="M1.5 8h3l1.5-4 3 8 1.5-4h4"/>
+  {%- elif name == "bolt" -%}
+    <path d="M9 1.5 3.5 9H7l-1 5.5L12.5 7H8.5z"/>
+  {%- elif name == "news" -%}
+    <path d="M2 3h9v10H2zM11 5.5h2.5V13H11M4.5 5.5h4M4.5 8h4M4.5 10h2.5"/>
+  {%- elif name == "github" -%}
+    <path d="M8 1.5a6 6 0 0 0-1.9 11.7c.3.1.4-.1.4-.3v-1c-1.7.4-2.1-.8-2.1-.8-.3-.7-.7-.9-.7-.9-.6-.4 0-.4 0-.4.6 0 1 .6 1 .6.6 1 1.6.7 2 .5.1-.4.4-.7.6-.9-1.6-.2-3.2-.8-3.2-3.5 0-.8.3-1.4.7-1.9-.1-.2-.3-1 .1-1.9 0 0 .6-.2 2 .7a5 5 0 0 1 2.6 0c1.4-.9 2-.7 2-.7.4.9.2 1.7.1 1.9.4.5.7 1.1.7 1.9 0 2.7-1.6 3.3-3.2 3.5.3.2.5.7.5 1.4v1.9c0 .2.1.4.4.3A6 6 0 0 0 8 1.5z"/>
+  {%- elif name == "sitemap" -%}
+    <rect x="6" y="1.5" width="4" height="3" rx=".5"/><rect x="1.5" y="11.5" width="4" height="3" rx=".5"/>
+    <rect x="10.5" y="11.5" width="4" height="3" rx=".5"/><path d="M8 4.5v3M3.5 11.5v-2h9v2"/>
+  {%- elif name == "sun" -%}
+    <circle cx="8" cy="8" r="3"/><path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3 3l1 1M12 12l1 1M13 3l-1 1M4 12l-1 1"/>
+  {%- elif name == "moon" -%}
+    <path d="M13.5 9.5A6 6 0 0 1 6.5 2.5a6 6 0 1 0 7 7z"/>
+  {%- elif name == "search" -%}
+    <circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>
+  {%- elif name == "check" -%}
+    <path d="M3 8.5 6.5 12 13 4"/>
+  {%- elif name == "x" -%}
+    <path d="M4 4l8 8M12 4l-8 8"/>
+  {%- elif name == "arrow-right" -%}
+    <path d="M3 8h10M9 4l4 4-4 4"/>
+  {%- elif name == "arrow-left" -%}
+    <path d="M13 8H3M7 4 3 8l4 4"/>
+  {%- elif name == "external" -%}
+    <path d="M9 2h5v5M14 2 7.5 8.5M12 9.5v4h-9v-9h4"/>
+  {%- elif name == "spark" -%}
+    <path d="M8 1.5 9.3 6l4.7 1.3-4.7 1.4L8 14l-1.3-5.3L2 7.3 6.7 6z"/>
+  {%- else -%}
+    <circle cx="8" cy="8" r="5"/>
+  {%- endif -%}
+</svg>
+{%- endmacro %}
+
+{# ── badge / status / score ──────────────────────────────────────────────── #}
+{% macro badge(text, tone="neutral", title="") -%}
+<span class="badge badge--{{ tone }}" {% if title %}title="{{ title }}"{% endif %}>{{ text }}</span>
+{%- endmacro %}
+
+{% macro status(value) -%}
+{%- set tone_map = {
+  "new": "info", "interested": "special", "dismissed": "neutral",
+  "applied": "success", "withdrawn": "neutral",
+  "packet:drafting": "warning", "packet:needs_input": "warning",
+  "packet:ready": "success", "filled": "success",
+} -%}
+{%- set label_map = {
+  "packet:needs_input": "needs input", "packet:ready": "ready",
+  "packet:drafting": "drafting",
+} -%}
+{%- set cls = (value or "neutral").split(":")[0] -%}
+<span class="status status--{{ cls }}">
+  {{ badge(label_map.get(value, value or "—"), tone_map.get(value, "neutral")) }}
+</span>
+{%- endmacro %}
+
+{% macro score(value) -%}
+{%- if value is none -%}
+<span class="score score--none" title="LLM scoring not run yet">—</span>
+{%- elif value >= 75 -%}
+<span class="score score--high">{{ "%.0f" | format(value) }}</span>
+{%- elif value >= 55 -%}
+<span class="score score--mid">{{ "%.0f" | format(value) }}</span>
+{%- else -%}
+<span class="score score--low">{{ "%.0f" | format(value) }}</span>
+{%- endif -%}
+{%- endmacro %}
+
+{# ── buttons ─────────────────────────────────────────────────────────────── #}
+{% macro button(label, variant="secondary", size="", icon_name=None,
+                attrs={}) -%}
+<button class="btn btn--{{ variant }}{{ ' btn--' + size if size }}"
+        {%- for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
+  {%- if icon_name %}{{ icon(icon_name) }}{% endif -%}
+  <span>{{ label }}</span>
+</button>
+{%- endmacro %}
+
+{# ── cards ───────────────────────────────────────────────────────────────── #}
+{% macro card(title=None, actions="") -%}
+<section class="card">
+  {%- if title %}
+  <header class="card__header">
+    <h2 class="card__title">{{ title }}</h2>
+    <div class="card__actions">{{ actions }}</div>
+  </header>
+  {%- endif %}
+  <div class="card__body card__body--flush">
+    {{ caller() }}
+  </div>
+</section>
+{%- endmacro %}
+
+{% macro stat(label, value, hint="", tone="") -%}
+<div class="stat">
+  <span class="stat__label">{{ label }}</span>
+  <span class="stat__value{{ ' stat__value--' + tone if tone }}">{{ value }}</span>
+  {%- if hint %}<span class="stat__hint">{{ hint }}</span>{% endif %}
+</div>
+{%- endmacro %}
+
+{# ── empty state ─────────────────────────────────────────────────────────── #}
+{% macro empty(title, hint="", icon_name="search") -%}
+<div class="empty">
+  <span class="dim">{{ icon(icon_name, 24) }}</span>
+  <span class="empty__title">{{ title }}</span>
+  {%- if hint %}<span class="empty__hint">{{ hint }}</span>{% endif %}
+</div>
+{%- endmacro %}
+
+{# ── field controls (filters) ────────────────────────────────────────────── #}
+{% macro field(label, name, control) -%}
+<label class="field">
+  <span class="field__label">{{ label }}</span>
+  {{ control }}
+</label>
+{%- endmacro %}
+
+{% macro select(name, value, options, placeholder=None, attrs={}) -%}
+<select class="select" name="{{ name }}" id="f-{{ name }}"
+        {%- for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
+  {%- if placeholder is not none %}
+  <option value="" {% if not value %}selected{% endif %}>{{ placeholder }}</option>
+  {%- endif -%}
+  {%- for val, label, count in options %}
+  <option value="{{ val }}" {% if value|string == val|string %}selected{% endif %}>
+    {{- label }}{% if count is not none %} ({{ count }}){% endif -%}
+  </option>
+  {%- endfor %}
+</select>
+{%- endmacro %}
+
+{% macro text_input(name, value="", placeholder="", attrs={}) -%}
+<input class="input" type="text" name="{{ name }}" value="{{ value }}"
+       placeholder="{{ placeholder }}"
+       {%- for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
+{%- endmacro %}
+
+{# ── pagination ──────────────────────────────────────────────────────────── #}
+{% macro pagination(pg, filters) -%}
+{% if pg.pages > 1 %}
+<nav class="pagination" aria-label="Results pages">
+  <span class="pagination__info">
+    {{ pg.start }}–{{ pg.end }} of {{ pg.total }} postings
+  </span>
+  {# page links use plain hrefs (works without JS) + hx enhancement #}
+  {% if pg.page > 1 %}
+  <a class="pagination__page" href="/?{{ pg.qs_page(pg.page - 1) }}"
+     hx-get="/?{{ pg.qs_page(pg.page - 1) }}" hx-target="#results"
+     hx-swap="outerHTML" hx-push-url="true" aria-label="Previous page">
+    {{ icon("arrow-left", 12) }}</a>
+  {% endif %}
+  {% for p in pg.window %}
+    {% if p is none %}
+    <span class="pagination__page pagination__page--gap">…</span>
+    {% elif p == pg.page %}
+    <span class="pagination__page pagination__page--active" aria-current="page">{{ p }}</span>
+    {% else %}
+    <a class="pagination__page" href="/?{{ pg.qs_page(p) }}"
+       hx-get="/?{{ pg.qs_page(p) }}" hx-target="#results"
+       hx-swap="outerHTML" hx-push-url="true">{{ p }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if pg.page < pg.pages %}
+  <a class="pagination__page" href="/?{{ pg.qs_page(pg.page + 1) }}"
+     hx-get="/?{{ pg.qs_page(pg.page + 1) }}" hx-target="#results"
+     hx-swap="outerHTML" hx-push-url="true" aria-label="Next page">
+    {{ icon("arrow-right", 12) }}</a>
+  {% endif %}
+</nav>
+{% elif pg.total > 0 %}
+<span class="pagination__info pagination">{{ pg.total }} postings</span>
+{% endif %}
+{%- endmacro %}
+
+{# ── signal feed item ────────────────────────────────────────────────────── #}
+{% macro signal(s) -%}
+{%- set icon_map = {
+  "news": "news", "github_activity": "github", "funding": "bolt",
+  "hn": "radar", "hn_mention": "radar",
+  "careers_page_changed": "sitemap", "sitemap_new_url": "sitemap",
+  "ats_found": "building",
+} -%}
+<div class="signal">
+  <span class="signal__icon signal__icon--{{ icon_map.get(s.kind, 'radar') }}">
+    {{ icon(icon_map.get(s.kind, "radar"), 14) }}
+  </span>
+  <div class="signal__body">
+    <span class="signal__note">{{ s.note or s.key }}</span>
+    <span class="signal__meta">
+      <span>{{ s.company_name or s.company_id or "—" }}</span>
+      {%- if s.created_at %}<span>{{ s.created_at[:16] | replace("T", " ") }}</span>{% endif -%}
+      <span>{{ badge(s.kind | replace("_", " "), "outline") }}</span>
+    </span>
+  </div>
+</div>
+{%- endmacro %}
+
+{# ── callout ─────────────────────────────────────────────────────────────── #}
+{% macro callout(text, tone="info") -%}
+<div class="callout callout--{{ tone }}">{{ text }}</div>
+{%- endmacro %}

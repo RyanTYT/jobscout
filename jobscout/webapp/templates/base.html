@@ -1,24 +1,62 @@
+{% import "components/macros.html" as m %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>jobscout</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/htmx.min.js"></script>
+  <title>{% block title %}jobscout{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/js/app.js" defer></script>
 </head>
 <body>
-<nav>
-  <span class="brand">jobscout</span>
-  <a href="/">inbox</a>
-  <a href="/companies">companies</a>
-  <a href="/applications">applications</a>
-  <a href="/discovery">discovery</a>
-  <a href="/ops">ops</a>
-  <span class="dim right">v{{ version }}</span>
-</nav>
-<main>
-{% block content %}{% endblock %}
-</main>
+<div class="app">
+
+  <nav class="nav" aria-label="Main navigation">
+    <a class="nav__brand" href="/">
+      <span class="nav__brand-mark">{{ m.icon("spark", 12) }}</span>
+      jobscout
+    </a>
+
+    <div class="nav__section">Pipeline</div>
+    {% for item in nav_items %}
+    <a class="nav__link{% if item.key == active %} nav__link--active{% endif %}"
+       href="{{ item.path }}"
+       {% if item.key == active %}aria-current="page"{% endif %}>
+      <span class="nav__link-icon">{{ m.icon(item.icon, 15) }}</span>
+      {{ item.label }}
+      {% if item.count %}<span class="nav__count">{{ item.count }}</span>{% endif %}
+    </a>
+    {% endfor %}
+
+    <div class="nav__footer">
+      <div>v{{ version }}</div>
+      <div style="margin-top: var(--sp-1)">daily 06:30 · agent 07:00</div>
+    </div>
+  </nav>
+
+  <div class="app__main">
+    <header class="topbar">
+      <span class="topbar__title">{% block topbar_title %}{% endblock %}</span>
+      <span class="topbar__spacer"></span>
+      <span class="topbar__progress" aria-hidden="true">
+        <span class="spinner spinner--light"></span> working…
+      </span>
+      {% block topbar_actions %}
+      <button class="btn btn--secondary btn--sm" data-theme-toggle
+              title="Toggle light / dark theme">
+        {{ m.icon("moon", 14) }}
+      </button>
+      {% endblock %}
+    </header>
+
+    <main class="content" id="main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+</div>
 </body>
 </html>

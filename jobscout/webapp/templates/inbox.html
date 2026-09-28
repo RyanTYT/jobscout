@@ -1,36 +1,79 @@
 {% extends "base.html" %}
+{% import "components/macros.html" as m %}
+
+{% block title %}inbox · jobscout{% endblock %}
+{% block topbar_title %}Inbox{% endblock %}
+
 {% block content %}
-<form class="filters" method="get" action="/">
-  <label>status
-    <select name="status">
-      {% for s in ["new", "interested", "dismissed", "all"] %}
-      <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s }}</option>
-      {% endfor %}
-    </select>
+
+{# ── filter panel (outside #results — survives pagination swaps) ──────── #}
+<form class="filters" method="get" action="/"
+      id="inbox-filters" data-busy-submit>
+
+  {# htmx wiring shared by all auto-submitting controls: swap #results in
+     place and push the URL — full-page GET still works without JS #}
+  {% set hx = {
+    "hx-get": "/", "hx-target": "#results", "hx-swap": "outerHTML",
+    "hx-push-url": "true", "hx-include": "closest form",
+    "hx-trigger": "change",
+  } %}
+  {% set hx_text = {
+    "hx-get": "/", "hx-target": "#results", "hx-swap": "outerHTML",
+    "hx-push-url": "true", "hx-include": "closest form",
+    "hx-trigger": "keyup changed delay:400ms",
+  } %}
+
+  {{ m.field("Status", "status",
+    m.select("status", filters.status, status_options, attrs=hx)) }}
+
+  {{ m.field("Company", "company",
+    m.select("company", filters.company, options.companies,
+             placeholder="any", attrs=hx)) }}
+
+  {{ m.field("Level", "level",
+    m.select("level", filters.level, options.levels,
+             placeholder="any", attrs=hx)) }}
+
+  {{ m.field("Location", "location",
+    m.text_input("location", filters.location, "city or region…", attrs=hx_text)) }}
+
+  {{ m.field("Source", "source",
+    m.select("source", filters.source, options.sources,
+             placeholder="any", attrs=hx)) }}
+
+  {{ m.field("Tier", "tier",
+    m.select("tier", filters.tier, tier_options,
+             placeholder="any", attrs=hx)) }}
+
+  {{ m.field("Sort", "sort",
+    m.select("sort", filters.sort, sort_options, attrs=hx)) }}
+
+  {{ m.field("Per page", "page_size",
+    m.select("page_size", pg.page_size | string, size_options, attrs=hx)) }}
+
+  {{ m.field("Min score", "min_score",
+    m.text_input("min_score", filters.min_score, "0", attrs=hx_text)) }}
+
+  <label class="check">
+    <input type="checkbox" name="remote" value="1"
+           {% if filters.remote %}checked{% endif %} {{ hx | xmlattr }}>
+    remote only
   </label>
-  <label>tier
-    <select name="tier">
-      <option value="">any</option>
-      {% for t in ["A", "B", "C"] %}
-      <option value="{{ t }}" {% if filters.tier == t %}selected{% endif %}>{{ t }}</option>
-      {% endfor %}
-    </select>
+
+  <label class="check">
+    <input type="checkbox" name="all_postings" value="1"
+           {% if filters.all_postings %}checked{% endif %} {{ hx | xmlattr }}>
+    show rule-excluded
   </label>
-  <label>search <input name="q" value="{{ filters.q }}" placeholder="title or company"></label>
-  <label>min score <input name="min_score" value="{{ filters.min_score }}" size="3" placeholder="0"></label>
-  <label class="chk"><input type="checkbox" name="all_postings" value="1" {% if filters.all %}checked{% endif %}> include rule-excluded</label>
-  <button type="submit">filter</button>
+
+  {{ m.button("Filter", "primary", icon_name="search") }}
+
+  {% if filters.is_filtered() %}
+  <a class="btn btn--ghost" href="/">Reset</a>
+  {% endif %}
 </form>
 
-<p class="dim">{{ rows | length }} postings (top 200 by score · unscored last)</p>
+{# ── results (swapped by htmx on pagination + filter changes) ─────────── #}
+{% include "_results.html" %}
 
-<table>
-  <thead>
-    <tr><th>score</th><th>title</th><th>company</th><th>location</th><th>level</th><th>source</th><th>first seen</th><th></th></tr>
-  </thead>
-  <tbody>
-  {% for p in rows %}{% include "_row.html" %}{% endfor %}
-  </tbody>
-</table>
-{% if not rows %}<p class="dim">nothing matches these filters</p>{% endif %}
 {% endblock %}

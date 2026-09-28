@@ -1,95 +1,166 @@
 {% extends "base.html" %}
+{% import "components/macros.html" as m %}
+
+{% block title %}{{ manifest.posting_title or "packet" }} · jobscout{% endblock %}
+{% block topbar_title %}Application packet{% endblock %}
+
 {% block content %}
-<p><a href="/applications">← packet board</a></p>
 
-<h1>{{ manifest.posting_title or "packet" }}</h1>
-<p class="sub">
-  {{ manifest.company }} ·
-  <a href="{{ manifest.posting_url }}" rel="noopener" target="_blank">posting</a> ·
-  <a href="/posting/{{ pk.posting_id }}">posting detail</a>
-</p>
+<a class="btn btn--ghost btn--sm" href="/applications">
+  {{ m.icon("arrow-left", 12) }} packet board
+</a>
 
-{% if pk.status == "ready" %}<span class="chip int">ready</span>
-{% elif pk.status == "applied" %}<span class="chip dis">applied</span>
-{% else %}<span class="chip">{{ pk.status }}</span>{% endif %}
-{% if manifest.dry_run %}<span class="chip">dry-run</span>{% endif %}
-<span class="dim">model: {{ manifest.model or "—" }} · cost ${{ "%.4f" | format(pk.cost_usd or 0) }}</span>
-
-{% if manifest.reasons %}
-<h2>needs input</h2>
-<ul>
-{% for r in manifest.reasons %}
-<li class="red">{{ r }}</li>
-{% endfor %}
-</ul>
+{% if just_prepared %}
+{{ m.callout("Packet prepared — review the fill sheet and claim-check below. "
+             "Nothing is ever auto-submitted; you press submit on the employer's site.",
+             "success") }}
 {% endif %}
 
-<div class="actions-page">
-  <form method="post" action="/packet/{{ pk.id }}/status" style="display:inline">
-    <input type="hidden" name="status" value="applied">
-    <button class="yes">mark applied</button>
-  </form>
-  <form method="post" action="/packet/{{ pk.id }}/status" style="display:inline">
-    <input type="hidden" name="status" value="withdrawn">
-    <button class="no">withdraw</button>
-  </form>
-  <span class="dim">files in {{ pk.dir }}</span>
+<div class="page-head">
+  <div class="page-head__title">
+    <h1>{{ manifest.posting_title or "packet" }}</h1>
+    <span class="page-head__sub">
+      {{ manifest.company or pk.company_id }} ·
+      <a href="{{ manifest.posting_url }}" target="_blank" rel="noopener">posting</a> ·
+      <a href="/posting/{{ pk.posting_id }}">posting detail</a> ·
+      {{ m.status(pk.status) }}
+      {% if manifest.dry_run %}{{ m.badge("dry-run", "outline") }}{% endif %}
+    </span>
+  </div>
+
+  <div class="page-head__actions">
+    {% if pk.status not in ("applied", "withdrawn") %}
+    <form method="post" action="/packet/{{ pk.id }}/status" data-busy-submit
+          style="display: contents">
+      <input type="hidden" name="status" value="filled">
+      <button class="btn btn--secondary" type="submit">
+        {{ m.icon("check", 14) }} Mark filled
+      </button>
+    </form>
+    <form method="post" action="/packet/{{ pk.id }}/status" data-busy-submit
+          style="display: contents">
+      <input type="hidden" name="status" value="applied">
+      <button class="btn btn--primary" type="submit"
+              data-confirm="Mark applied? This also marks the posting applied.">
+        {{ m.icon("external", 14) }} Applied — pressed submit
+      </button>
+    </form>
+    <form method="post" action="/packet/{{ pk.id }}/status" data-busy-submit
+          style="display: contents">
+      <input type="hidden" name="status" value="withdrawn">
+      <button class="btn btn--danger" type="submit">Withdraw</button>
+    </form>
+    {% else %}
+    <span class="dim">final state — files remain in {{ pk.dir }}</span>
+    {% endif %}
+  </div>
 </div>
 
+{% if manifest.reasons %}
+<div class="card">
+  <header class="card__header">
+    <h2 class="card__title">Needs your input</h2>
+    {{ m.badge("needs input", "warning") }}
+  </header>
+  <div class="card__body" style="display: flex; flex-direction: column; gap: var(--sp-3)">
+    {% for r in manifest.reasons %}
+    {{ m.callout(r, "warning") }}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% set unsupported = claims | selectattr("status", "equalto", "unsupported") | list | length %}
+
 {% if claims %}
-<h2>claim check ({{ claims | length }} claims, {{ (claims | selectattr("status", "equalto", "unsupported") | list) | length }} unsupported)</h2>
-<table>
-  <thead><tr><th>section</th><th>kind</th><th>claim</th><th>status</th></tr></thead>
-  <tbody>
-  {% for c in claims %}
-  <tr>
-    <td class="dim">{{ c.section }}</td>
-    <td><span class="chip">{{ c.kind }}</span></td>
-    <td>{{ c.claim }}</td>
-    <td>{% if c.status == "verified" %}<span class="chip int">verified</span>
-      {% else %}<span class="chip dis">unsupported</span>{% endif %}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+<div class="card">
+  <header class="card__header">
+    <h2 class="card__title">Claim check</h2>
+    <span class="dim" style="font-size: var(--fs-xs)">
+      {{ claims | length }} claims · {{ unsupported }} unsupported
+      (deterministic gate — no LLM)
+    </span>
+  </header>
+  <div class="table-wrap" style="border: none; box-shadow: none; border-radius: 0">
+    <table class="table">
+      <thead><tr><th>section</th><th>kind</th><th>claim</th><th>status</th></tr></thead>
+      <tbody>
+        {% for c in claims %}
+        <tr>
+          <td class="table__cell--dim">{{ c.section }}</td>
+          <td>{{ m.badge(c.kind, "outline") }}</td>
+          <td class="table__cell--main">{{ c.claim }}</td>
+          <td>
+            {% if c.status == "verified" %}{{ m.badge("verified", "success") }}
+            {% else %}{{ m.badge("unsupported", "danger") }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endif %}
 
 {% if fill_sheet %}
-<h2>fill sheet ({{ (fill_sheet | selectattr("confidence", "equalto", "missing") | selectattr("required") | list) | length }} required missing)</h2>
-<table>
-  <thead><tr><th>field</th><th>value</th><th>source</th><th>confidence</th></tr></thead>
-  <tbody>
-  {% for f in fill_sheet %}
-  <tr>
-    <td>{{ f.label }}{% if f.required %} *{% endif %}</td>
-    <td>{{ f.value if f.value is not none else "—" }}</td>
-    <td class="dim">{{ f.value_source | truncate(40) }}</td>
-    <td>
-      {% if f.confidence == "missing" %}<span class="chip dis">missing</span>
-      {% elif f.confidence == "policy" %}<span class="chip">policy</span>
-      {% else %}<span class="chip int">{{ f.confidence }}</span>{% endif %}
-    </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% endif %}
-
-{% if resume_md %}
-<h2>resume</h2>
-<pre class="desc">{{ resume_md }}</pre>
-{% endif %}
-
-{% if cover_letter %}
-<h2>cover letter</h2>
-<pre class="desc">{{ cover_letter }}</pre>
+{% set missing = fill_sheet | selectattr("confidence", "equalto", "missing") | selectattr("required") | list | length %}
+<div class="card">
+  <header class="card__header">
+    <h2 class="card__title">Fill sheet</h2>
+    <span class="dim" style="font-size: var(--fs-xs)">{{ missing }} required missing</span>
+  </header>
+  <div class="table-wrap" style="border: none; box-shadow: none; border-radius: 0">
+    <table class="table">
+      <thead><tr><th>field</th><th>value</th><th>source</th><th>confidence</th></tr></thead>
+      <tbody>
+        {% for f in fill_sheet %}
+        <tr>
+          <td class="table__cell--main">{{ f.label }}{% if f.required %} <span style="color: var(--danger)">*</span>{% endif %}</td>
+          <td class="dim-2">{{ f.value if f.value is not none else "—" }}</td>
+          <td class="table__cell--dim"><span class="truncate">{{ f.value_source or "—" }}</span></td>
+          <td>
+            {% if f.confidence == "missing" %}{{ m.badge("missing", "danger") }}
+            {% elif f.confidence == "policy" %}{{ m.badge("policy", "neutral") }}
+            {% else %}{{ m.badge(f.confidence, "success") }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endif %}
 
 {% if tailor and (tailor.keyword_alignment or tailor.summary) %}
-<h2>tailor plan</h2>
-<p class="dim">
-  emphasis: {{ (tailor.skills_emphasis or []) | join(", ") or "—" }} ·
-  gaps: {{ (tailor.keyword_alignment.gaps or []) | join(", ") or "—" }} (not papered over)
-</p>
+<div class="card">
+  <header class="card__header"><h2 class="card__title">Tailor plan</h2></header>
+  <div class="card__body">
+    <div class="kv">
+      <span class="kv__key">emphasis</span>
+      <span class="kv__value">{{ (tailor.skills_emphasis or []) | join(", ") or "—" }}</span>
+      <span class="kv__key">gaps</span>
+      <span class="kv__value">{{ (tailor.keyword_alignment.gaps or []) | join(", ") or "—" }} (not papered over)</span>
+    </div>
+  </div>
+</div>
 {% endif %}
+
+{% if resume_md %}
+<div class="card">
+  <header class="card__header"><h2 class="card__title">Tailored resume</h2>
+    <span class="dim mono" style="font-size: var(--fs-xs)">{{ pk.dir }}/resume.md</span>
+  </header>
+  <div class="card__body"><pre>{{ resume_md }}</pre></div>
+</div>
+{% endif %}
+
+{% if cover_letter %}
+<div class="card">
+  <header class="card__header"><h2 class="card__title">Cover letter</h2>
+    <span class="dim mono" style="font-size: var(--fs-xs)">{{ pk.dir }}/cover_letter.md</span>
+  </header>
+  <div class="card__body"><pre>{{ cover_letter }}</pre></div>
+</div>
+{% endif %}
+
 {% endblock %}

@@ -1,34 +1,52 @@
+{% import "components/macros.html" as m %}
 <tr id="row-{{ p.id }}">
-  <td>
-    {% if p.final_score is not none %}
-      <span class="badge {{ 'good' if p.final_score >= 75 else ('ok' if p.final_score >= 50 else 'low') }}">{{ "%.0f" | format(p.final_score) }}</span>
-    {% else %}
-      <span class="badge dim">·</span>
-    {% endif %}
+  <td class="table__cell--mono">{{ m.score(p.final_score) }}</td>
+  <td class="table__cell--main">
+    <a href="/posting/{{ p.id }}" class="truncate">{{ p.title or "(untitled)" }}</a>
   </td>
-  <td class="title"><a href="/posting/{{ p.id }}">{{ p.title or "(untitled)" }}</a></td>
   <td>
-    {{ p.company_name or p.company_id }}
-    {% if p.tier %}<span class="chip tier-{{ p.tier | lower }}">{{ p.tier }}</span>{% endif %}
-    {% if p.non_ats %}<span class="chip dark" title="no public ATS board — dark-pool watch">dark</span>{% endif %}
+    <span class="dim-2">{{ p.company_name or p.company_id }}</span>
+    {% if p.tier %} {{ m.badge(p.tier, "outline") }}{% endif %}
+    {% if p.non_ats %} {{ m.badge("dark", "special", "no public ATS board — dark-pool watch") }}{% endif %}
   </td>
-  <td class="dim">{{ (p.location or "—") | truncate(28) }}</td>
-  <td class="dim">{{ p.seniority or "—" }}</td>
-  <td class="dim">{{ (p.source or "") | replace("ats:", "") | truncate(24) }}</td>
-  <td class="dim">{{ (p.first_seen or "")[:10] }}</td>
-  <td class="actions">
+  <td class="table__cell--dim"><span class="truncate">{{ p.location or "—" }}</span></td>
+  <td class="table__cell--dim table__cell--nowrap">
+    {% if p.seniority %}{{ m.badge(p.seniority, "outline") }}{% else %}<span class="dim">—</span>{% endif %}
+  </td>
+  <td class="table__cell--dim table__cell--nowrap">{{ (p.source or "") | replace("ats:", "") | truncate(22) }}</td>
+  <td class="table__cell--dim table__cell--mono">{{ (p.first_seen or "")[:10] }}</td>
+  <td class="table__cell--actions">
     {% if p.status == "new" %}
-      <button class="yes" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"interested"}' hx-target="#row-{{ p.id }}" hx-swap="outerHTML">✓</button>
-      <button class="no" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"dismissed"}' hx-target="#row-{{ p.id }}" hx-swap="outerHTML">✗</button>
+    <button class="btn btn--success btn--sm" title="Mark interested"
+            hx-post="/posting/{{ p.id }}/status"
+            hx-vals='{"status":"interested"}'
+            hx-target="#row-{{ p.id }}" hx-swap="outerHTML">
+      {{ m.icon("check", 12) }}
+    </button>
+    <button class="btn btn--ghost btn--sm" title="Dismiss"
+            hx-post="/posting/{{ p.id }}/status"
+            hx-vals='{"status":"dismissed"}'
+            hx-target="#row-{{ p.id }}" hx-swap="outerHTML">
+      {{ m.icon("x", 12) }}
+    </button>
     {% elif p.status == "interested" %}
-      <span class="chip int">interested</span>
-      <button class="no" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"dismissed"}' hx-target="#row-{{ p.id }}" hx-swap="outerHTML">✗</button>
+    {{ m.status(p.status) }}
+    <button class="btn btn--ghost btn--sm" title="Dismiss"
+            hx-post="/posting/{{ p.id }}/status"
+            hx-vals='{"status":"dismissed"}'
+            hx-target="#row-{{ p.id }}" hx-swap="outerHTML">
+      {{ m.icon("x", 12) }}
+    </button>
     {% elif p.status == "dismissed" %}
-      <span class="chip dis">dismissed</span>
-      <button class="yes" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"new"}' hx-target="#row-{{ p.id }}" hx-swap="outerHTML">undo</button>
+    {{ m.status(p.status) }}
+    <button class="btn btn--ghost btn--sm" title="Undo — back to new"
+            hx-post="/posting/{{ p.id }}/status"
+            hx-vals='{"status":"new"}'
+            hx-target="#row-{{ p.id }}" hx-swap="outerHTML">undo</button>
     {% else %}
-      <span class="dim">{{ p.status }}</span>
+    {{ m.status(p.status) }}
     {% endif %}
-    <a class="detail" href="/posting/{{ p.id }}">▸</a>
+    <a class="btn btn--ghost btn--sm btn--icon" title="Open detail"
+       href="/posting/{{ p.id }}">{{ m.icon("arrow-right", 12) }}</a>
   </td>
 </tr>

@@ -1,0 +1,21 @@
+packet_id: pk-1113573b4a7f
+posting_id: p_2026-09-28_9c3cb1ae
+posting_title: Senior AI Compute Infrastructure Engineer
+company: Kraken
+posting_url: https://jobs.ashbyhq.com/kraken.com/055adaf0-a15b-40f3-89ab-dc5ab4fa719e/application
+status: needs_input
+reasons:
+- 'master resume missing 10 required field(s): Full Name, Email, Phone, Country, LinkedIn,
+  Current Company, Current Title, Years of Experience, Highest Degree, School'
+- LLM key required for tailoring and cover letter (set JOBSCOUT_LLM_API_KEY in .env,
+  or use --dry-run)
+- typst not installed — resume.md only (brew install typst for PDF)
+model: null
+cost_usd: 0.0
+generated: 2026-09-28T10:03Z
+dry_run: false
+files:
+- claim_check.yaml
+- fill_sheet.yaml
+- resume.md
+- tailor.yaml
