@@ -202,8 +202,10 @@ def create_app() -> FastAPI:
     # ── discovery ────────────────────────────────────────────────────────
 
     @app.get("/discovery", response_class=HTMLResponse)
-    def discovery_page(request: Request, ran: str = Query("")):
+    def discovery_page(request: Request, ran: str = Query(""),
+                       saved: str = Query(""), error: str = Query("")):
         from jobscout.core.config import load_settings
+        from jobscout.webapp import targeting_store
 
         settings = load_settings()
         conn = db.connect()
@@ -250,6 +252,10 @@ def create_app() -> FastAPI:
                 **ctx,
                 "settings": settings,
                 "target": target,
+                "level_tokens": targeting_store.LEVEL_TOKENS,
+                "remote_prefs": targeting_store.REMOTE_PREFS,
+                "targeting_saved": saved == "1",
+                "targeting_error": error,
                 "agent_spend": agent_spend,
                 "last_agent_run": last_agent_run,
                 "reports": [r.name for r in reports[-10:]],
@@ -365,6 +371,32 @@ def create_app() -> FastAPI:
                     f"/applications?error={quote(str(e))}", status_code=303)
         finally:
             conn.close()
+
+    @app.post("/discovery/targeting")
+    async def discovery_targeting_save(request: Request):
+        """Hunting-profile edits: line-patched into config/profile.yaml
+        with validation + rollback; version bump re-scores the LLM cache."""
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import targeting_store
+
+        form = await request.form()
+        try:
+            result = targeting_store.save(
+                seniorities=form.getlist("seniorities"),
+                primary_locations=form.get("primary_locations", ""),
+                other_locations=form.get("other_locations", ""),
+                roles=form.get("roles", ""),
+                stack=form.get("stack", ""),
+                remote_preference=form.get("remote_preference", "hybrid"),
+                remote_allowed=form.get("remote_allowed") == "1",
+            )
+            return RedirectResponse(
+                f"/discovery?saved=1&v={result['profile_version']}",
+                status_code=303)
+        except targeting_store.TargetingError as e:
+            return RedirectResponse(
+                f"/discovery?error={_q(str(e))}", status_code=303)
 
     @app.get("/packet/{pid}", response_class=HTMLResponse)
     def packet_detail(request: Request, pid: str, prepared: str = Query("")):

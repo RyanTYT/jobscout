@@ -4,25 +4,40 @@
 # the LLM score cache is keyed on (content_hash, profile_version) and a
 # bump re-scores active postings only.
 
-profile_version: "2026-09-28.3"
+profile_version: "2026-09-28.2"
 
 target:
-  roles: [quant developer, trading systems engineer, backend engineer]   # rule gate keyword-matches titles/descriptions
+  roles:
+    - quant developer
+    - trading systems engineer
+    - backend engineer
   weighting:
     quant: 0.7            # ← "both, quant-weighted"
     general-backend: 0.3
-  seniorities: [junior]   # exclusion list — senior/lead/... titles fail; unlabeled pass
-  locations: [Singapore, Hong Kong, Amsterdam, San Francisco, New York]   # substring match on posting location; remote passes
-  primary_locations: [Singapore]   # preferred first; rules treat both lists the same
+  seniorities: [junior]    # EXCLUSION list: titles explicitly senior/
+                           # staff/lead/principal/manager fail the rule gate;
+                           # unlabeled titles (most "mid" postings) pass
+  locations:
+    - Singapore
+    - Hong Kong
+    - Amsterdam
+    - San Francisco
+    - New York
+  primary_locations: [Singapore]   # preferred first; others acceptable
   remote:
     allowed: true
-    preference: "hybrid"
+    preference: hybrid     # onsite | hybrid | remote
   domains:
     - market-data
     - execution
     - exchange-infra
     - low-latency-systems
-  stack: [rust, c++, python, kafka, postgresql]   # LLM rubric stack keywords
+  stack:
+    - rust
+    - c++
+    - python
+    - kafka
+    - postgresql
 
 dealbreakers:
   - clearance_required

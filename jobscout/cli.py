@@ -60,6 +60,7 @@ def init_home() -> None:
     defaults = Path(__file__).resolve().parent / "defaults"
     seeds = [
         (defaults / "settings.yaml", config_dir() / "settings.yaml"),
+        (defaults / "profile.yaml", config_dir() / "profile.yaml"),
         (defaults / "resume.yaml", master_resume_dir() / "resume.yaml"),
     ]
     for src, dst in seeds:
