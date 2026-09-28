@@ -231,31 +231,58 @@ SORT_OPTIONS = [
 ]
 SIZE_OPTIONS = [(str(s), str(s), None) for s in PAGE_SIZES]
 
-NAV_ITEMS = (
-    # (key, path, label, icon, count_key)
-    ("inbox", "/", "Inbox", "inbox", None),
-    ("companies", "/companies", "Companies", "building", None),
-    ("discovery", "/discovery", "Discovery", "radar", None),
-    ("applications", "/applications", "Applications", "doc", "packets"),
-    ("profile", "/profile", "Profile", "spark", None),
-    ("ops", "/ops", "Ops", "pulse", None),
+# nav grouped by concern — Discovery (control) and Ops (observability) sit
+# together under Automation: two views of the same agent subsystem
+NAV_SECTIONS = (
+    {
+        "label": "Pipeline",
+        "items": (
+            ("inbox", "/", "Inbox", "inbox", None),
+            ("companies", "/companies", "Companies", "building", None),
+        ),
+    },
+    {
+        "label": "Automation",
+        "items": (
+            ("discovery", "/discovery", "Discovery", "radar", None),
+            ("ops", "/ops", "Ops", "pulse", None),
+        ),
+    },
+    {
+        "label": "Apply",
+        "items": (
+            ("applications", "/applications", "Applications", "doc", "packets"),
+            ("profile", "/profile", "Profile", "spark", None),
+        ),
+    },
+)
+
+NAV_ITEMS = tuple(
+    item for section in NAV_SECTIONS for item in section["items"]
 )
 
 
 def template_ctx(version: str, active: str, counts: dict) -> dict:
     """Common context every template receives."""
     profile_missing = counts.pop("profile_missing", 0) if counts else 0
+    sections = []
+    for section in NAV_SECTIONS:
+        sections.append({
+            "label": section["label"],
+            "entries": [
+                {
+                    "key": key, "path": path, "label": label, "icon": icon,
+                    "count": counts.get(count_key) if count_key else None,
+                }
+                for key, path, label, icon, count_key in section["items"]
+            ],
+        })
     return {
         "profile_missing": profile_missing,
         "version": version,
         "active": active,
-        "nav_items": [
-            {
-                "key": key, "path": path, "label": label, "icon": icon,
-                "count": counts.get(count_key) if count_key else None,
-            }
-            for key, path, label, icon, count_key in NAV_ITEMS
-        ],
+        "nav_sections": sections,
+        "nav_items": [item for s in sections for item in s["entries"]],
         "statuses": STATUSES,
         "tiers": TIERS,
         "sorts": SORTS,

@@ -252,21 +252,45 @@
     enhanceAllSelects(e.detail.target);
   });
 
-  /* ── client-side table sorting (data-sortable tables) ─────────────────── */
+  /* ── table sorting: a property of every .table component ──────────────
+     app.js flags each table automatically; th[data-sort-key] columns sort
+     client-side (numeric-aware). Tables with .th-sort headers (the inbox)
+     use server-side sorting and are skipped here. */
+
+  function ensureSortKeys(table) {
+    var head = table.tHead;
+    if (!head || !head.rows.length) return;
+    Array.prototype.forEach.call(head.rows[0].cells, function (th, i) {
+      if (th.hasAttribute("data-sort-key")) return;
+      if (th.querySelector(".th-sort")) return;      // server-side column
+      if (!th.textContent.trim()) return;             // empty actions column
+      th.setAttribute("data-sort-key", "col-" + i);
+    });
+  }
+
+  function autoEnableSorting(root) {
+    (root || document).querySelectorAll("table.table").forEach(function (t) {
+      if (t.hasAttribute("data-nosort")) return;
+      if (t.querySelector(".th-sort")) return;        // server-side table
+      t.setAttribute("data-sortable", "");
+      ensureSortKeys(t);
+    });
+  }
+
+  autoEnableSorting(document);
+  document.body.addEventListener("htmx:afterSwap", function (e) {
+    autoEnableSorting(e.detail.target);
+  });
 
   document.addEventListener("click", function (e) {
     var th = e.target.closest("table[data-sortable] th[data-sort-key]");
     if (!th) return;
     var table = th.closest("table");
     var tbody = table.tBodies[0];
-    var key = th.getAttribute("data-sort-key");
-    var dir = th.getAttribute("data-sort-dir") === "asc" ? -1 : 1;
-    if (th.getAttribute("data-sort-active") === "1") {
-      dir = th.getAttribute("data-sort-dir") === "asc" ? -1 : 1;  // toggle
-    } else {
-      dir = 1;
-    }
     var idx = Array.prototype.indexOf.call(th.parentNode.children, th);
+    // first click sorts ascending; clicking the active column toggles
+    var dir = (th.getAttribute("data-sort-active") === "1" &&
+               th.getAttribute("data-sort-dir") === "asc") ? -1 : 1;
 
     Array.prototype.slice.call(tbody.rows).sort(function (a, b) {
       var ca = a.cells[idx] ? a.cells[idx].textContent.trim() : "";

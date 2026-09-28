@@ -56,17 +56,36 @@
       </div>
       <noscript>
         <select class="select" name="mode" onchange="this.form.submit()">
-          {% for mkey, mdesc in [
-            ("off", "nothing runs automatically"),
-            ("pipeline", "deterministic + cheap LLM only (~$1/mo)"),
-            ("agent", "morning agent rides on top"),
-            ("hybrid", "agent N days/week + on-demand"),
+          {% for mkey, mdesc, mdetail in [
+            ("off", "nothing runs automatically", ""),
+            ("pipeline", "deterministic + cheap LLM only (~$1/mo)", ""),
+            ("agent", "morning agent rides on top", ""),
+            ("hybrid", "agent N days/week + on-demand", ""),
           ] %}
           <option value="{{ mkey }}" {% if settings.discovery.mode == mkey %}selected{% endif %}>{{ mkey }}</option>
           {% endfor %}
         </select>
         <button class="btn btn--secondary btn--sm" type="submit">set mode</button>
       </noscript>
+
+      <div class="mode-legend" id="mode-legend">
+        {% for mkey, mdesc, mdetail in [
+          ("off", "nothing runs automatically",
+           "No launchd job, no agent, no LLM spend. You drive every run yourself from this page or the CLI. Signals still accumulate when you run sweeps manually."),
+          ("pipeline", "deterministic sources + cheap LLM scoring",
+           "The daily 06:30 launchd job runs all deterministic sources (ATS boards, careers crawl, monitoring, GitHub, News, HN, RSS) and bulk-scores new postings with the cheap tier (~$1/mo). No agent judgment, no morning brief."),
+          ("agent", "morning agent on top of the pipeline",
+           "Everything pipeline does, plus the 07:00 agent: an LLM tool loop with step and cost caps that reads your signals, decides what's worth investigating, and writes the morning brief. Dimes per day, capped."),
+          ("hybrid", "agent on schedule + on signal spikes",
+           "Agent runs on its schedule AND is triggered on-demand when signal spikes arrive (several new-job URLs, funding news, or page changes in one day). Best coverage for the budget."),
+        ] %}
+        <div class="mode-legend__row{% if settings.discovery.mode == mkey %} mode-legend__row--active{% endif %}"
+             data-mode-row="{{ mkey }}">
+          <span class="mode-legend__name">{{ mkey }}</span>
+          <span class="mode-legend__desc"><strong>{{ mdesc }}</strong> — {{ mdetail }}</span>
+        </div>
+        {% endfor %}
+      </div>
     </form>
 
     <div class="kv" style="margin-top: var(--sp-5)">
@@ -99,6 +118,37 @@
 </div>
 {% endif %}
 
+{# ── recent runs (the Ops view, scoped to the agent) ─────────────────── #}
+<div class="card">
+  <header class="card__header">
+    <h2 class="card__title">Recent runs</h2>
+    <a class="btn btn--ghost btn--sm" href="/ops">full history &amp; spend →</a>
+  </header>
+  {% if recent_runs %}
+  <div class="table-wrap" style="border: none; box-shadow: none; border-radius: 0">
+    <table class="table">
+      <thead>
+        <tr><th>kind</th><th>started</th><th>ok</th><th>cost</th><th>companies</th><th>postings</th></tr>
+      </thead>
+      <tbody>
+        {% for r in recent_runs %}
+        <tr>
+          <td>{{ m.badge(r["kind"], "outline") }}</td>
+          <td class="table__cell--dim table__cell--mono">{{ (r["started"] or "")[:19] | replace("T", " ") }}</td>
+          <td>{% if r["ok"] %}{{ m.badge("ok", "success") }}{% else %}{{ m.badge("fail", "danger") }}{% endif %}</td>
+          <td class="table__cell--mono">${{ "%.3f" | format(r["cost_usd"] or 0) }}</td>
+          <td class="table__cell--mono dim">{{ r.stats.get("companies", "—") }}</td>
+          <td class="table__cell--mono dim">{{ r.stats.get("postings_seen", "—") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card__body">{{ m.empty("No runs yet", "The daily launchd job and agent runs land here.", "pulse") }}</div>
+  {% endif %}
+</div>
+
 {# ── morning reports ──────────────────────────────────────────────────── #}
 <div class="card">
   <header class="card__header">
@@ -130,11 +180,16 @@
     var hidden = document.getElementById("mode-value");
     form.querySelectorAll("[data-mode]").forEach(function (btn) {
       btn.addEventListener("click", function () {
+        var mode = btn.getAttribute("data-mode");
         form.querySelectorAll("[data-mode]").forEach(function (b) {
           b.classList.remove("segmented__item--active");
         });
         btn.classList.add("segmented__item--active");
-        hidden.value = btn.getAttribute("data-mode");
+        document.querySelectorAll("[data-mode-row]").forEach(function (row) {
+          row.classList.toggle("mode-legend__row--active",
+                               row.getAttribute("data-mode-row") === mode);
+        });
+        hidden.value = mode;
         // submit immediately via the hidden real submit button
         document.getElementById("mode-submit").click();
       });

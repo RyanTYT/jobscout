@@ -11,6 +11,17 @@
     <h1>Operations</h1>
     <span class="page-head__sub">run history, spend, and source health</span>
   </div>
+  <div class="page-head__actions">
+    <a class="btn btn--secondary" href="/discovery">
+      {{ m.icon("radar", 14) }} Agent controls &amp; mode
+    </a>
+    <form method="post" action="/discovery/run" data-busy-submit
+          style="display: contents">
+      <button class="btn btn--primary" type="submit">
+        {{ m.icon("bolt", 14) }} Run agent now
+      </button>
+    </form>
+  </div>
 </div>
 
 <div class="stats card">

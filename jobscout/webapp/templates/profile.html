@@ -45,7 +45,7 @@
       <span class="dim" style="font-size: var(--fs-xs)">the basics every form asks</span>
     </header>
     <div class="card__body">
-      <div class="filters" style="box-shadow: none; border: none; padding: 0">
+      <div class="form-grid">
         {% for f in fields if f.block == "identity" %}
         <label class="field">
           <span class="field__label">{{ f.label }}</span>
@@ -68,7 +68,7 @@
       <span class="dim" style="font-size: var(--fs-xs)">derived fields (current company / title / years / degree) come from here</span>
     </header>
     <div class="card__body">
-      <div class="filters" style="box-shadow: none; border: none; padding: 0">
+      <div class="form-grid">
         {% for f in fields if f.block == "experience" or f.block == "education" %}
         <label class="field">
           <span class="field__label">{{ f.label }}</span>
@@ -86,7 +86,7 @@
       <h2 class="card__title">Work authorization &amp; availability</h2>
     </header>
     <div class="card__body">
-      <div class="filters" style="box-shadow: none; border: none; padding: 0">
+      <div class="form-grid">
         {% for f in fields if f.block == "work_authorization" or f.block == "extras" %}
         <label class="field">
           <span class="field__label">{{ f.label }}</span>

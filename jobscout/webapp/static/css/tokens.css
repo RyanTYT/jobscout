@@ -181,6 +181,7 @@
   --content-pad:    var(--sp-8);
   --row-h:          52px;
   --table-min-w:    720px;   /* below: table scrolls horizontally     */
+  --field-min-w:    200px;   /* grid form-field minimum column        */
   --menu-max-h:     280px;   /* dropdown popover scroll limit         */
 
   /* ── z-index scale ──────────────────────────────────────────────────── */

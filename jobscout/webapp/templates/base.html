@@ -20,8 +20,9 @@
       jobscout
     </a>
 
-    <div class="nav__section">Pipeline</div>
-    {% for item in nav_items %}
+    {% for section in nav_sections %}
+    <div class="nav__section">{{ section.label }}</div>
+    {% for item in section.entries %}
     <a class="nav__link{% if item.key == active %} nav__link--active{% endif %}"
        href="{{ item.path }}"
        {% if item.key == active %}aria-current="page"{% endif %}>
@@ -32,6 +33,7 @@
       <span class="nav__count">{{ profile_missing }}</span>
       {% endif %}
     </a>
+    {% endfor %}
     {% endfor %}
 
     <div class="nav__footer">

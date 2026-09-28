@@ -394,6 +394,30 @@
   width: var(--sp-10);
 }
 
+/* generic sortable th — app.js flags every table; arrows via attributes */
+.table[data-sortable] th[data-sort-key] {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--tr-fast) var(--ease);
+}
+.table[data-sortable] th[data-sort-key]:hover { color: var(--text-1); }
+.table[data-sortable] th[data-sort-key]::after {
+  content: "↕";
+  margin-left: var(--sp-2);
+  font-size: var(--fs-2xs);
+  opacity: calc(1 - var(--dim-sort-arrow) / 100);
+}
+.table[data-sortable] th[data-sort-key][data-sort-dir="asc"]::after {
+  content: "↑";
+  opacity: 1;
+  color: var(--accent);
+}
+.table[data-sortable] th[data-sort-key][data-sort-dir="desc"]::after {
+  content: "↓";
+  opacity: 1;
+  color: var(--accent);
+}
+
 /* sortable column headers */
 .th-sort {
   all: unset;
@@ -448,6 +472,18 @@
   gap: var(--sp-2);
   min-width: calc(var(--sp-10) * 2);
 }
+
+/* generic token-spaced form grid (profile page etc.) — no chrome */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--field-min-w), 1fr));
+  gap: var(--sp-5) var(--sp-4);
+  align-items: end;
+}
+
+.form-grid .field,
+.form-grid .field .select,
+.form-grid .field .input { width: 100%; }
 
 .filters .field,
 .filters .field .select,
@@ -739,6 +775,46 @@
   padding: var(--sp-10) var(--sp-6);
   text-align: center;
   color: var(--text-3);
+}
+
+/* ── mode legend (discovery page) ────────────────────────────────────── */
+
+.mode-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+}
+
+.mode-legend__row {
+  display: grid;
+  grid-template-columns: var(--field-min-w) 1fr;
+  gap: var(--sp-4);
+  align-items: start;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  transition: background var(--tr-fast) var(--ease);
+}
+
+.mode-legend__row--active {
+  background: var(--accent-soft);
+  outline: var(--w-border) solid var(--accent-border);
+}
+
+.mode-legend__name {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-2);
+  padding-top: var(--sp-1);
+}
+
+.mode-legend__row--active .mode-legend__name { color: var(--accent); }
+
+.mode-legend__desc {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  line-height: var(--lh-normal);
 }
 
 .legend { display: flex; flex-direction: column; gap: var(--sp-4); }

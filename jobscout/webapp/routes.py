@@ -217,6 +217,16 @@ def create_app() -> FastAPI:
             last_agent_run = conn.execute(
                 "SELECT * FROM runs WHERE kind = 'agent' ORDER BY id DESC LIMIT 1"
             ).fetchone()
+            recent_rows = db.recent_runs(conn, 5)
+            recent_runs = []
+            for r in recent_rows:
+                try:
+                    st = json.loads(r["stats"] or "{}")
+                except ValueError:
+                    st = {}
+                row = dict(r)
+                row["stats"] = st
+                recent_runs.append(row)
             ctx = _ctx("discovery", conn)
         finally:
             conn.close()
@@ -235,6 +245,7 @@ def create_app() -> FastAPI:
                 "last_agent_run": last_agent_run,
                 "reports": [r.name for r in reports[-10:]],
                 "latest_report": latest_report,
+                "recent_runs": recent_runs,
                 "run_output": _run_output_holder.get("out") if ran == "1" else None,
             },
         )
