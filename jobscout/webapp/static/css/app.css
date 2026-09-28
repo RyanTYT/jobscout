@@ -234,6 +234,47 @@
 /* alerts (callouts) already follow the *-text-emphasis / *-bg-subtle /
    *-border-subtle vars mapped above — no override needed */
 
+/* control typography: Bootstrap ships 1rem (16px) controls, which dwarf
+   the app's 13px body — align buttons & inputs to the token scale.
+   Buttons read as controls: medium weight + tight tracking */
+.btn {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--lh-tight);
+}
+.btn-lg { font-size: var(--fs-lg); }
+.btn-sm { font-size: var(--fs-sm); }
+.form-control, .form-select, .dropdown-item { font-size: var(--fs-md); }
+
+/* unfilled vs filled: an empty field (placeholder showing) reads as an
+   open slot — dashed outline + sunken well + muted hint text. Filling
+   it restores the solid border and normal surface. Works on any text
+   input with a placeholder; the js-select toggle carries .is-empty. */
+.form-control::placeholder { color: var(--text-3); }
+.form-control:placeholder-shown,
+textarea.form-control:placeholder-shown {
+  background-color: var(--bg-sunken);
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+.form-control:not(:placeholder-shown) { border-color: var(--border-strong); }
+.js-select .dropdown-toggle.is-empty {
+  color: var(--text-3);
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+
+/* focus: Bootstrap hardcodes its blue (#86b7fe + rgba(13,110,253,.25))
+   here — route it through the tokens like everything else */
+.form-control:focus, .form-select:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+/* pagination: match the table's smaller type */
+.pagination-sm { --bs-pagination-font-size: var(--fs-xs); }
+
 /* forms: token label rhythm */
 .form-label, .card-title {
   font-size: var(--fs-xs);

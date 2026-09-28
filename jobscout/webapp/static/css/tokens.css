@@ -116,6 +116,7 @@
   --border:        var(--c-slate-200);
   --border-strong: var(--c-slate-300);
   --focus-ring-color: var(--c-indigo-200);
+  --focus-ring: 0 0 0 var(--sp-2) rgba(var(--c-indigo-600-rgb), 0.25);
 
   /* sidebar (stays dark in both themes — app chrome) */
   --bg-nav:        var(--c-slate-900);
@@ -187,6 +188,7 @@
   --lh-tight: 1.25;  --lh-normal: 1.5;  --lh-relaxed: 1.65;
   --fw-regular: 400;  --fw-medium: 500;  --fw-semibold: 600;  --fw-bold: 700;
   --tracking-caps: 0.08em;
+  --tracking-tight: 0.01em;
 
   /* ── radii ──────────────────────────────────────────────────────────── */
   --r-sm: 4px;  --r-md: 8px;  --r-lg: 12px;  --r-round: 999px;
@@ -237,6 +239,7 @@
   --border:        var(--c-slate-800);
   --border-strong: var(--c-slate-700);
   --focus-ring-color: var(--c-indigo-700);
+  --focus-ring: 0 0 0 var(--sp-2) rgba(var(--c-indigo-400-rgb), 0.3);
 
   /* sidebar */
   --bg-nav:        var(--c-slate-950);

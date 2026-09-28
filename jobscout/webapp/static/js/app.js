@@ -153,6 +153,7 @@
     });
     toggle.querySelector(".js-select-label").textContent =
       item.textContent.trim() || "—";
+    toggle.classList.toggle("is-empty", !select.value);
 
     [].forEach.call(wrap.querySelectorAll(".dropdown-item"), function (i) {
       i.classList.toggle("active", i === item);
