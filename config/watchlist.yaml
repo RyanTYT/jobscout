@@ -56,7 +56,8 @@ A:
   note: no public ATS board — dark-pool entry
 - name: Five Rings
   domain: fiverings.com
-  ats: {}
+  ats:
+    greenhouse: fiveringsllc
   note: small, secretive, high talent density
 - name: Tower Research Capital
   domain: towerresearch.com
@@ -84,7 +85,8 @@ A:
   note: ETP + crypto market maker
 - name: Headlands Technologies
   domain: headlandstech.com
-  ats: {}
+  ats:
+    greenhouse: headlandstechnologiesllc
   note: no public ATS board — dark-pool entry
 - name: Point72
   domain: point72.com
@@ -141,7 +143,8 @@ B:
   note: ''
 - name: Kraken
   domain: kraken.com
-  ats: {}
+  ats:
+    ashby: kraken.com
   note: no public ATS board — dark-pool entry
 - name: Stripe
   domain: stripe.com

@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Version** | 2.0 (pinned 2026-09-28) |
-| **Status** | P2 complete — dashboard live (inbox/companies/ops, 127.0.0.1:8787), bulk LLM scoring implemented + cached + capped (activates when the API key lands in .env) · **Next: P3 — careers crawler + ATS-absence detection** |
+| **Status** | P3 complete — careers crawler live: 3 hidden boards discovered + watchlist self-healed (Five Rings, Headlands, Kraken — 98 postings), 10 true dark-pool companies honestly flagged JS-rendered (P7) · **Next: P4 — deterministic discovery (CSE, HN, RSS) + signals** |
 | **Repo** | `/Users/user/Downloads/Personal Project/jobscout` (local only, no remote yet) |
 | **Sibling repos** | `../JobPilot` (the "hands", see §6) · `../rusty_trader` (unrelated) |
 | **Dev Mac rule** | This Mac develops only. **Never run `bootstrap.sh` here** — it installs launchd and belongs on the target/deployment Mac. |
@@ -489,13 +489,18 @@ Done when: scoring runs cheap+cached and postings are browsable at 127.0.0.1:878
 - [x] `webapp/`: FastAPI + Jinja2 + HTMX (vendored htmx.min.js, no npm); Inbox + Posting detail + Companies + Ops pages
 - [x] `jobscout serve` (loopback) + `jobscout score` (backfill) + `jobscout stats`; interested/dismiss/revert actions persist to DB via HTMX row swap
 
-### P3 — Careers crawler + ATS-absence probe (dark-pool detection)
-Done when: a company with a careers page but no ATS board is tracked end-to-end.
+### P3 — Careers crawler + ATS-absence probe (dark-pool detection) ✅ (2026-09-28)
+Done when: a company with a careers page but no ATS board is tracked end-to-end —
+**exceeded: careers-page scan discovered 3 boards token-guessing missed
+(Five Rings greenhouse:fiveringsllc, Headlands greenhouse:headlandstechnologiesllc,
+Kraken ashby:kraken.com — 98 postings, watchlist self-healed in-run).**
+10 companies remain true dark-pool (JS-rendered careers pages: Two Sigma, HRT,
+Citadel Sec, DRW, Optiver, SIG, XTX, Radix, Wintermute, GSR) — sidecar render lands in P7.
 
-- [ ] `sources/careers_page.py`: JSON-LD `JobPosting` extraction → sitemap crawl → WP Job Manager feed → sidecar render fallback
-- [ ] ATS-absence probe: token guesses (greenhouse/lever/ashby/smartrecruiters) + careers-page board-link scan → `companies.non_ats`
-- [ ] `companies` table fully populated (ATS tokens, career_url, non_ats, tier)
-- [ ] Dark-pool classification: no ATS + signals + no postings → lead
+- [x] `sources/careers_page.py`: careers-URL discovery (subdomains + paths + homepage anchors) → board-link scan (verified) → JSON-LD `JobPosting` → WP feeds → bounded sitemap crawl; stdlib-only; JS pages deferred to P7 sidecar
+- [x] ATS-absence probe: token guesses + careers-page board-link scan → `companies.non_ats` + `career_url`; `jobscout probe` runs the full ladder
+- [x] `companies` table fully populated (ATS tokens, career_url, non_ats, tier); dashboard companies page shows career links
+- [x] Dark-pool classification: no ATS + no static postings → flagged (signals arrive in P4/P5 to light them up)
 
 ### P4 — Deterministic discovery (CSE, HN, RSS) + signals
 Done when: new companies enter the watchlist without owner action.
@@ -577,6 +582,7 @@ Done when: [Fill for me] fills a real form headfully and returns an auditable fi
 | 2026-09-28 | watchlist.yaml = living company-first substrate: discovery appends `candidates` daily, owner promotes; git history = auditable growth (PLAN §5.9) |
 | 2026-09-28 | Probe rule: a board hit requires live postings — SmartRecruiters returns 200-empty for wrong ids (e.g. "JaneStreet"); Optiver's greenhouse board exists but is empty (they moved on) |
 | 2026-09-28 | Bulk scoring: cache key (profile_version, content_hash); per-tier daily caps in models.yaml degrade to rule-only; no-key runs are rule-only by design; first-run baseline scores only within cap (backfill via `jobscout score`) |
+| 2026-09-28 | Careers ladder (P3): board-link scan beats page scraping — discovered tokens are live-verified, then the standard ATS connector owns future pulls (watchlist self-heals); JS-rendered careers pages are honest dark-pool, not failures (sidecar render is P7) |
 | OPEN | Private remote vs local-only |
 | OPEN | Final name |
 

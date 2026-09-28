@@ -172,28 +172,42 @@ def add_company(
 def probe(
     name: str = typer.Argument(...),
     domain: str | None = typer.Option(None, "--domain"),
+    no_careers: bool = typer.Option(False, "--no-careers", help="Skip careers-page discovery"),
 ) -> None:
-    """Probe ATS boards for a company without adding it to the watchlist."""
+    """Probe ATS boards + careers page for a company (the full ATS-absence probe, P3)."""
     from jobscout.ats_probe import probe_company
+    from jobscout.sources import careers_page
     from jobscout.sources.ats.base import make_client
 
     client = make_client()
     try:
         res = probe_company(name, domain, client=client)
+        if res["tokens"]:
+            table = Table(title=f"ATS boards — {name}")
+            table.add_column("provider")
+            table.add_column("token")
+            table.add_column("live jobs", justify="right")
+            for provider, tok in res["tokens"].items():
+                table.add_row(provider, tok, str(res["jobs"].get(provider, 0)))
+            console.print(table)
+        else:
+            console.print(f"[yellow]no ATS board by token guessing for {name}[/]")
+
+        if domain and not res["tokens"] and not no_careers:
+            console.print(f"crawling careers presence for [bold]{domain}[/] …")
+            crawl = careers_page.crawl_company(domain, name, client)
+            if crawl["career_url"]:
+                console.print(f"  careers page: [link={crawl['career_url']}]{crawl['career_url']}[/link]")
+            if crawl["board_tokens"]:
+                for prov, tok in crawl["board_tokens"].items():
+                    console.print(f"  [green]✓ board via careers page[/] {prov}: {tok}")
+            console.print(f"  static postings found: {len(crawl['postings'])}")
+            for note in crawl["notes"]:
+                console.print(f"  [dim]· {note}[/]")
+            if not crawl["career_url"]:
+                console.print("  [yellow]no static careers page — dark-pool entry (P7 sidecar render later)[/]")
     finally:
         client.close()
-    if res["tokens"]:
-        table = Table(title=f"ATS boards — {name}")
-        table.add_column("provider")
-        table.add_column("token")
-        table.add_column("live jobs", justify="right")
-        for provider, tok in res["tokens"].items():
-            table.add_row(provider, tok, str(res["jobs"].get(provider, 0)))
-        console.print(table)
-    else:
-        console.print(
-            f"[yellow]no public ATS board found for {name}[/] — dark-pool candidate"
-        )
 
 
 @app.command()

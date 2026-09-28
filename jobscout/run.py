@@ -1,7 +1,8 @@
 """`jobscout run --daily` orchestration (PLAN §4 step 1).
 
-Deterministic only: ATS JSON pulls → dedup → rule filter → markdown digest.
-LLM scoring is P2; careers crawl P3; discovery P4/P5.
+Deterministic only: ATS JSON pulls + careers-page crawl (dark-pool entries) →
+dedup → rule filter → LLM scoring (P2, if keyed) → markdown digest.
+Discovery is P4/P5.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from jobscout import digest, watchlist
 from jobscout.core import db
 from jobscout.core.config import load_profile, load_settings
 from jobscout.scoring.rules import guess_seniority, rule_filter
+from jobscout.sources import careers_page
 from jobscout.sources.ats import FETCHERS
 from jobscout.sources.ats.base import make_client
 
@@ -53,6 +55,7 @@ def run_daily(force: bool = False) -> int:
     coverage: list[dict] = []
     errors: list[str] = []
     postings_seen = 0
+    wl_changed = False
 
     client = make_client()
     try:
@@ -82,6 +85,41 @@ def run_daily(force: bool = False) -> int:
                 found[provider] = token
                 postings_seen += len(postings)
                 time.sleep(0.35)  # one politeness pause per board
+
+            # ── dark-pool entries: careers-page crawl (P3) ──────────────────
+            careers_note = ""
+            if settings.discovery.pipeline.careers_crawl and not (e.ats or {}):
+                try:
+                    res = careers_page.crawl_company(e.domain, e.name, client)
+                except Exception as ex:  # noqa: BLE001 — careers crawl must never break the run
+                    errors.append(f"{e.name}/careers: {ex}")
+                    res = None
+                if res:
+                    if res["board_tokens"]:
+                        for prov, tok in res["board_tokens"].items():
+                            e.ats.setdefault(prov, tok)
+                            found[prov] = tok
+                        wl_changed = True
+                        careers_note = "ATS board discovered via careers page"
+                    elif res["career_url"]:
+                        careers_note = "; ".join(res["notes"][:2]) or "careers page tracked"
+                    if res["postings"]:
+                        for p in res["postings"]:
+                            if not p.seniority:
+                                p.seniority = guess_seniority(p.title)
+                        counts = db.upsert_postings(conn, res["postings"])
+                        jobs_total += len(res["postings"])
+                        new_count += counts["new"]
+                        postings_seen += len(res["postings"])
+                    db.upsert_company(
+                        conn, name=e.name, domain=e.domain, tier=tier,
+                        ats_tokens=(e.ats or None), career_url=res["career_url"],
+                        notes=e.note,
+                    )
+
+            note = e.note or ""
+            if careers_note:
+                note = f"{note} — {careers_note}" if note else careers_note
             coverage.append(
                 {
                     "name": e.name,
@@ -89,9 +127,12 @@ def run_daily(force: bool = False) -> int:
                     "ats": found,
                     "jobs": jobs_total,
                     "new": new_count,
-                    "note": e.note or "",
+                    "note": note,
                 }
             )
+        if wl_changed:
+            watchlist.save(wl)
+            print("watchlist self-healed: ATS boards discovered via careers pages (see git diff)")
     finally:
         client.close()
 
