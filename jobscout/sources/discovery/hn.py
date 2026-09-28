@@ -185,3 +185,73 @@ def sweep(client: httpx.Client, conn, wl, profile, add_candidate) -> dict:
 
 def _domains_for_url(url: str) -> str:
     return urlparse(url).netloc
+
+
+# ── HN company-name search (P8 dark-pool extension) ─────────────────────────
+
+_HIRING_CONTEXT_RE = re.compile(
+    r"\b(hiring|hire|hires|looking for|join (?:our|the) team|growing|"
+    r"expanding|recruiting|open position|job opening|careers|we'?re growing|"
+    r"we are hiring|new role|engineering role)\b",
+    re.I,
+)
+
+
+def search_company_mentions(client: httpx.Client, conn, wl) -> dict:
+    """Search recent HN comments for watchlist company mentions.
+
+    Different from the Who-is-hiring sweep: this searches for the company
+    name anywhere in recent comments (last 7 days), not just in the hiring
+    thread. Catches "I work at X and we're growing" in unrelated threads.
+    Only signals when a hiring-context keyword is also present.
+    """
+    import time as _time
+    from datetime import UTC, datetime, timedelta
+
+    stats = {"companies_searched": 0, "comments_found": 0,
+             "hiring_context": 0, "signals_new": 0, "matched": []}
+    week_ago = int((datetime.now(UTC) - timedelta(days=7)).timestamp())
+
+    names = [e.name for tier in ("A", "B", "C", "candidates")
+             for e in getattr(wl, tier) if len(e.name) >= 4]
+    # dedupe while preserving order
+    seen_names: set[str] = set()
+    unique_names = [n for n in names if not (n in seen_names or seen_names.add(n))]
+
+    for name in unique_names[:30]:  # cap at 30 to stay within API budget
+        r = soft_get(client, _SEARCH, params={
+            "query": f'"{name}"',
+            "tags": "comment",
+            "numericFilters": f"created_at_i>{week_ago}",
+            "hitsPerPage": 20,
+        })
+        if r is None:
+            continue
+        stats["companies_searched"] += 1
+        try:
+            hits = r.json().get("hits") or []
+        except ValueError:
+            continue
+
+        for h in hits:
+            text = h.get("comment_text") or ""
+            stats["comments_found"] += 1
+            if name.lower() not in text.lower():
+                continue
+            if not _HIRING_CONTEXT_RE.search(text):
+                continue
+            stats["hiring_context"] += 1
+            comment_id = str(h.get("objectID") or "")
+            note = " ".join(text.split())[:140]
+            is_new = db.upsert_signal(
+                conn, kind="hn_mention", key=comment_id,
+                company_id=db.slugify(name),
+                note=note,
+            )
+            if is_new:
+                stats["signals_new"] += 1
+                stats["matched"].append(f"{name} (hn-mention): {note[:80]}")
+
+        _time.sleep(0.3)  # politeness
+
+    return stats

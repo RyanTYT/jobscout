@@ -15,6 +15,7 @@ def _esc(s: str | None) -> str:
 def write_daily(
     digest_date: str,
     *,
+    monitoring: dict | None = None,
     discovery: dict | None = None,
     coverage: list[dict],
     new: list[sqlite3.Row],
@@ -99,6 +100,28 @@ def write_daily(
                 lines.append(
                     f"- cse: {cse_s.get('queries', 0)} queries / {cse_s.get('results', 0)} results"
                 )
+        lines.append("")
+
+    if monitoring:
+        lines.append("## Monitoring")
+        lines.append("")
+        pc = monitoring.get("page_changes") or {}
+        sm = monitoring.get("sitemap") or {}
+        if pc.get("error"):
+            lines.append(f"- page changes: error — {_esc(pc['error'])}")
+        elif pc:
+            lines.append(
+                f"- careers pages: {pc.get('companies_checked', 0)} checked, "
+                f"{pc.get('changes_detected', 0)} changed, "
+                f"{pc.get('signals_new', 0)} new signals"
+            )
+        if sm.get("error"):
+            lines.append(f"- sitemaps: error — {_esc(sm['error'])}")
+        elif sm:
+            lines.append(
+                f"- sitemaps: {sm.get('companies_checked', 0)} checked, "
+                f"{sm.get('new_urls', 0)} new job URLs"
+            )
         lines.append("")
 
     lines.append("## Watchlist coverage")

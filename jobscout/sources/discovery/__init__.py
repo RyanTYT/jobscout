@@ -14,7 +14,7 @@ from jobscout import watchlist as wlmod
 from jobscout.core import db
 from jobscout.core.models import ProfileCfg, Settings, WatchlistEntry
 from jobscout.sources.ats.base import soft_get  # noqa: F401 — used by rss/hn/cse
-from jobscout.sources.discovery import cse, hn, rss
+from jobscout.sources.discovery import cse, github, hn, news, rss
 from jobscout.sources.discovery.blocklist import BLOCKED_DOMAINS, is_blocked  # noqa: F401
 
 MAX_HN_CANDIDATES = 6
@@ -110,6 +110,25 @@ def run_sweep(
         out["matched"].extend(out["hn"].get("matched", [])[:10])
     except Exception as e:  # noqa: BLE001
         out["hn"] = {"error": str(e)}
+
+    # ── monitoring-oriented discovery sources (P8 dark-pool extension) ─────
+    try:
+        out["github"] = github.sweep(client, conn, wl)
+        out["matched"].extend(out["github"].get("matched", [])[:5])
+    except Exception as e:  # noqa: BLE001
+        out["github"] = {"error": str(e)}
+
+    try:
+        out["news"] = news.sweep(client, conn, wl)
+        out["matched"].extend(out["news"].get("matched", [])[:5])
+    except Exception as e:  # noqa: BLE001
+        out["news"] = {"error": str(e)}
+
+    try:
+        out["hn_mentions"] = hn.search_company_mentions(client, conn, wl)
+        out["matched"].extend(out["hn_mentions"].get("matched", [])[:5])
+    except Exception as e:  # noqa: BLE001
+        out["hn_mentions"] = {"error": str(e)}
 
     try:
         if settings.discovery.pipeline.cse_queries_per_day > 0:

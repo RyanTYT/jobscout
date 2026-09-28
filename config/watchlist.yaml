@@ -298,3 +298,38 @@ candidates:
   note: 'HN Who-is-hiring: New Vector (Matrix.org &amp; Riot.im) | Offices in London,
     UK, Rennes, Fr | REMOTE | Full-time | Tea'
   found_via: hn-whoishiring
+- name: REMOTE (Worldwide)
+  domain: edx.org
+  ats: {}
+  note: 'HN Who-is-hiring: REMOTE (Worldwide) - Open Source Developer on Open edX
+    - React, Python&#x2F;Django, AWS&#x2F;OpenSta'
+  found_via: hn-whoishiring
+- name: HubSpot
+  domain: hubspot.com
+  ats: {}
+  note: 'HN Who-is-hiring: HubSpot | Senior Software Engineer | Cambridge, MA REMOTE
+    | Full time<p>HubSpot helps millions of or'
+  found_via: hn-whoishiring
+- name: Tray.io
+  domain: tray.io
+  ats: {}
+  note: 'HN Who-is-hiring: Tray.io | London | Backend Engineer (Scala&#x2F;Java) &#x2F;
+    Security Engineer &#x2F; Frontend Engin'
+  found_via: hn-whoishiring
+- name: ory
+  domain: ory.sh
+  ats: {}
+  note: 'HN Who-is-hiring: ory | ory.sh | Germany | Full-Time | On-Site<p><a href="https:&#x2F;&#x2F;github.com&#x2F;ory&#x2F;j'
+  found_via: hn-whoishiring
+- name: Minimax Labs
+  domain: minimaxlabs.com
+  ats: {}
+  note: 'HN Who-is-hiring: Minimax Labs | Full-stack, Research engineers&#x2F;scientists
+    | London, UK | ONSITE&#x2F;REMOTE, INT'
+  found_via: hn-whoishiring
+- name: LayerTwo
+  domain: layertwo.info
+  ats: {}
+  note: 'HN Who-is-hiring: LayerTwo | <a href="https:&#x2F;&#x2F;layertwo.info&#x2F;"
+    rel="nofollow">https:&#x2F;&#x2F;layertwo'
+  found_via: hn-whoishiring

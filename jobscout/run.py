@@ -57,6 +57,7 @@ def run_daily(force: bool = False) -> int:
     postings_seen = 0
     wl_changed = False
     discovery_stats: dict | None = None
+    monitoring_stats: dict | None = None
 
     client = make_client()
     try:
@@ -135,7 +136,7 @@ def run_daily(force: bool = False) -> int:
             watchlist.save(wl)
             print("watchlist self-healed: ATS boards discovered via careers pages (see git diff)")
 
-        # ── deterministic discovery (P4): RSS + HN + CSE → signals + candidates ──
+        # ── deterministic discovery (P4+P8): RSS + HN + CSE + GitHub + News + HN-mentions ──
         if settings.discovery.mode != "off":
             try:
                 import os as _os
@@ -151,6 +152,15 @@ def run_daily(force: bool = False) -> int:
                     print(f"watchlist grew: +{n_new} candidate(s) from discovery (see git diff)")
             except Exception as e:  # noqa: BLE001 — discovery must never break the run
                 errors.append(f"discovery: {e}")
+
+        # ── monitoring (P8): careers page changes + sitemap diffs ──────────
+        try:
+            from jobscout.sources.monitoring import run_monitoring
+
+            monitoring_stats = run_monitoring(client, conn)
+        except Exception as e:  # noqa: BLE001 — monitoring must never break the run
+            errors.append(f"monitoring: {e}")
+            monitoring_stats = None
     finally:
         client.close()
 
@@ -199,6 +209,7 @@ def run_daily(force: bool = False) -> int:
         errors=errors,
         closing=closing,
         discovery=discovery_stats,
+        monitoring=monitoring_stats,
         run_meta={
             "run_id": run_id,
             "companies": len(entries),

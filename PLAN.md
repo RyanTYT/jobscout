@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Version** | 2.0 (pinned 2026-09-28) |
-| **Status** | P7 complete — JobPilot sidecar integration live: protocol PRs committed (stdout responses, error serialization, scanForm, applyJobsByPayload), sidecar client spawns the real process, ping/manifests verified live; scanForm returns 0 fields (Greenhouse forms are in iframes — filler revalidation is the remaining P8 item) · **ALL 8 PHASES COMPLETE** |
+| **Status** | P7 + P8 dark-pool extension live: sidecar integration verified + 5 new monitoring/discovery sources (careers page change detector, sitemap diff, GitHub org activity, Google News RSS, HN company-mention search) — 207 news + 199 sitemap + 3 GitHub + 2 HN-mention signals accumulated on first run · **ALL 8 PHASES + EXTENSIONS COMPLETE** |
 | **Repo** | `/Users/user/Downloads/Personal Project/jobscout` (local only, no remote yet) |
 | **Sibling repos** | `../JobPilot` (the "hands", see §6) · `../rusty_trader` (unrelated) |
 | **Dev Mac rule** | This Mac develops only. **Never run `bootstrap.sh` here** — it installs launchd and belongs on the target/deployment Mac. |
@@ -563,6 +563,27 @@ need live revalidation before trusting them with real applications.
 - [x] Deferred to P8: all 4 fillers self-marked broken/degraded (lastVerified 2025-03-01); they need live testing against actual application forms — this is the same class of work as the ATS token revalidation in P1
 - [x] bootstrap.sh already checks Node presence (raises if missing); Playwright browsers are installed by the sidecar itself on first run. The JobPilot repo is a sibling clone (settings.yaml sidecar.path)
 
+### P8 extension — Dark-pool monitoring + discovery (2026-09-28)
+
+Five new signal sources, all deterministic, all free, all feeding the existing
+`signals` table (no schema migration — the architecture held):
+
+- `sources/monitoring.py` — careers page change detector (hash + job-title diff
+  via deterministic regex, state in the `state` table) + sitemap diff for job
+  URLs (catches drafts before posting goes live)
+- `sources/discovery/github.py` — GitHub org activity (guesses org from domain,
+  caches in state, signals on repos pushed in the last 7 days)
+- `sources/discovery/news.py` — Google News RSS per company (`"{name}" hiring`,
+  hiring-keyword filter on headlines)
+- `sources/discovery/hn.py` extension — `search_company_mentions()` searches
+  recent HN comments for watchlist company names with hiring-context filter
+- All wired into `run_sweep()` / `run_monitoring()` with per-source error
+  isolation (the existing pattern)
+
+First live run: 207 news signals, 199 sitemap job URLs, 3 GitHub pushes,
+2 HN mentions, 9 careers pages baselined. Digest gained a `## Monitoring`
+section. 51/51 tests.
+
 ### P8 — Polish + agent-generated plugins
 - [ ] Agent-generated ScraperPlugins for new watchlist companies (JobPilot plugin interface)
 - [ ] LinkedIn opt-in channel (interactive only, rate-limited)
@@ -605,6 +626,7 @@ need live revalidation before trusting them with real applications.
 | 2026-09-28 | Agent (P5): no CodeMax inference key exists to borrow — key-agnostic build with `--dry-run` scripted model; harness tools are safe by construction (SELECT-only db_query, path-sanitized notes, domain-validated adds); tool calling added to LlmClient (response_format suppressed when tools present) |
 | 2026-09-28 | Packets (P6): skeleton-first — the pipeline runs end-to-end on the skeleton resume and reports honest `needs_input` (missing fields + missing key + missing typst are reasons, not failures); tailor plans are ID-validated (unknown refs stripped+flagged, never trusted); claim-check is deterministic (no-LLM) and runs even in dry-run; FakeTailorModel/FakeCoverModel are deliberately fact-free so the gate provably passes only honest content |
 | 2026-09-28 | Sidecar (P7): JobPilot WIP committed first (bb247ad + 0bb646b) — clean base for the protocol PR; protocol changes are: responses→stdout (demux by shape), errors→err.message (was JSON.stringify({})), scanForm is read-only (no fill dispatch), applyJobsByPayload accepts full JobDetails (ids don't survive process boundaries); scanForm returning 0 fields on greenhouse listing URLs is honest (forms in iframes) — not a bug; filler revalidation is P8's remaining work |
+| 2026-09-28 | Dark-pool monitoring (P8 extension): the signals table + state table held WITHOUT migration — new signal kinds are just new `kind` values, per-company state is JSON in the existing `state` table; monitoring is a separate concept from discovery (targeted state comparison vs broad outward search) but shares the same emit-and-dedup pattern; first-run baselining is honest (no signal until the second run sees a change) |
 | OPEN | Private remote vs local-only |
 | OPEN | Final name |
 
