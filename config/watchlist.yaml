@@ -260,3 +260,41 @@ candidates:
   note: 'HN Who-is-hiring: Interos, Inc. | Haskell Engineer | ONSITE Arlington, VA
     | Full-Time<p>My team at Interos is hiring H'
   found_via: hn-whoishiring
+- name: LearnerShape, AI
+  domain: learnershape.com
+  ats: {}
+  note: 'HN Who-is-hiring: LearnerShape, AI-driven workforce skills startup Ruby on
+    Rails developer Full-time (part time possib'
+  found_via: hn-whoishiring
+- name: Rapyuta Robotics
+  domain: rapyuta.io
+  ats: {}
+  note: 'HN Who-is-hiring: Rapyuta Robotics | Site Reliability Engineers, Robotics
+    Software Engineers and Backend Engineers | T'
+  found_via: hn-whoishiring
+- name: Skydio
+  domain: skydio.com
+  ats:
+    ashby: skydio
+  note: 'HN Who-is-hiring: Skydio | Redwood City, California | Full-Time | Onsite
+    (post-quarantine)<p>Skydio is productizing st'
+  found_via: hn-whoishiring
+- name: Scrapinghub
+  domain: scrapinghub.com
+  ats: {}
+  note: 'HN Who-is-hiring: Scrapinghub | <a href="https:&#x2F;&#x2F;scrapinghub.com"
+    rel="nofollow">https:&#x2F;&#x2F;scrapingh'
+  found_via: hn-whoishiring
+- name: Wealthfront
+  domain: wealthfront.com
+  ats:
+    lever: wealthfront
+  note: 'HN Who-is-hiring: Wealthfront | Palo Alto, CA | Onsite | <a href="https:&#x2F;&#x2F;www.wealthfront.com"
+    rel="nofollow'
+  found_via: hn-whoishiring
+- name: New Vector (Matrix.org &amp; Riot.im)
+  domain: matrix.org
+  ats: {}
+  note: 'HN Who-is-hiring: New Vector (Matrix.org &amp; Riot.im) | Offices in London,
+    UK, Rennes, Fr | REMOTE | Full-time | Tea'
+  found_via: hn-whoishiring

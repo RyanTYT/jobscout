@@ -12,6 +12,7 @@ Design (PLAN §1, §9):
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from dataclasses import dataclass
@@ -34,12 +35,20 @@ class CapExceeded(LlmError):
 
 
 @dataclass
+class ToolCall:
+    id: str
+    name: str
+    arguments: dict
+
+
+@dataclass
 class LlmResponse:
     text: str
     model: str
     prompt_tokens: int
     completion_tokens: int
     cost_usd: float
+    tool_calls: list[ToolCall] | None = None
 
 
 class LlmClient:
@@ -88,6 +97,7 @@ class LlmClient:
         *,
         json_mode: bool = True,
         cache_key: str | None = None,
+        tools: list[dict] | None = None,
     ) -> LlmResponse:
         cfg = self.tier_cfg(tier)
         if not self.available:
@@ -105,8 +115,11 @@ class LlmClient:
             "messages": messages,
             "temperature": 0,
         }
-        if json_mode:
+        if json_mode and not tools:
             payload["response_format"] = {"type": "json_object"}
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -134,16 +147,28 @@ class LlmClient:
                 raise LlmError(f"{cfg.model}: HTTP {r.status_code}: {r.text[:300]}")
             try:
                 data = r.json()
-                text = data["choices"][0]["message"]["content"]
+                message = data["choices"][0]["message"]
             except (ValueError, KeyError, IndexError, TypeError) as e:
                 raise LlmError(f"{cfg.model}: unexpected response shape: {e}") from e
+            text = message.get("content") or ""
+            tool_calls: list[ToolCall] = []
+            for tc in message.get("tool_calls") or []:
+                fn = tc.get("function") or {}
+                try:
+                    args = json.loads(fn.get("arguments") or "{}")
+                except ValueError:
+                    args = {}
+                tool_calls.append(ToolCall(id=tc.get("id") or "",
+                                           name=fn.get("name") or "",
+                                           arguments=args))
             usage = data.get("usage") or {}
             pt = int(usage.get("prompt_tokens") or 0)
             ct = int(usage.get("completion_tokens") or 0)
             cost = _cost(cfg, pt, ct)
             self._record_call(tier, cfg.model, cache_key, pt, ct, cost)
             return LlmResponse(text=text, model=cfg.model, prompt_tokens=pt,
-                               completion_tokens=ct, cost_usd=cost)
+                               completion_tokens=ct, cost_usd=cost,
+                               tool_calls=tool_calls or None)
         raise LlmError(f"{cfg.model}: request failed after retries: {last_err}")
 
     # ── internals ───────────────────────────────────────────────────────────

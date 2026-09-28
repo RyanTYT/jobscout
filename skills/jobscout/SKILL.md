@@ -33,7 +33,7 @@ never mutate state except through it.
 | Validate master resume edits | `jobscout resume validate` |
 | Show canonical field map | `jobscout resume fields` |
 | Daily pipeline (deterministic) | `jobscout run --daily` → read `digest/` |
-| Morning agent brief (P5) | `jobscout agent --morning` → read `morning_reports/` |
+| Morning agent brief | `jobscout agent` (or `--dry-run`) → read `morning_reports/` |
 | Add a company to watchlist | `jobscout add-company <name> --domain <d> --tier C` |
 | Prepare a packet (P6) | `jobscout prepare --posting <id>` |
 | Record outcome | `jobscout mark <id> applied\|dismissed` |
@@ -41,14 +41,31 @@ never mutate state except through it.
 
 ## Morning routine (when asked to "check jobs" / "run the morning routine")
 
-1. Ensure today's pipeline ran (or run it): `jobscout run --daily`.
-2. Read `digest/$(date +%F).md`; if the agent switch is on, read
-   `morning_reports/$(date +%F).md` too.
-3. Summarize: top 5 postings WITH fit rationale + red flags; dark-pool leads
-   with their signals; anything closing soon; source-health anomalies.
+1. Run the Morning Brief: `jobscout agent` (deterministic sweep + agent harness
+   if an LLM key is set; `--dry-run` exercises the harness loop without a key).
+   The 07:00 launchd agent (`bootstrap --with-agent`) may have already run it —
+   check `morning_reports/$(date +%F).md` first.
+2. Ensure today's pipeline ran (or run it): `jobscout run --daily` → `digest/`.
+3. Read the morning report AND the digest. Summarize: what the agent added
+   (candidates, signals, research notes) with its one-line rationales; top 5
+   postings WITH fit rationale + red flags; dark-pool leads with their signals;
+   anything closing soon; source-health anomalies.
 4. Ask which postings to prepare packets for. Do NOT prepare unrequested.
 5. For packet prep, follow PLAN §5.4–§5.8 exactly, ending at `needs_input`/`ready`
    with the claim-check report shown.
+
+## Acting AS the discovery agent (interactive runtime)
+
+The headless harness (jobscout/agent/) and you execute the SAME Morning Brief
+(PLAN §1.2). When asked to research/discover interactively:
+- Resolve unresolved mentions: signals with company_id NULL (RSS funding names
+  without domains) — web-search the company, then `jobscout add-company` with
+  the real domain.
+- Deep-dive dark-pool leads: fetch careers pages/blogs/news, then write
+  `research/<company-slug>.md` with sources and dates.
+- Propose watchlist promotions (never apply without the owner's confirmation).
+- The headless harness has the same caps discipline: be frugal, cite sources,
+  never invent domains.
 
 ## Dark-pool drill-down (when asked to research a company)
 

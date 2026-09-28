@@ -1,0 +1,1 @@
+Dry-run research note: harness loop exercised end-to-end.

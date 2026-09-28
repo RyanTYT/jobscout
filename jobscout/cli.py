@@ -7,7 +7,6 @@ Later-phase verbs exist as stubs pointing at the PLAN so the surface is discover
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import typer
@@ -224,12 +223,14 @@ def digest(today: bool = typer.Option(True, "--today", help="Show the latest dig
 
 
 @app.command()
-def agent(morning: bool = typer.Option(False, "--morning")):
-    """Run the deterministic discovery sweep (RSS + HN + CSE).
+def agent(
+    morning: bool = typer.Option(False, "--morning", help="Run the full Morning Brief (deterministic sweep + agent harness)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Run the agent harness with a scripted fake model (no key needed)"),
+) -> None:
+    """The Morning Brief: deterministic sweep, then the agent tool loop (P5).
 
-    The full Morning Brief — web search + judgment + research notes behind
-    the mode switch — lands in P5. This runs the same deterministic sweep
-    the daily pipeline runs, on demand.
+    Without an API key the deterministic sweep still runs (free), and the
+    harness is skipped — unless --dry-run exercises the loop with a fake model.
     """
     import os
 
@@ -248,29 +249,61 @@ def agent(morning: bool = typer.Option(False, "--morning")):
     dbmod.init_db()
     conn = dbmod.connect()
     client = make_client()
+    env = {**os.environ, **load_env()}
     try:
-        stats = discovery.run_sweep(
-            client, conn, wl, profile, settings, {**os.environ, **load_env()}
-        )
+        # 1. deterministic sweep (free)
+        stats = discovery.run_sweep(client, conn, wl, profile, settings, env)
         if stats.get("watchlist_changed"):
             wlmod.save(wl)
+        for c in (stats.get("candidates") or []):
+            console.print(f"  [green]+ candidate[/] {c}")
+        for m in list(dict.fromkeys(stats.get("matched") or []))[:8]:
+            console.print(f"  [cyan]· signal[/] {m}")
+        for key in ("rss", "hn", "cse"):
+            part = stats.get(key) or {}
+            if part.get("skipped"):
+                console.print(f"  [yellow]{key}: skipped[/] — {part['skipped']}")
+            elif part.get("error"):
+                console.print(f"  [red]{key}: error[/] — {part['error']}")
+
+        # 2. agent harness (P5)
+        from jobscout.agent.harness import FakeAgentModel, run_morning
+        from jobscout.llm import LlmClient
+
+        if dry_run:
+            console.print("[bold]agent harness (dry run — scripted fake model)[/]")
+            result = run_morning(
+                FakeAgentModel(), conn, wl, profile, settings, env, client
+            )
+            _print_agent_result(result)
+            return
+        llm = LlmClient(conn=conn, settings=settings, env=env)
+        if llm.available:
+            console.print("[bold]agent harness — Morning Brief[/]")
+            result = run_morning(llm, conn, wl, profile, settings, env, client)
+            if result.get("watchlist_changed"):
+                wlmod.save(wl)
+                console.print("[green]watchlist changed — saved[/]")
+            _print_agent_result(result)
+        else:
+            console.print(
+                "[yellow]agent harness skipped (no API key)[/] — deterministic sweep only. "
+                "Set JOBSCOUT_LLM_API_KEY in .env, or try --dry-run to see the loop."
+            )
     finally:
         client.close()
         conn.close()
 
-    for c in (stats.get("candidates") or []):
-        console.print(f"  [green]+ candidate[/] {c}")
-    for m in (stats.get("matched") or [])[:10]:
-        console.print(f"  [cyan]· signal[/] {m}")
-    for key in ("rss", "hn", "cse"):
-        part = stats.get(key) or {}
-        if part.get("skipped"):
-            console.print(f"  [yellow]{key}: skipped[/] — {part['skipped']}")
-        elif part.get("error"):
-            console.print(f"  [red]{key}: error[/] — {part['error']}")
-        else:
-            console.print(f"  {key}: {json.dumps({k: v for k, v in part.items() if k not in ('matched', 'unknown')}, default=str)}")
-    console.print("[dim]full agent Morning Brief (query generation + judgment + research notes) lands in P5[/]")
+
+def _print_agent_result(result: dict) -> None:
+    console.print(
+        f"  {result['steps']} steps · ${result['cost']:.4f}"
+        + (f" · [yellow]{result['cap_note']}[/]" if result.get("cap_note") else "")
+    )
+    for d in (result.get("diff") or []):
+        console.print(f"  [cyan]· change[/] {d}")
+    console.print(result.get("final", "")[:800])
+    console.print(f"  report → {result['report']}")
 
 
 @app.command()

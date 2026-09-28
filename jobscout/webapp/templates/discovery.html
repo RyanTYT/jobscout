@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>discovery</h1>
+
+<h2>mode switch</h2>
+<form method="post" action="/discovery/mode" class="filters">
+  <label>discovery mode
+    <select name="mode" onchange="this.form.submit()">
+      {% for m, desc in [
+        ("off", "nothing runs automatically"),
+        ("pipeline", "deterministic sources + cheap LLM scoring only (~$1/mo)"),
+        ("agent", "morning agent rides on top of the always-running pipeline"),
+        ("hybrid", "agent N days/week + on-demand runs on signal spikes"),
+      ] %}
+      <option value="{{ m }}" {% if settings.discovery.mode == m %}selected{% endif %}>{{ m }} — {{ desc }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <noscript><button type="submit">set mode</button></noscript>
+</form>
+<p class="dim">
+  schedule: {{ settings.discovery.agent.schedule }} ·
+  step cap: {{ settings.discovery.agent.max_steps }} ·
+  cost cap: ${{ "%.2f" | format(settings.discovery.agent.max_cost_usd) }}/day ·
+  run on signal: {{ "on" if settings.discovery.agent.run_on_signal else "off" }}
+  (launchd: com.jobscout.agent 07:00 — installed via bootstrap --with-agent)
+</p>
+
+<div class="actions-page">
+  <form method="post" action="/discovery/run">
+    <button type="submit">Run agent now</button>
+  </form>
+  <span class="dim">runs the deterministic sweep + agent harness (if key present) as a subprocess, bounded by caps</span>
+</div>
+
+{% if run_output %}
+<h2>last run output</h2>
+<pre class="desc">{{ run_output }}</pre>
+{% endif %}
+
+<h2>agent spend (30 days)</h2>
+<p class="dim">
+  {{ agent_spend["calls"] }} calls · {{ "{:,}".format(agent_spend["tokens"]) }} tokens · ${{ "%.4f" | format(agent_spend["cost"]) }}
+  — metered in llm_calls, capped per tier in config/models.yaml
+</p>
+
+<h2>morning reports</h2>
+{% if reports %}
+<ul>
+  {% for r in reports %}
+  <li class="dim">{{ r }}</li>
+  {% endfor %}
+</ul>
+{% if latest_report %}
+<h2>{{ latest_report.name }}</h2>
+<pre class="desc">{{ latest_report.content }}</pre>
+{% endif %}
+{% else %}
+<p class="dim">no morning reports yet — run `jobscout agent --morning` (or press Run agent now)</p>
+{% endif %}
+{% endblock %}

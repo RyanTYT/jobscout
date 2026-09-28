@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -73,3 +74,31 @@ def load_env() -> dict[str, str]:
         key, _, value = line.partition("=")
         out[key.strip()] = value.strip().strip("'\"")
     return out
+
+
+def set_discovery_mode(mode: str) -> None:
+    """Persist discovery.mode to settings.yaml with a line-level edit
+    (preserves the file's comments)."""
+    if mode not in ("off", "pipeline", "agent", "hybrid"):
+        raise ConfigError(f"invalid discovery mode: {mode!r}")
+    path = config_dir() / "settings.yaml"
+    if not path.is_file():
+        raise ConfigError(f"missing config file: {path}")
+    lines = path.read_text(encoding="utf-8").splitlines()
+    in_block = False
+    changed = False
+    for i, line in enumerate(lines):
+        if line.startswith("discovery:"):
+            in_block = True
+            continue
+        if in_block:
+            if line and not line[0].isspace():
+                in_block = False  # left the discovery block
+                continue
+            if line.strip().startswith("mode:"):
+                lines[i] = re.sub(r"mode:\s*\w+", f"mode: {mode}", line)
+                changed = True
+                break
+    if not changed:
+        raise ConfigError("could not find discovery.mode in settings.yaml")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")

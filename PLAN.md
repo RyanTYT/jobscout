@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Version** | 2.0 (pinned 2026-09-28) |
-| **Status** | P4 complete — deterministic discovery live: 11 companies entered the watchlist without owner action (HN Who-is-hiring + RSS funding), 164 signals recorded, Companies page shows timelines · **Next: P5 — agent harness + Morning Brief + the discovery-mode switch** |
+| **Status** | P5 complete — agent harness live (tool loop, caps, morning reports, dashboard Discovery switch, --dry-run verified end-to-end); harness activates fully when an LLM key lands in .env · **Next: P6 — master-resume consumers: packets** |
 | **Repo** | `/Users/user/Downloads/Personal Project/jobscout` (local only, no remote yet) |
 | **Sibling repos** | `../JobPilot` (the "hands", see §6) · `../rusty_trader` (unrelated) |
 | **Dev Mac rule** | This Mac develops only. **Never run `bootstrap.sh` here** — it installs launchd and belongs on the target/deployment Mac. |
@@ -514,16 +514,18 @@ first runs (Adyen, 10X Genomics, AMEX, Skool, causaLens, IOMED, ...),
 - [x] Signal → company resolution (name matching); Companies page: signals column + recent-signals timeline; digest Discovery section; schema v3 (state kv + dedup-by-(kind,key) signals)
 - [x] `jobscout agent` runs the deterministic sweep on demand (full Morning Brief lands in P5)
 
-### P5 — Agent harness + Morning Brief + the mode switch
-Done when: a headless agent run writes a morning report with auditable DB diff, under caps.
+### P5 — Agent harness + Morning Brief + the mode switch ✅ (2026-09-28)
+Done when: a headless agent run writes a morning report with auditable DB diff, under caps —
+**verified via --dry-run (scripted FakeAgentModel: 4 steps, $0, tool loop + report + diff);
+the live-model path engages the moment an API key lands in .env.**
 
-- [ ] `agent/harness.py` (tool loop, step/cost caps, abort-on-cap)
-- [ ] `agent/tools.py`: web_search, fetch, db_query, add_company, add_signal, write_note — all DB writes via core functions
-- [ ] `agent/brief.py` (§1.2 as a prompt + context builder)
-- [ ] Discovery mode switch: config + dashboard Settings/Discovery page + [Run agent now]
-- [ ] `jobscout agent --morning` real; `com.jobscout.agent` launchd (bootstrap `--with-agent`)
-- [ ] `skills/jobscout/SKILL.md` full contract (interactive runtime for the same brief)
-- [ ] Morning report ends with DB-change diff
+- [x] `agent/harness.py` — tool loop, step cap, cost cap (CapExceeded → graceful stop), DB snapshot/diff, morning report writer
+- [x] `agent/tools.py`: get_context, web_search (CSE→Brave, honest no-key error), fetch, db_query (SELECT-only + allowlist + forced LIMIT), add_company (live-probed, domain-validated), add_signal (deduped), write_note (path-sanitized into research/)
+- [x] `agent/brief.py` — §1.2 rendered from live state (caps, rules, dark-pool focus)
+- [x] Discovery mode switch: dashboard /discovery page — mode dropdown persisting to settings.yaml (line-level patch), caps display, agent spend, report archive, [Run agent now] via subprocess; verified live with a roundtrip (hybrid→agent→hybrid)
+- [x] `jobscout agent [--morning|--dry-run]` — deterministic sweep then harness (real or fake); `com.jobscout.agent` launchd plist already in bootstrap
+- [x] SKILL.md full contract: morning routine, acting-as-the-agent section (resolve unresolved mentions, dark-pool deep-dives, propose-not-promote)
+- [x] Morning report: steps/cost header, final summary, DB-change diff, full tool log
 
 ### P6 — Master-resume consumers: packets
 Done when: one selected posting → complete packet, claim-checked, PDF.
@@ -587,6 +589,7 @@ Done when: [Fill for me] fills a real form headfully and returns an auditable fi
 | 2026-09-28 | Bulk scoring: cache key (profile_version, content_hash); per-tier daily caps in models.yaml degrade to rule-only; no-key runs are rule-only by design; first-run baseline scores only within cap (backfill via `jobscout score`) |
 | 2026-09-28 | Careers ladder (P3): board-link scan beats page scraping — discovered tokens are live-verified, then the standard ATS connector owns future pulls (watchlist self-heals); JS-rendered careers pages are honest dark-pool, not failures (sidecar render is P7) |
 | 2026-09-28 | Discovery (P4): HN comments rarely hyperlink — domains come from emails + bare mentions; discovered companies enter `candidates` with live ATS probing and domain-level dedup (name variants don't duplicate); unresolved RSS mentions stay company-NULL signals for the P5 agent |
+| 2026-09-28 | Agent (P5): no CodeMax inference key exists to borrow — key-agnostic build with `--dry-run` scripted model; harness tools are safe by construction (SELECT-only db_query, path-sanitized notes, domain-validated adds); tool calling added to LlmClient (response_format suppressed when tools present) |
 | OPEN | Private remote vs local-only |
 | OPEN | Final name |
 
@@ -604,6 +607,6 @@ Done when: [Fill for me] fills a real form headfully and returns an auditable fi
 
 ## Appendix B — CLI surface
 
-Implemented (P0–P2): `jobscout doctor` (incl. source health) · `jobscout db init|status` · `jobscout config check|show` · `jobscout resume validate|fields` · `jobscout run [--daily|--force]` · `jobscout add-company` · `jobscout probe` · `jobscout digest` · `jobscout serve` · `jobscout score` · `jobscout stats` · `jobscout version`
+Implemented (P0–P2): `jobscout doctor` (incl. source health) · `jobscout db init|status` · `jobscout config check|show` · `jobscout resume validate|fields` · `jobscout run [--daily|--force]` · `jobscout add-company` · `jobscout probe` · `jobscout digest` · `jobscout serve` · `jobscout score` · `jobscout stats` · `jobscout agent [--dry-run]` · `jobscout version`
 
-Planned: `jobscout run [--daily]` (P1) · `jobscout add-company` (P1) · `jobscout serve` (P2) · `jobscout agent [--morning|--now]` (P5) · `jobscout prepare --posting ID` (P6) · `jobscout mark ID applied|dismissed|withdrawn` (P6) · `jobscout digest --today` (P1) · `jobscout stats` (P2) · `jobscout fill --packet ID` (P7)
+Planned: `jobscout prepare --posting ID` (P6) · `jobscout mark ID applied|dismissed|withdrawn` (P6) · `jobscout fill --packet ID` (P7)
