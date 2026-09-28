@@ -656,6 +656,33 @@ build step (vendored files, portable bootstrap), ships the full
 component set (dropdowns, toasts, dark mode) without JS we'd otherwise
 hand-write, and is the industry default that future maintainers know.
 
+Theme follow-up (same day): the first Bootstrap pass left two variable
+systems half-bridged — framework components rendered in Bootstrap's
+default palette while app chrome used the token palette, and
+tokens.css's dark block was still keyed to the retired [data-theme]
+attribute so semantic tokens never flipped. Now wired end to end:
+
+- tokens.css defines ONE semantic theme (surfaces, text, borders, nav,
+  accent + success/danger/warning/info/special, each with rgb / text /
+  soft / border variants) and flips ALL of it under
+  [data-bs-theme="dark"]; rgb companion tokens feed rgba() compositing.
+- app.css forwards every semantic token into the full --bs-* surface
+  (body/surfaces/borders, all theme colors + -rgb / text-emphasis /
+  bg-subtle / border-subtle, links, focus ring) via ONE
+  `:root, [data-bs-theme="dark"]` block — later in source than
+  Bootstrap, so it wins in both modes; component-level overrides
+  (card, table, dropdown, pagination, solid buttons, filled badges)
+  beat Bootstrap's own dark-mode rules the same way.
+- Zero literal colors outside tokens.css; app.css references vars only
+  (fonts/sizes/spacings included). Media-query breakpoints are the one
+  unavoidable literal (CSS vars can't appear in @media) — documented
+  in tokens.css next to --bp-*.
+- Contrast fixes the mapping surfaced: dark mode uses inverse text
+  (near-black) on bright accent buttons/badges/active pagination
+  instead of Bootstrap's hardcoded white; .text-bg-light becomes a
+  subtle neutral chip in both modes; .text-bg-purple added for the
+  dark-pool/interested tone.
+
 ### P8 — Polish + agent-generated plugins
 - [ ] Agent-generated ScraperPlugins for new watchlist companies (JobPilot plugin interface)
 - [ ] LinkedIn opt-in channel (interactive only, rate-limited)
