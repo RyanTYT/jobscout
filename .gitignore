@@ -1,0 +1,21 @@
+# --- secrets & state (NEVER commit) ---
+.env
+data/
+logs/
+*.sqlite3
+*.db
+
+# --- python ---
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# --- os / editor ---
+.DS_Store
+~/
+*.swp

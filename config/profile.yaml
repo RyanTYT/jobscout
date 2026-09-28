@@ -1,0 +1,50 @@
+# Distilled scoring rubric — the ONLY input to bulk (tier-1) scoring.
+# Generated from master_resume/ by the quality model (Phase 6 distiller),
+# then HUMAN-APPROVED. Edit freely; bump profile_version when you do —
+# the LLM score cache is keyed on (content_hash, profile_version) and a
+# bump re-scores active postings only.
+
+profile_version: "2026-09-28.1"
+
+target:
+  roles:
+    - quant developer
+    - trading systems engineer
+    - backend engineer
+  weighting:
+    quant: 0.7            # ← "both, quant-weighted"
+    general-backend: 0.3
+  seniorities: [senior, staff]
+  locations: []            # e.g. [Singapore, "New York", Remote]
+  remote:
+    allowed: true
+    preference: hybrid     # onsite | hybrid | remote
+  domains:
+    - market-data
+    - execution
+    - exchange-infra
+    - low-latency-systems
+  stack:
+    - rust
+    - c++
+    - python
+    - kafka
+    - postgresql
+
+dealbreakers:
+  - clearance_required
+  - on_call_heavy
+
+company_tiers:
+  A: []                    # dream companies (name or domain per row)
+  B: []
+  C: []
+
+scoring_rubric:
+  fit: 0.6
+  company_quality: 0.25
+  opportunity: 0.15        # ATS-weakness / low competition — the dark-pool thesis
+
+comp_floor:                # optional: currency + annual floor; policy from master extras
+  currency: USD
+  amount: null

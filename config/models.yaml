@@ -1,0 +1,23 @@
+# LLM tiers — three tiers, three jobs (PLAN §1). Provider-agnostic:
+# every model is served through the OpenAI-compatible endpoint in settings/llm.
+# Names below are placeholders pointing at OpenRouter-style slugs — set yours.
+
+tiers:
+  bulk:
+    model: deepseek/deepseek-chat
+    max_daily_usd: 0.25
+    purpose: bulk scoring, field mapping, claim checks (cached by content hash)
+
+  agent:
+    model: deepseek/deepseek-chat
+    max_daily_usd: 1.00
+    purpose: morning discovery harness (step+cost capped, PLAN §1.2)
+
+  quality:
+    model: deepseek/deepseek-chat
+    max_daily_usd: 2.00
+    purpose: resume tailoring, cover letters, profile distillation
+
+caps:
+  monthly_usd: 15.0
+  on_cap: rule-only        # degrade to deterministic scoring, note in digest footer

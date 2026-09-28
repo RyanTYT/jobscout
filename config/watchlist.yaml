@@ -1,0 +1,192 @@
+# jobscout watchlist — the living company-first substrate (PLAN §5.9)
+#
+# BOTH jobs live in this one file:
+#   1. SCRAPE LIST — entries with `ats:` tokens are polled daily via free ATS JSON APIs.
+#   2. DARK-POOL GRAPH — entries with no `ats:` tokens have no board presence:
+#      monitored via careers pages (P3) and signals (P4/P5). Hiring signals + no
+#      postings = dark-pool lead.
+#
+# Discovery (pipeline + morning agent) appends entries to `candidates` every day
+# via `jobscout add-company <name> --domain <d>` (ATS boards probed automatically).
+# Promote with `jobscout add-company <name> --tier B`, or edit this file by hand.
+# Per-entry `note:` is data (survives regeneration); free-form comments do not.
+#
+# Entry fields: name, domain, ats (provider -> board token), note, found_via.
+# Git history of this file = the auditable record of your network growing.
+
+A:
+- name: Jane Street
+  domain: janestreet.com
+  ats:
+    greenhouse: janestreet
+  note: OCaml shop, flat culture; own careers page — dark-pool entry
+- name: Hudson River Trading
+  domain: hudsonrivertrading.com
+  ats: {}
+  note: no public ATS board — dark-pool entry
+- name: Citadel Securities
+  domain: citadelsecurities.com
+  ats: {}
+  note: C++20/FPGA nanosecond shop; check Citadel too
+- name: Two Sigma
+  domain: twosigma.com
+  ats: {}
+  note: no public ATS board — dark-pool entry
+- name: Jump Trading
+  domain: jumptrading.com
+  ats:
+    greenhouse: jumptrading
+  note: HFT/FPGA; Jump Crypto arm
+- name: DRW
+  domain: drw.com
+  ats: {}
+  note: Cumberland = crypto arm
+- name: Optiver
+  domain: optiver.com
+  ats: {}
+  note: no public ATS board — dark-pool entry
+- name: IMC Trading
+  domain: imc.com
+  ats:
+    greenhouse: imc
+  note: ''
+- name: Susquehanna International Group
+  domain: sig.com
+  ats: {}
+  note: no public ATS board — dark-pool entry
+- name: Five Rings
+  domain: fiverings.com
+  ats: {}
+  note: small, secretive, high talent density
+- name: Tower Research Capital
+  domain: towerresearch.com
+  ats:
+    greenhouse: towerresearchcapital
+  note: ''
+- name: Squarepoint Capital
+  domain: squarepoint.com
+  ats:
+    greenhouse: squarepointcapital
+  note: ''
+- name: XTX Markets
+  domain: xtx.tech
+  ats: {}
+  note: no public ATS board — dark-pool entry
+- name: Virtu Financial
+  domain: virtu.com
+  ats:
+    greenhouse: virtu
+  note: ''
+- name: Flow Traders
+  domain: flowtraders.com
+  ats:
+    greenhouse: flowtraders
+  note: ETP + crypto market maker
+- name: Headlands Technologies
+  domain: headlandstech.com
+  ats: {}
+  note: no public ATS board — dark-pool entry
+- name: Point72
+  domain: point72.com
+  ats:
+    greenhouse: point72
+  note: ''
+- name: Radix Trading
+  domain: radixtrading.com
+  ats: {}
+  note: own careers page — dark-pool entry
+B:
+- name: Wintermute
+  domain: wintermute.com
+  ats: {}
+  note: crypto MM, Rust/C++
+- name: GSR
+  domain: gsr.io
+  ats: {}
+  note: crypto MM
+- name: Keyrock
+  domain: keyrock.net
+  ats:
+    ashby: keyrock
+  note: crypto MM
+- name: B2C2
+  domain: b2c2.com
+  ats:
+    greenhouse: b2c2
+  note: institutional crypto MM (SBI)
+- name: Presto Labs
+  domain: prestolabs.io
+  ats:
+    lever: prestolabs
+  note: Singapore HFT crypto
+- name: Caladan
+  domain: caladan.io
+  ats:
+    greenhouse: caladan
+  note: Singapore quant MM (ex-AlphaLab)
+- name: Selini Capital
+  domain: selinicapital.com
+  ats:
+    greenhouse: selinicapital
+  note: algo trading, CeFi+DeFi
+- name: FalconX
+  domain: falconx.io
+  ats:
+    greenhouse: falconx
+  note: crypto prime brokerage
+- name: Coinbase
+  domain: coinbase.com
+  ats:
+    greenhouse: coinbase
+  note: ''
+- name: Kraken
+  domain: kraken.com
+  ats: {}
+  note: no public ATS board — dark-pool entry
+- name: Stripe
+  domain: stripe.com
+  ats:
+    greenhouse: stripe
+  note: ''
+- name: Figma
+  domain: figma.com
+  ats:
+    greenhouse: figma
+  note: ''
+- name: Cloudflare
+  domain: cloudflare.com
+  ats:
+    greenhouse: cloudflare
+  note: ''
+- name: Datadog
+  domain: datadoghq.com
+  ats:
+    greenhouse: datadog
+  note: ''
+- name: Vercel
+  domain: vercel.com
+  ats:
+    greenhouse: vercel
+  note: ''
+- name: Linear
+  domain: linear.app
+  ats:
+    ashby: linear
+  note: ''
+- name: Ramp
+  domain: ramp.com
+  ats:
+    ashby: ramp
+  note: ''
+- name: Plaid
+  domain: plaid.com
+  ats:
+    ashby: plaid
+  note: ''
+- name: Anthropic
+  domain: anthropic.com
+  ats:
+    greenhouse: anthropic
+  note: ''
+C: []
+candidates: []
