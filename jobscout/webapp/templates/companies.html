@@ -13,9 +13,9 @@
       watchlist.yaml mirrors this table · discovery appends candidates daily (PLAN §5.9)
     </div>
   </div>
-  <div class="row g-2 mw-100" style="width: auto">
-    <div class="col-6">{{ m.stat("companies", rows | length) }}</div>
-    <div class="col-6">{{ m.stat("signals", signals | length) }}</div>
+  <div class="d-flex flex-wrap gap-2">
+    {{ m.stat("companies", rows | length) }}
+    {{ m.stat("signals", signals | length) }}
   </div>
 </div>
 
@@ -23,7 +23,7 @@
 
   <div class="col-lg-8">
     <div class="card">
-      <div class="table-responsive">
+      <div class="table-responsive scroll-y">
         <table class="table table-hover align-middle mb-0">
           <thead class="table-light">
             <tr>
@@ -39,7 +39,7 @@
           </thead>
           <tbody>
             {% for r in rows %}
-            <tr>
+            <tr {% if r.career_url %}data-row-link="{{ r.career_url }}"{% endif %}>
               <td class="fw-medium">{{ r.name }}</td>
               <td>{% if r.tier %}{{ m.badge(r.tier, "light") }}{% endif %}</td>
               <td class="small text-secondary text-truncate" style="max-width: 12rem;">{{ r.domain or "—" }}</td>
@@ -78,11 +78,13 @@
         <h2 class="card-title mb-0 h6">Signal feed</h2>
         <span class="text-secondary small">latest {{ signals | length }}</span>
       </div>
+      <div class="scroll-y">
       {% for s in signals %}
         {{ m.signal(s) }}
       {% else %}
-      <div class="card-body">{{ m.empty("No signals yet", "Signals accumulate as sources run daily.", "radar") }}</div>
+        <div class="card-body">{{ m.empty("No signals yet", "Signals accumulate as sources run daily.", "radar") }}</div>
       {% endfor %}
+      </div>
     </div>
 
     {% if kinds %}

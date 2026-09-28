@@ -213,6 +213,7 @@
   --topbar-h: 60px;
   --content-max: 1280px;
   --field-min-w: 200px;
+  --panel-max-h: 60vh;    /* signal feed / long tables scroll past this */
   --menu-max-h: 280px;
   --table-min-w: 720px;
 

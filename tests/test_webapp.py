@@ -519,3 +519,26 @@ def test_discovery_page_shows_hunting_profile(client):
     assert r.status_code == 200
     assert "Hunting profile" in r.text
     assert "levels" in r.text and "locations" in r.text
+
+
+# ── companies page: scrollable panels + row links (UI polish) ───────────────
+
+
+def test_companies_page_scrollable_and_row_links(client):
+    r = client.get("/companies")
+    assert r.status_code == 200
+    assert r.text.count("scroll-y") >= 2          # table + signal feed
+    assert "data-row-link" in r.text              # rows with careers URLs
+    assert "text-nowrap" in r.text                # stat titles never wrap
+
+
+def test_inbox_rows_carry_row_links(client):
+    r = client.get("/")
+    assert r.status_code == 200
+    assert 'data-row-link="/posting/' in r.text
+
+
+def test_applications_rows_carry_row_links(client, db_file, tmp_path):
+    _seed_packet(db_file, tmp_path)
+    r = client.get("/applications")
+    assert 'data-row-link="/packet/pk_w1"' in r.text

@@ -584,6 +584,24 @@ textarea.form-control:placeholder-shown {
 .description { font-size: var(--fs-md); line-height: var(--lh-relaxed); color: var(--text-1); }
 .description p { margin-bottom: var(--sp-4); max-width: 75ch; }
 
+/* ── scrollable panels: feeds and long tables scroll internally past
+   --panel-max-h instead of stretching the page; headers stick ──────── */
+
+.scroll-y { max-height: var(--panel-max-h); overflow-y: auto; }
+.table-responsive.scroll-y { overflow: auto; }  /* keep horizontal too */
+
+/* sticky column headers, but only inside a vertical scroll container */
+.scroll-y thead th {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+/* ── whole-row navigation: tr[data-row-link] (app.js navigates on plain
+   clicks; links/buttons inside the row keep their own behaviour) ─────── */
+
+tr[data-row-link] { cursor: pointer; }
+
 /* toasts sit above everything (bootstrap container z-index) */
 .toast-container { z-index: var(--z-toast); }
 

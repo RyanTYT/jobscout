@@ -93,7 +93,7 @@
         {% for item in stage_rows %}
         {% set pk = item.row %}
         {% set man = item.manifest %}
-        <tr>
+        <tr data-row-link="/packet/{{ pk.id }}">
           <td class="ps-4">
             <input class="form-check-input" type="checkbox" name="pk"
                    value="{{ pk.id }}" data-apply-row

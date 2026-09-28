@@ -183,6 +183,20 @@
     sync();
   }
 
+  /* ── whole-row navigation: tr[data-row-link] ────────────────────────── */
+  // plain left-clicks anywhere in the row navigate to its link; clicks on
+  // real links/buttons/controls keep their own behaviour, and modifier
+  // clicks fall through to the browser (new tab, etc.)
+  document.addEventListener("click", function (e) {
+    if (e.defaultPrevented || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var tr = e.target.closest("tr[data-row-link]");
+    if (!tr || !tr.getAttribute("data-row-link")) return;
+    if (e.target.closest(
+        "a, button, input, select, textarea, label, .form-check")) return;
+    window.location.assign(tr.getAttribute("data-row-link"));
+  });
+
   /* ── table sorting: a property of every .table component ────────────── */
 
   function ensureSortKeys(table) {
