@@ -621,7 +621,26 @@ DB additions (no migration): `_posting_filters()` shared WHERE builder,
 `count_postings()`, `filter_options()`; `list_postings()` gained
 level/location/company/source/remote/sort params. 74/74 tests.
 
-#### P9 — Apply launcher (2026-09-28, user request)
+#### P10 — Tauri desktop port (2026-09-28, user request)
+
+The app is wrapped, not rewritten — the FastAPI backend stays the single
+implementation; desktop/src-tauri is a Rust shell that owns process
+lifecycle: free port → spawn backend (dev: .venv/bin/jobscout; release:
+Resources/backend/jobscout-server, a PyInstaller onedir freeze with
+webapp templates/static + jobscout/defaults bundled) → `jobscout
+init-home` first-run bootstrap (seeds config + master resume from
+defaults, inits DB; idempotent) → port readiness poll → webview window →
+backend killed on app exit. JOBSCOUT_HOME relocates the whole runtime
+(packaged: ~/Library/Application Support/com.jobscout.desktop);
+JOBSCOUT_SIDECAR_BIN points at a bundled JobPilot sidecar later (not
+bundled yet — automated apply degrades to assisted). Logs: stderr +
+<app-data>/logs/desktop.log. One command — desktop/build-release.sh —
+freezes and bundles: jobscout.app 51.9 MiB + dmg 25.3 MiB (system
+webview; an order of magnitude under an Electron equivalent). Dev:
+`cd desktop && npm install && npm run dev`. Desktop details in
+desktop/README.md.
+
+### P9 — Apply launcher (2026-09-28, user request)
 
 Detail-page back links are quiet inline .backlink components (the old
 outline buttons stretched full-width because .content is a flex column).
