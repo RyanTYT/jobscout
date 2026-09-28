@@ -460,6 +460,132 @@ def mark(vid: str, status: str = typer.Argument(...)) -> None:
 
 
 @app.command()
+def scan_form(
+    posting_id: str = typer.Argument(..., help="posting id"),
+    headless: bool = typer.Option(True, "--headless/--headed"),
+) -> None:
+    """Scan the real ATS application form for a posting (read-only, P7).
+
+    Spawns the JobPilot sidecar, navigates to the posting's apply URL,
+    and collects all labelled form fields. Writes fill_sheet_scanned.yaml
+    into the packet directory.
+    """
+    import yaml
+
+    from jobscout.sidecar import SidecarClient, SidecarError
+
+    db.init_db()
+    conn = db.connect()
+    try:
+        posting = db.get_posting(conn, posting_id)
+        if posting is None:
+            console.print(f"[red]no such posting: {posting_id}[/]")
+            raise typer.Exit(1)
+        packet = db.get_packet_for_posting(conn, posting_id)
+    finally:
+        conn.close()
+
+    url = posting["url"]
+    console.print(f"scanning form at [bold]{url}[/] …")
+    try:
+        with SidecarClient(headless=headless) as sidecar:
+            result = sidecar.scan_form(url, timeout=45)
+    except SidecarError as e:
+        console.print(f"[red]sidecar error: {e}[/]")
+        console.print("  build: cd ../JobPilot/scraper && npm run build-internal")
+        raise typer.Exit(1) from e
+
+    fields = result.get("fields") or []
+    console.print(f"  [green]{len(fields)} fields[/] found")
+    for f in fields[:20]:
+        req = " *" if f.get("required") else ""
+        opts = f" ({', '.join(f.get('options', [])[:3])}…)" if f.get("options") else ""
+        console.print(f"  · {f['label']}{req} [{f['kind']}]{opts}")
+    if len(fields) > 20:
+        console.print(f"  … +{len(fields) - 20} more")
+
+    # write into the packet directory if a packet exists
+    if packet and packet["dir"]:
+        out = Path(packet["dir"]) / "fill_sheet_scanned.yaml"
+        out.write_text(yaml.safe_dump({"source": "scanned", "url": url,
+                                        "fields": fields},
+                                       sort_keys=False, allow_unicode=True),
+                       encoding="utf-8")
+        console.print(f"  written: {out}")
+    else:
+        console.print("  (no packet yet — run `jobscout prepare --posting "
+                       f"{posting_id}` first to store the scan in a packet)")
+
+
+@app.command()
+def fill(
+    posting_id: str = typer.Argument(..., help="posting id"),
+) -> None:
+    """[Fill for me] — headful sidecar fills the form; you press submit (P7).
+
+    Spawns the JobPilot sidecar in HEADED mode with pauseOnUncertainty=true,
+    navigates to the posting's apply URL, and fills every field using the
+    profile from the master resume. The browser window opens on YOUR screen —
+    you watch the fill happen and press the submit button yourself.
+    """
+    import json
+
+    from jobscout.core.resume import ResumeError, field_map, load_master_resume
+    from jobscout.sidecar import SidecarClient, SidecarError
+
+    db.init_db()
+    conn = db.connect()
+    try:
+        posting = db.get_posting(conn, posting_id)
+        if posting is None:
+            console.print(f"[red]no such posting: {posting_id}[/]")
+            raise typer.Exit(1)
+    finally:
+        conn.close()
+
+    # load profile from master resume → UserProfile shape
+    try:
+        resume = load_master_resume()
+    except ResumeError as e:
+        console.print(f"[red]{e}[/]")
+        raise typer.Exit(1) from e
+
+    fm_entries = field_map(resume)
+    profile = {e.canonical_key: (e.value if e.value is not None else "") for e in fm_entries}
+    # add the extra fields the fillers expect
+    profile.setdefault("firstName", resume.identity.full_name or "")
+    profile.setdefault("lastName", "")
+    profile.setdefault("resumePath", "")
+
+    url = posting["url"]
+    console.print(f"[bold]Fill for me[/] — opening [link={url}]{url}[/link] in a browser …")
+    console.print("[yellow]the browser window will open on your screen; watch the fill "
+                  "and press submit yourself when it pauses[/]")
+
+    # headful mode (visible browser) with pauseOnUncertainty
+    job = {
+        "id": posting_id,
+        "title": posting["title"],
+        "company": posting["company_name"] or posting["company_id"],
+        "applyUrl": url,
+        "applyHostname": url.split("/")[2] if "://" in url else "",
+    }
+    settings = {"pauseOnUncertainty": True, "maxConcurrentApplications": 1}
+
+    try:
+        with SidecarClient(headless=False, max_workers=1) as sidecar:
+            resp = sidecar.request(
+                "applyJobsByPayload",
+                {"jobs": [job], "profile": profile, "settings": settings},
+                timeout=600,  # 10 minutes for a headful session
+            )
+            console.print(f"  [green]sidecar response:[/] {json.dumps(resp, default=str)[:200]}")
+    except SidecarError as e:
+        console.print(f"[red]sidecar error: {e}[/]")
+        raise typer.Exit(1) from e
+
+
+@app.command()
 def retro() -> None:
     """Weekly retro (P6): labels vs scores → a proposed profile tweak (read-only)."""
     conn = db.connect()
