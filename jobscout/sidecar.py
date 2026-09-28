@@ -47,6 +47,7 @@ class SidecarClient:
         self._stdout_thread: threading.Thread | None = None
         self._stderr_thread: threading.Thread | None = None
         self._responses: dict[str, dict] = {}
+        self._events: dict[str, list] = {}
         self._lock = threading.Lock()
         self._log_tail: list[str] = []
 
@@ -189,6 +190,25 @@ class SidecarClient:
         resp = self.request("getAllFillers", {}, timeout=10)
         return resp.get("fillers") or resp.get("result", {}).get("fillers") or []
 
+    def apply_jobs_by_payload(self, jobs: list[dict], profile: dict,
+                              settings: dict, *, timeout: float = 60.0) -> dict:
+        """Enqueue a headed apply run. Returns the first response (its "id"
+        keys all later events for this run — feed it to drain_events)."""
+        return self.request("applyJobsByPayload",
+                            {"jobs": jobs, "profile": profile,
+                             "settings": settings}, timeout=timeout)
+
+    def drain_events(self, req_id: str) -> list[dict]:
+        """Pop all sidecar events accumulated for a request id so far.
+
+        applyJobsByPayload streams progress: apply:update → {result:
+        ApplicationRecord} while running, apply:all-done → event_type
+        "EndMsg". The webapp's run tracker polls this to update statuses.
+        """
+        with self._lock:
+            events = self._events.pop(req_id, [])
+        return events
+
     def get_scrapers(self) -> list[dict]:
         """List registered scraper manifests."""
         resp = self.request("getAllScrapers", {}, timeout=10)
@@ -218,6 +238,7 @@ class SidecarClient:
             if msg_id:
                 with self._lock:
                     self._responses[msg_id] = msg
+                    self._events.setdefault(msg_id, []).append(msg)
             elif msg.get("type") == "ready":
                 with self._lock:
                     self._responses["__ready__"] = msg

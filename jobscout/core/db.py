@@ -15,7 +15,7 @@ from pathlib import Path
 
 from jobscout.core.paths import db_path, ensure_runtime_dirs
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -112,6 +112,17 @@ CREATE TABLE IF NOT EXISTS llm_calls (
 );
 CREATE INDEX IF NOT EXISTS idx_llm_calls_day ON llm_calls(tier, date(created_at));
 
+CREATE TABLE IF NOT EXISTS apply_runs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    packet_id     TEXT NOT NULL,
+    mode          TEXT NOT NULL,             -- automated (sidecar filler) | assisted (opened for the human)
+    status        TEXT NOT NULL,             -- launched|running|submitted|paused|failed|opened
+    detail        TEXT,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_apply_runs_packet ON apply_runs(packet_id, id DESC);
+
 CREATE TABLE IF NOT EXISTS llm_cache (
     cache_key   TEXT PRIMARY KEY,          -- sha256(model + prompt) or (content_hash, profile_version)
     response    TEXT NOT NULL,
@@ -120,7 +131,7 @@ CREATE TABLE IF NOT EXISTS llm_cache (
 );
 """
 
-_COUNTED_TABLES = ("companies", "postings", "signals", "packets", "runs", "llm_cache", "llm_calls", "state")
+_COUNTED_TABLES = ("companies", "postings", "signals", "packets", "runs", "apply_runs", "llm_cache", "llm_calls", "state")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -732,6 +743,46 @@ def set_packet_status(conn: sqlite3.Connection, packet_id: str, status: str) -> 
     )
     conn.commit()
     return cur.rowcount > 0
+
+
+# ── apply runs (webapp/apply.py launcher) ───────────────────────────────────
+
+
+def record_apply_run(conn: sqlite3.Connection, *, packet_id: str, mode: str,
+                      status: str, detail: str | None = None) -> int:
+    now = _utcnow()
+    cur = conn.execute(
+        "INSERT INTO apply_runs (packet_id, mode, status, detail, created_at, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (packet_id, mode, status, detail, now, now),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def update_apply_run(conn: sqlite3.Connection, *, packet_id: str, status: str,
+                     detail: str | None = None) -> int:
+    """Latest run for a packet moves to `status` (runs are per-launch)."""
+    now = _utcnow()
+    cur = conn.execute(
+        "UPDATE apply_runs SET status = ?, detail = COALESCE(?, detail), updated_at = ?"
+        " WHERE id = (SELECT id FROM apply_runs WHERE packet_id = ? ORDER BY id DESC LIMIT 1)",
+        (status, detail, now, packet_id),
+    )
+    conn.commit()
+    return cur.rowcount
+
+
+def list_apply_runs(conn: sqlite3.Connection, limit: int = 50) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT r.*, p.title AS posting_title, c.name AS company_name"
+        " FROM apply_runs r"
+        " LEFT JOIN packets pk ON pk.id = r.packet_id"
+        " LEFT JOIN postings p ON p.id = pk.posting_id"
+        " LEFT JOIN companies c ON c.id = p.company_id"
+        " ORDER BY r.id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
 
 
 def list_packets(conn: sqlite3.Connection) -> list[sqlite3.Row]:

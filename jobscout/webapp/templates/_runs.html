@@ -1,0 +1,67 @@
+{# _runs.html — apply-run log partial. The wrapper div in applications.html
+   polls this every 3s while a run is in flight (the partial carries its own
+   wrapper when active so polling continues). #}
+{% import "components/macros.html" as m %}
+
+{% set tone_map = {
+  "launched": "primary", "running": "primary", "submitted": "success",
+  "paused": "warning", "failed": "danger", "opened": "info",
+} %}
+{% set label_map = {
+  "running": "filling…", "opened": "browser open", "submitted": "submitted",
+  "paused": "waiting for you", "failed": "failed",
+} %}
+
+<div {% if runs_active %}hx-get="/applications/runs" hx-trigger="every 3s"
+     hx-swap="outerHTML"{% endif %} id="runs-panel">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h2 class="card-title mb-0 h6">Apply runs</h2>
+      {% if runs_active %}
+      <span class="badge text-bg-primary">
+        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+        live
+      </span>
+      {% endif %}
+    </div>
+    {% if runs %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th scope="col">posting</th><th scope="col">mode</th>
+              <th scope="col">status</th><th scope="col">detail</th>
+              <th scope="col">when</th></tr>
+        </thead>
+        <tbody>
+          {% for r in runs %}
+          <tr>
+            <td class="text-truncate" style="max-width: 22rem;">
+              <a href="/packet/{{ r.packet_id }}" class="text-decoration-none">
+                {{ r.posting_title or r.packet_id }}
+              </a>
+            </td>
+            <td class="text-nowrap">
+              {{ m.badge(r.mode, "light",
+                 "automated = headed filler run · assisted = browser opened for the human") }}
+            </td>
+            <td>{{ m.badge(label_map.get(r.status, r.status or "—"),
+                           tone_map.get(r.status, "secondary")) }}</td>
+            <td class="small text-secondary text-truncate"
+                style="max-width: 26rem;">{{ r.detail or "—" }}</td>
+            <td class="small text-secondary font-monospace text-nowrap">
+              {{ (r.updated_at or "")[:16] | replace("T", " ") }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body">
+      {{ m.empty("No apply runs yet",
+                 "Tick packets on the board above and press “apply to selected”.",
+                 "pulse") }}
+    </div>
+    {% endif %}
+  </div>
+</div>

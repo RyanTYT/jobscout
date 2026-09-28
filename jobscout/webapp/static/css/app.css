@@ -425,6 +425,25 @@ textarea.form-control:placeholder-shown {
   .nav { display: none; }
 }
 
+/* ── backlink: quiet inline link, not a stretched outline button.
+   .content is a flex column (children stretch) — align-self undoes it. ── */
+
+.backlink {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-2);
+  text-decoration: none;
+  padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-1);
+  margin-left: calc(var(--sp-0) - var(--sp-3));
+  border-radius: var(--r-sm);
+  transition: color var(--tr-fast) var(--ease);
+}
+.backlink:hover { color: var(--accent); }
+
 /* ── sortable headers (server-side links + generic client-side) ────────── */
 
 .th-sort {

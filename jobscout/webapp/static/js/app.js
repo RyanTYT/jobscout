@@ -161,6 +161,28 @@
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
 
+  /* ── apply form: live selection count + select-all ──────────────────── */
+  var applyForm = document.getElementById("apply-form");
+  if (applyForm) {
+    var boxes = applyForm.querySelectorAll('[data-apply-row]');
+    var count = applyForm.querySelector("[data-count]");
+    var applyBtn = applyForm.querySelector("[data-apply-button]");
+    var sync = function () {
+      var n = applyForm.querySelectorAll('[data-apply-row]:checked').length;
+      if (count) count.textContent = n + " selected";
+      if (applyBtn) applyBtn.disabled = n === 0;
+    };
+    applyForm.addEventListener("change", function (e) {
+      if (e.target.hasAttribute("data-select-all")) {
+        [].forEach.call(boxes, function (b) {
+          if (!b.disabled) b.checked = e.target.checked;
+        });
+      }
+      sync();
+    });
+    sync();
+  }
+
   /* ── table sorting: a property of every .table component ────────────── */
 
   function ensureSortKeys(table) {
