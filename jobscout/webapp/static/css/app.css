@@ -360,11 +360,11 @@ textarea.form-control:placeholder-shown {
               color var(--tr-fast) var(--ease);
 }
 
-.nav__link:hover { background: var(--bg-nav-hover); color: var(--text-inverse); }
+.nav__link:hover { background: var(--bg-nav-hover); color: var(--text-nav-strong); }
 
 .nav__link--active {
   background: var(--bg-nav-active);
-  color: var(--text-inverse);
+  color: var(--text-nav-strong);
   box-shadow: inset var(--sp-1) var(--sp-0) var(--sp-0) var(--c-indigo-400);
 }
 

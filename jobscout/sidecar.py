@@ -64,8 +64,11 @@ class SidecarClient:
     @staticmethod
     def available(sidecar_path: str | None = None) -> bool:
         """True when the sidecar binary is built and Node is present."""
+        import os
+
         path = Path(sidecar_path) if sidecar_path else SidecarClient._default_path()
-        return path.is_file() and shutil.which("node") is not None
+        node = os.environ.get("JOBSCOUT_NODE_BIN") or shutil.which("node")
+        return path.is_file() and node is not None
 
     # ── lifecycle ────────────────────────────────────────────────────────────
 
@@ -78,9 +81,13 @@ class SidecarClient:
                 f"sidecar not built: {self._path} — run "
                 f"'cd {self._path.parent.parent} && npm run build-internal'"
             )
-        node = shutil.which("node")
+        import os
+
+        node = os.environ.get("JOBSCOUT_NODE_BIN") or shutil.which("node")
         if node is None:
-            raise SidecarError("node not found — install Node.js ≥ 18")
+            raise SidecarError(
+                "node not found — install Node.js ≥ 18, or point "
+                "JOBSCOUT_NODE_BIN at a bundled node runtime")
 
         args = ["node", str(self._path)]
         if self._headless:

@@ -9,7 +9,7 @@
 {# ── filter panel: Bootstrap's standardized row/col gutters (g-3) ───────
    This is the spacing fix: 12-column grid with g-3 gutters and responsive
    col classes — the framework's rhythm, not hand-rolled CSS. ──────────── #}
-<form class="card card-body" method="get" action="/"
+<form class="card card-body py-2" method="get" action="/"
       id="inbox-filters" data-busy-submit>
   <div class="row g-3 align-items-end">
 
@@ -90,7 +90,7 @@
                  filters.all_postings, attrs=hx) }}
     </div>
 
-    <div class="col-12 d-flex justify-content-end gap-2">
+    <div class="col-6 col-md-4 col-xl-2 d-flex align-items-end gap-2">
       <noscript>
         {# without JS the dropdowns are inert buttons — plain selects that
            submit with the Filter button instead #}

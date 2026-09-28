@@ -111,6 +111,9 @@
   --text-3:        var(--c-slate-400);   /* muted / meta               */
   --text-inverse:  var(--c-slate-50);    /* on accent surfaces         */
   --text-nav:      var(--c-slate-300);
+  --text-nav-strong: var(--c-slate-50);   /* hover/active on the dark
+                                             sidebar — constant: the sidebar
+                                             is dark in BOTH themes */
   --text-nav-dim:  var(--c-slate-500);
 
   --border:        var(--c-slate-200);
