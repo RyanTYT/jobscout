@@ -203,7 +203,7 @@
 
 {# ── empty state ─────────────────────────────────────────────────────────── #}
 {% macro empty(title, hint="", icon_name="search") -%}
-<div class="text-center text-secondary py-5 px-3">
+<div class="text-center text-secondary py-4 px-3">
   <div class="mb-2 opacity-50">{{ icon(icon_name, 24) }}</div>
   <div class="fw-semibold text-body-secondary">{{ title }}</div>
   {%- if hint %}<div class="small">{{ hint }}</div>{% endif %}

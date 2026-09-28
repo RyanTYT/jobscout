@@ -9,8 +9,9 @@
 {# ── filter panel: Bootstrap's standardized row/col gutters (g-3) ───────
    This is the spacing fix: 12-column grid with g-3 gutters and responsive
    col classes — the framework's rhythm, not hand-rolled CSS. ──────────── #}
-<form class="card card-body py-2" method="get" action="/"
+<form class="card" method="get" action="/"
       id="inbox-filters" data-busy-submit>
+  <div class="card-body py-2">
   <div class="row g-3 align-items-end">
 
     {# htmx wiring shared by all auto-submitting controls: swap #results
@@ -103,6 +104,7 @@
       <a class="btn btn-link" href="/">Reset</a>
       {% endif %}
     </div>
+  </div>
   </div>
 </form>
 

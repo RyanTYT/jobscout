@@ -118,6 +118,10 @@
 /* cards: raised surface, sunken headers */
 .card {
   --bs-card-bg: var(--bg-raised);
+  /* a card must never BE its own card-body: bootstrap gives .card-body
+     flex:1 1 auto (body fills card), which in a page-level flex column
+     stretches a self-bodied card to eat all leftover viewport height */
+  flex: 0 1 auto;
   --bs-card-border-color: var(--border);
   --bs-card-border-radius: var(--r-lg);
   --bs-card-cap-bg: var(--bg-sunken);
