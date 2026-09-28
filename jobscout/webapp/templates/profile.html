@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as m %}
+
+{% block title %}profile · jobscout{% endblock %}
+{% block topbar_title %}Profile{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+  <div class="page-head__title">
+    <h1>Your profile</h1>
+    <span class="page-head__sub">
+      feeds every application field — written straight into
+      <span class="mono">master_resume/resume.yaml</span> (the single source
+      of truth; its comments are preserved)
+    </span>
+  </div>
+  <div class="page-head__actions">
+    <span class="dim" style="font-size: var(--fs-xs)">
+      {{ missing | length }} required field{{ "s" if missing | length != 1 }} still missing
+    </span>
+  </div>
+</div>
+
+{% if just_saved %}
+{{ m.callout("Profile saved — resume.yaml updated and re-validated. New packets pick these values up immediately.", "success") }}
+{% endif %}
+{% if error %}
+{{ m.callout(error, "danger") }}
+{% endif %}
+
+{% if missing %}
+{{ m.callout(
+     "These required fields are missing: " ~ missing | join(", ") ~
+     ". Packets stay in needs-input until they're filled.",
+     "warning") }}
+{% endif %}
+
+<form class="stack" method="post" action="/profile/save" data-busy-submit>
+
+  {# ── identity ────────────────────────────────────────────────────────── #}
+  <div class="card">
+    <header class="card__header">
+      <h2 class="card__title">Identity</h2>
+      <span class="dim" style="font-size: var(--fs-xs)">the basics every form asks</span>
+    </header>
+    <div class="card__body">
+      <div class="filters" style="box-shadow: none; border: none; padding: 0">
+        {% for f in fields if f.block == "identity" %}
+        <label class="field">
+          <span class="field__label">{{ f.label }}</span>
+          {% if f.kind == "select" %}
+          {{ m.select(f.input_name, values[f.key], field_options[f.key]) }}
+          {% else %}
+          <input class="input" type="text" name="{{ f.input_name }}"
+                 value="{{ values[f.key] }}" placeholder="{{ f.placeholder }}">
+          {% endif %}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# ── current job + education ─────────────────────────────────────────── #}
+  <div class="card">
+    <header class="card__header">
+      <h2 class="card__title">Current role &amp; education</h2>
+      <span class="dim" style="font-size: var(--fs-xs)">derived fields (current company / title / years / degree) come from here</span>
+    </header>
+    <div class="card__body">
+      <div class="filters" style="box-shadow: none; border: none; padding: 0">
+        {% for f in fields if f.block == "experience" or f.block == "education" %}
+        <label class="field">
+          <span class="field__label">{{ f.label }}</span>
+          <input class="input" type="text" name="{{ f.input_name }}"
+                 value="{{ values[f.key] }}" placeholder="{{ f.placeholder }}">
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# ── work authorization + extras ─────────────────────────────────────── #}
+  <div class="card">
+    <header class="card__header">
+      <h2 class="card__title">Work authorization &amp; availability</h2>
+    </header>
+    <div class="card__body">
+      <div class="filters" style="box-shadow: none; border: none; padding: 0">
+        {% for f in fields if f.block == "work_authorization" or f.block == "extras" %}
+        <label class="field">
+          <span class="field__label">{{ f.label }}</span>
+          {% if f.kind == "select" %}
+          {{ m.select(f.input_name, values[f.key], field_options[f.key]) }}
+          {% else %}
+          <input class="input" type="text" name="{{ f.input_name }}"
+                 value="{{ values[f.key] }}" placeholder="{{ f.placeholder }}">
+          {% endif %}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# ── custom fields ───────────────────────────────────────────────────── #}
+  <div class="card">
+    <header class="card__header">
+      <h2 class="card__title">Custom fields</h2>
+      <span class="dim" style="font-size: var(--fs-xs)">
+        extra label/value pairs — land on forms as “other:&lt;label&gt;”
+      </span>
+    </header>
+    <div class="card__body" style="display: flex; flex-direction: column; gap: var(--sp-3)">
+      <div id="custom-rows" style="display: flex; flex-direction: column; gap: var(--sp-3)">
+        {% for c in custom %}
+        <div class="row" data-custom-row>
+          <input class="input" type="text" name="cf_label_{{ loop.index }}"
+                 value="{{ c.label }}" placeholder="label (e.g. portfolio)"
+                 style="flex: 1">
+          <input class="input" type="text" name="cf_value_{{ loop.index }}"
+                 value="{{ c.value }}" placeholder="value" style="flex: 2">
+          <button class="btn btn--ghost btn--sm" type="button"
+                  onclick="this.closest('[data-custom-row]').remove()">✕</button>
+        </div>
+        {% endfor %}
+        {% if not custom %}
+        <p class="dim" style="font-size: var(--fs-sm)">
+          none yet — add pairs for anything forms keep asking that isn't above
+        </p>
+        {% endif %}
+      </div>
+      <div>
+        <button class="btn btn--secondary btn--sm" type="button"
+                id="add-custom-row">{{ m.icon("spark", 12) }} Add field</button>
+      </div>
+      <input type="hidden" name="cf_touched" id="cf-touched" value="">
+    </div>
+  </div>
+
+  <div class="filters__actions">
+    <button class="btn btn--primary btn--lg" type="submit">
+      {{ m.icon("check", 14) }} Save profile
+    </button>
+  </div>
+</form>
+
+<script>
+  (function () {
+    var n = {{ custom | length }};
+    var touched = document.getElementById("cf-touched");
+    document.getElementById("add-custom-row").addEventListener("click", function () {
+      n += 1;
+      touched.value = "1";
+      var row = document.createElement("div");
+      row.className = "row";
+      row.setAttribute("data-custom-row", "");
+      row.innerHTML =
+        '<input class="input" type="text" name="cf_label_' + n + '" ' +
+        'placeholder="label (e.g. portfolio)" style="flex: 1">' +
+        '<input class="input" type="text" name="cf_value_' + n + '" ' +
+        'placeholder="value" style="flex: 2">' +
+        '<button class="btn btn--ghost btn--sm" type="button">✕</button>';
+      row.querySelector("button").addEventListener("click", function () {
+        touched.value = "1";
+        row.remove();
+      });
+      document.getElementById("custom-rows").appendChild(row);
+    });
+  })();
+</script>
+
+{% endblock %}

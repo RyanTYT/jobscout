@@ -66,11 +66,13 @@
     show rule-excluded
   </label>
 
-  {{ m.button("Filter", "primary", icon_name="search") }}
+  <div class="filters__actions">
+    {{ m.button("Filter", "primary", icon_name="search") }}
 
-  {% if filters.is_filtered() %}
-  <a class="btn btn--ghost" href="/">Reset</a>
-  {% endif %}
+    {% if filters.is_filtered() %}
+    <a class="btn btn--ghost" href="/">Reset</a>
+    {% endif %}
+  </div>
 </form>
 
 {# ── results (swapped by htmx on pagination + filter changes) ─────────── #}

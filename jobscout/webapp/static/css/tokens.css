@@ -180,6 +180,8 @@
   --content-max:    1280px;
   --content-pad:    var(--sp-8);
   --row-h:          52px;
+  --table-min-w:    720px;   /* below: table scrolls horizontally     */
+  --menu-max-h:     280px;   /* dropdown popover scroll limit         */
 
   /* ── z-index scale ──────────────────────────────────────────────────── */
   --z-base:   1;

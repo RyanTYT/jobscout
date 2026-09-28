@@ -205,11 +205,12 @@
   "ats_found": "building",
 } -%}
 <div class="signal">
-  <span class="signal__icon signal__icon--{{ icon_map.get(s.kind, 'radar') }}">
+  <span class="signal__icon signal__icon--{{ icon_map.get(s.kind, 'radar') }}"
+        title="{{ kind_desc(s.kind) }}">
     {{ icon(icon_map.get(s.kind, "radar"), 14) }}
   </span>
   <div class="signal__body">
-    <span class="signal__note">{{ s.note or s.key }}</span>
+    <span class="signal__note">{{ linkify(s.note or s.key) }}</span>
     <span class="signal__meta">
       <span>{{ s.company_name or s.company_id or "—" }}</span>
       {%- if s.created_at %}<span>{{ s.created_at[:16] | replace("T", " ") }}</span>{% endif -%}

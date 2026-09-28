@@ -22,6 +22,9 @@ from jobscout.webapp import ui
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+TEMPLATES.env.globals["linkify"] = ui.linkify
+TEMPLATES.env.globals["kind_meta"] = ui.signal_kind_meta
+TEMPLATES.env.globals["kind_desc"] = lambda k: ui.signal_kind_meta(k)["desc"]
 
 _run_output_holder: dict = {"out": ""}
 
@@ -59,7 +62,13 @@ def create_app() -> FastAPI:
     db.init_db()  # idempotent; also migrates schema
 
     def _ctx(active: str, conn) -> dict:
-        return ui.template_ctx(__version__, active, ui.nav_counts(conn))
+        counts = ui.nav_counts(conn)
+        try:
+            from jobscout.webapp import profile_store
+            counts["profile_missing"] = len(profile_store.missing_required())
+        except Exception:  # noqa: BLE001 — resume unreadable must not kill nav
+            counts["profile_missing"] = 0
+        return ui.template_ctx(__version__, active, counts)
 
     # ── inbox ────────────────────────────────────────────────────────────
 
@@ -100,12 +109,14 @@ def create_app() -> FastAPI:
         finally:
             conn.close()
 
+        sort_headers = ui.inbox_sort_headers(filters)
+
         # htmx pagination/filter requests swap only the results partial
         if request.headers.get("HX-Request") == "true":
             return TEMPLATES.TemplateResponse(
                 request, "_results.html",
                 {**ctx, "rows": rows, "pg": pg, "filters": filters,
-                 "options": options},
+                 "options": options, "sort_headers": sort_headers},
             )
 
         return TEMPLATES.TemplateResponse(
@@ -117,6 +128,7 @@ def create_app() -> FastAPI:
                 "pg": pg,
                 "filters": filters,
                 "options": options,
+                "sort_headers": sort_headers,
             },
         )
 
@@ -387,5 +399,65 @@ def create_app() -> FastAPI:
                 "last_stats": last_stats,
             },
         )
+
+    # ── profile (master resume editor) ───────────────────────────────────
+
+    @app.get("/profile", response_class=HTMLResponse)
+    def profile_page(request: Request, saved: str = Query("")):
+        from jobscout.webapp import profile_store
+
+        conn = db.connect()
+        try:
+            ctx = _ctx("profile", conn)
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(
+            request, "profile.html",
+            {
+                **ctx,
+                "fields": profile_store.FIELDS,
+                "field_options": {
+                    f.key: [(o, o, None) for o in f.options]
+                    for f in profile_store.FIELDS
+                },
+                "values": profile_store.current_values(),
+                "missing": profile_store.missing_required(),
+                "custom": profile_store.custom_fields(),
+                "just_saved": saved == "1",
+                "error": None,
+            },
+        )
+
+    @app.post("/profile/save")
+    async def profile_save(request: Request):
+        from jobscout.webapp import profile_store
+
+        form = dict(await request.form())
+        try:
+            profile_store.save_profile(form)
+            return RedirectResponse("/profile?saved=1", status_code=303)
+        except profile_store.ProfileError as e:
+            conn = db.connect()
+            try:
+                ctx = _ctx("profile", conn)
+            finally:
+                conn.close()
+            return TEMPLATES.TemplateResponse(
+                request, "profile.html",
+                {
+                    **ctx,
+                    "fields": profile_store.FIELDS,
+                    "field_options": {
+                        f.key: [(o, o, None) for o in f.options]
+                        for f in profile_store.FIELDS
+                    },
+                    "values": profile_store.current_values(),
+                    "missing": profile_store.missing_required(),
+                    "custom": profile_store.custom_fields(),
+                    "just_saved": False,
+                    "error": str(e),
+                },
+                status_code=422,
+            )
 
     return app

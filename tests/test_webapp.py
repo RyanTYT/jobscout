@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 import textwrap
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -255,3 +256,165 @@ def test_unknown_posting_redirects(client):
     r = client.get("/posting/nope", follow_redirects=False)
     assert r.status_code == 303
     assert r.headers["location"] == "/"
+
+
+# ── linkify / signal kinds / sorting (ui layer) ─────────────────────────────
+
+
+def test_linkify_extracts_url():
+    out = ui.linkify("new job URL in sitemap: https://acme.com/jobs/fpga")
+    assert '<a class="signal__url"' in out
+    assert 'href="https://acme.com/jobs/fpga"' in out
+    assert "acme.com/jobs/fpga</a>" in out
+
+
+def test_linkify_escapes_text():
+    out = ui.linkify("a <script> & https://x.io/y. end")
+    assert "<script>" not in out
+    assert "&lt;script&gt;" in out
+    assert out.endswith("end")
+
+
+def test_linkify_empty():
+    assert ui.linkify("") == ""
+    assert ui.linkify(None) == ""
+
+
+def test_signal_kind_meta_covers_all_kinds():
+    for kind in ui.SIGNAL_KINDS:
+        meta = ui.signal_kind_meta(kind)
+        assert meta["desc"] and meta["icon"] and meta["label"]
+
+
+def test_sort_headers_toggle_direction():
+    f = ui.InboxFilters.from_query(sort="score")
+    h = ui.inbox_sort_headers(f)
+    score = h[0]
+    assert score["active"] and score["dir"] == "desc"
+    assert "sort=score_asc" in score["href"]
+
+
+def test_sort_headers_ascending_link():
+    f = ui.InboxFilters.from_query()
+    h = ui.inbox_sort_headers(f)
+    title = h[1]                      # title column
+    assert not title["active"]
+    assert "sort=title" in title["href"] and "page=1" in title["href"]
+
+
+def test_new_sort_keys_query_db(conn):
+    rows = db.list_postings(conn, sort="title", status="all", limit=5)
+    titles = [r["title"] for r in rows]
+    assert titles == sorted(titles, key=str.lower)
+
+
+def test_newest_oldest_sort(conn):
+    newest = db.list_postings(conn, sort="newest", status="all", limit=3)
+    oldest = db.list_postings(conn, sort="oldest", status="all", limit=3)
+    assert newest[0]["first_seen"] >= newest[-1]["first_seen"]
+    assert oldest[0]["first_seen"] <= oldest[-1]["first_seen"]
+
+
+# ── inbox sortable headers render ────────────────────────────────────────────
+
+
+def test_inbox_renders_sort_links(client):
+    r = client.get("/")
+    assert 'class="th-sort' in r.text
+    assert 'title="Sort by company"' in r.text
+
+
+def test_sort_param_filters_through(client):
+    r = client.get("/?sort=title")
+    assert r.status_code == 200
+    assert "th-sort--active" in r.text
+
+
+# ── profile routes ──────────────────────────────────────────────────────────
+
+
+def test_profile_page_renders(client):
+    r = client.get("/profile")
+    assert r.status_code == 200
+    assert "Your profile" in r.text
+    assert "Full name" in r.text
+    assert "Custom fields" in r.text
+
+
+def test_profile_save_roundtrip(client, monkeypatch):
+    import shutil
+    import tempfile
+
+    from jobscout.webapp import profile_store
+    tmp = Path(tempfile.mkdtemp()) / "master_resume"
+    tmp.mkdir()
+    shutil.copytree(core_resume_dir(), tmp, dirs_exist_ok=True)
+    monkeypatch.setattr(
+        "jobscout.webapp.profile_store.master_resume_dir", lambda: tmp)
+    monkeypatch.setattr(
+        "jobscout.core.resume.master_resume_dir", lambda: tmp)
+
+    r = client.post("/profile/save", data={
+        "f_full_name": "Jane Doe",
+        "f_email": "jane@example.com",
+        "f_current_company": "Acme Trading",
+        "f_current_title": "Senior Software Engineer",
+        "f_employment_start": "2019-06",
+        "f_school": "NUS",
+        "f_degree": "BS",
+        "cf_touched": "1",
+        "cf_label_1": "portfolio",
+        "cf_value_1": "https://janedoe.dev",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/profile?saved=1"
+
+    text = (tmp / "resume.yaml").read_text()
+    assert 'full_name: "Jane Doe"' in text
+    assert "Acme Trading" in text
+    assert "comments are preserved" or "#" in text  # comments intact
+    # comments from the original file survived
+    assert "THE source of truth" in text
+
+    values = profile_store.current_values()
+    assert values["full_name"] == "Jane Doe"
+    assert values["current_company"] == "Acme Trading"
+
+    import shutil as sh
+    sh.rmtree(tmp.parent)
+
+
+def test_profile_save_invalid_rolls_back(client, monkeypatch):
+    import shutil
+    import tempfile
+    tmp = Path(tempfile.mkdtemp()) / "master_resume"
+    tmp.mkdir()
+    shutil.copytree(core_resume_dir(), tmp, dirs_exist_ok=True)
+    monkeypatch.setattr(
+        "jobscout.webapp.profile_store.master_resume_dir", lambda: tmp)
+    monkeypatch.setattr(
+        "jobscout.core.resume.master_resume_dir", lambda: tmp)
+
+    before = (tmp / "resume.yaml").read_text()
+    # force validation failure by monkeypatching the validator
+    import jobscout.core.resume as cr
+    orig = cr.load_master_resume
+
+    def broken():
+        raise cr.ResumeError("boom")
+    monkeypatch.setattr(cr, "load_master_resume", broken)
+    monkeypatch.setattr(
+        "jobscout.webapp.profile_store.core_resume.load_master_resume", broken)
+
+    r = client.post("/profile/save", data={"f_full_name": "X"},
+                    follow_redirects=False)
+    assert r.status_code == 422
+    assert (tmp / "resume.yaml").read_text() == before
+    monkeypatch.setattr(cr, "load_master_resume", orig)
+    import shutil as sh
+    sh.rmtree(tmp.parent)
+
+
+def core_resume_dir():
+    from jobscout.core.paths import master_resume_dir
+    return master_resume_dir()

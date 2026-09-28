@@ -148,6 +148,145 @@
     }
   });
 
+  /* ── themed dropdowns (progressive enhancement over <select>) ────────── */
+
+  function enhanceSelect(sel) {
+    if (sel.closest(".select-wrap")) return;           // already enhanced
+    var wrap = document.createElement("div");
+    wrap.className = "select-wrap";
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "select-btn";
+    btn.setAttribute("aria-haspopup", "listbox");
+    var label = document.createElement("span");
+    label.className = "select-btn__label";
+    var chev = document.createElement("span");
+    chev.className = "select-btn__chevron";
+    chev.textContent = "▾";
+    btn.appendChild(label);
+    btn.appendChild(chev);
+
+    var menu = document.createElement("div");
+    menu.className = "select-menu";
+    menu.setAttribute("role", "listbox");
+
+    function currentText() {
+      var opt = sel.options[sel.selectedIndex];
+      return opt ? opt.textContent : "";
+    }
+
+    function syncBtn() {
+      label.textContent = currentText() || "—";
+      btn.setAttribute("aria-expanded", wrap.classList.contains("select-wrap--open"));
+    }
+
+    function buildMenu() {
+      menu.innerHTML = "";
+      Array.prototype.forEach.call(sel.options, function (opt) {
+        var row = document.createElement("div");
+        row.className = "select-option" +
+          (opt.selected ? " select-option--selected" : "");
+        row.setAttribute("role", "option");
+        var text = document.createElement("span");
+        text.textContent = opt.textContent;
+        row.appendChild(text);
+        menu.appendChild(row);
+        row.addEventListener("click", function () {
+          sel.value = opt.value;
+          Array.prototype.forEach.call(sel.options, function (o) {
+            o.selected = o.value === opt.value;
+          });
+          buildMenu();
+          close();
+          syncBtn();
+          // fire a real change so htmx hx-trigger=change picks it up
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      });
+    }
+
+    function open() {
+      closeAllDropdowns();
+      wrap.classList.add("select-wrap--open");
+      syncBtn();
+    }
+    function close() {
+      wrap.classList.remove("select-wrap--open");
+      syncBtn();
+    }
+
+    btn.addEventListener("click", function () {
+      if (wrap.classList.contains("select-wrap--open")) close();
+      else open();
+    });
+    document.addEventListener("click", function (e) {
+      if (!wrap.contains(e.target)) close();
+    });
+    sel.addEventListener("change", function () { buildMenu(); syncBtn(); });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    wrap.classList.add("select-wrap--enhanced");
+    buildMenu();
+    syncBtn();
+  }
+
+  var closeAllDropdowns = (function () {
+    var listeners = [];
+    return function () {
+      document.querySelectorAll(".select-wrap--open").forEach(function (w) {
+        w.classList.remove("select-wrap--open");
+      });
+    };
+  })();
+
+  function enhanceAllSelects(root) {
+    (root || document).querySelectorAll("select.select").forEach(enhanceSelect);
+  }
+
+  enhanceAllSelects(document);
+  document.body.addEventListener("htmx:afterSwap", function (e) {
+    enhanceAllSelects(e.detail.target);
+  });
+
+  /* ── client-side table sorting (data-sortable tables) ─────────────────── */
+
+  document.addEventListener("click", function (e) {
+    var th = e.target.closest("table[data-sortable] th[data-sort-key]");
+    if (!th) return;
+    var table = th.closest("table");
+    var tbody = table.tBodies[0];
+    var key = th.getAttribute("data-sort-key");
+    var dir = th.getAttribute("data-sort-dir") === "asc" ? -1 : 1;
+    if (th.getAttribute("data-sort-active") === "1") {
+      dir = th.getAttribute("data-sort-dir") === "asc" ? -1 : 1;  // toggle
+    } else {
+      dir = 1;
+    }
+    var idx = Array.prototype.indexOf.call(th.parentNode.children, th);
+
+    Array.prototype.slice.call(tbody.rows).sort(function (a, b) {
+      var ca = a.cells[idx] ? a.cells[idx].textContent.trim() : "";
+      var cb = b.cells[idx] ? b.cells[idx].textContent.trim() : "";
+      var na = parseFloat(ca.replace(/[^\d.-]/g, ""));
+      var nb = parseFloat(cb.replace(/[^\d.-]/g, ""));
+      var cmp;
+      if (!isNaN(na) && !isNaN(nb) && ca && cb) cmp = na - nb;
+      else cmp = ca.localeCompare(cb, undefined, { numeric: true, sensitivity: "base" });
+      return cmp * dir;
+    }).forEach(function (row) { tbody.appendChild(row); });
+
+    table.querySelectorAll("th[data-sort-key]").forEach(function (h) {
+      h.removeAttribute("data-sort-active");
+      h.removeAttribute("data-sort-dir");
+    });
+    th.setAttribute("data-sort-active", "1");
+    th.setAttribute("data-sort-dir", dir === 1 ? "asc" : "desc");
+  });
+
   /* ── keyboard: "/" focuses the search box ─────────────────────────────── */
 
   document.addEventListener("keydown", function (e) {

@@ -28,6 +28,9 @@
       <span class="nav__link-icon">{{ m.icon(item.icon, 15) }}</span>
       {{ item.label }}
       {% if item.count %}<span class="nav__count">{{ item.count }}</span>{% endif %}
+      {% if item.key == "profile" and profile_missing %}
+      <span class="nav__count">{{ profile_missing }}</span>
+      {% endif %}
     </a>
     {% endfor %}
 

@@ -5,13 +5,18 @@
     <table class="table">
       <thead>
         <tr>
-          <th>score</th>
-          <th>title</th>
-          <th>company</th>
-          <th>location</th>
-          <th>level</th>
-          <th>source</th>
-          <th>first seen</th>
+          {% for h in sort_headers %}
+          <th>
+            {% if h.href %}
+            <a class="th-sort{{ ' th-sort--active' if h.active }}{{ ' th-sort--' + h.dir if h.dir }}"
+               href="{{ h.href }}"
+               hx-get="{{ h.href }}" hx-target="#results" hx-swap="outerHTML"
+               hx-push-url="true" title="Sort by {{ h.label }}">{{ h.label }}</a>
+            {% else %}
+            {{ h.label }}
+            {% endif %}
+          </th>
+          {% endfor %}
           <th></th>
         </tr>
       </thead>

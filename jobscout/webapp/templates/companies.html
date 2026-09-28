@@ -77,14 +77,23 @@
 
     {% if kinds %}
     <div class="card">
-      <header class="card__header"><h2 class="card__title">By kind</h2></header>
-      <div class="card__body" style="display: flex; flex-direction: column; gap: var(--sp-3)">
-        {% for k in kinds %}
-        <div class="row" style="justify-content: space-between">
-          <span class="dim-2">{{ m.badge(k.kind | replace("_", " "), "outline") }}</span>
-          <span class="table__cell--mono dim">{{ k.n }}</span>
+      <header class="card__header">
+        <h2 class="card__title">Signal kinds</h2>
+        <span class="dim" style="font-size: var(--fs-xs)">what each detection means</span>
+      </header>
+      <div class="card__body">
+        <div class="legend">
+          {% for k in kinds %}
+          {% set meta = kind_meta(k.kind) %}
+          <div class="legend__row">
+            <span class="row" style="gap: var(--sp-2); flex-wrap: nowrap">
+              {{ m.badge(meta.label, "outline") }}
+              <span class="mono dim" style="font-size: var(--fs-2xs)">{{ k.n }}</span>
+            </span>
+            <span class="legend__desc">{{ meta.desc }}</span>
+          </div>
+          {% endfor %}
         </div>
-        {% endfor %}
       </div>
     </div>
     {% endif %}

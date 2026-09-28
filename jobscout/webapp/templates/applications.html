@@ -31,7 +31,14 @@
 <div class="card">
   <header class="card__header">
     <h2 class="card__title">{{ label }}</h2>
-    <span class="dim" style="font-size: var(--fs-xs)">{{ stage_rows | length }}</span>
+    <span class="row" style="gap: var(--sp-3)">
+      {% if stage == "packet:needs_input" and profile_missing %}
+      <a class="btn btn--secondary btn--sm" href="/profile">
+        {{ m.icon("spark", 11) }} provide missing info ({{ profile_missing }})
+      </a>
+      {% endif %}
+      <span class="dim" style="font-size: var(--fs-xs)">{{ stage_rows | length }}</span>
+    </span>
   </header>
   <div class="table-wrap" style="border: none; box-shadow: none; border-radius: 0">
     <table class="table">

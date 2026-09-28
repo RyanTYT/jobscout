@@ -7,13 +7,21 @@ functions/dataclasses only — trivially unit-testable without a server.
 
 from __future__ import annotations
 
+import html as _html
+import re
 from dataclasses import dataclass, field, replace
 from urllib.parse import urlencode
+
+from markupsafe import Markup
 
 # allowed values — anything else from the query string is dropped
 STATUSES = ("new", "interested", "dismissed", "applied", "withdrawn", "all")
 TIERS = ("A", "B", "C")
-SORTS = ("score", "newest", "posted", "company", "title")
+SORTS = (
+    "score", "score_asc", "newest", "oldest", "posted", "company",
+    "company_desc", "title", "title_desc", "location",
+    "location_desc", "level", "level_desc",
+)
 PAGE_SIZES = (25, 50, 100, 200)
 DEFAULT_PAGE_SIZE = 50
 
@@ -215,9 +223,11 @@ def nav_counts(conn) -> dict:
 STATUS_OPTIONS = [(s, s.title(), None) for s in STATUSES]
 TIER_OPTIONS = [(t, f"tier {t}", None) for t in TIERS]
 SORT_OPTIONS = [
-    ("score", "score", None), ("newest", "newest", None),
-    ("posted", "posted date", None), ("company", "company", None),
-    ("title", "title", None),
+    ("score", "score ↓", None), ("score_asc", "score ↑", None),
+    ("newest", "newest first", None), ("oldest", "oldest first", None),
+    ("posted", "posting date", None), ("company", "company A–Z", None),
+    ("company_desc", "company Z–A", None), ("title", "title A–Z", None),
+    ("title_desc", "title Z–A", None),
 ]
 SIZE_OPTIONS = [(str(s), str(s), None) for s in PAGE_SIZES]
 
@@ -227,13 +237,16 @@ NAV_ITEMS = (
     ("companies", "/companies", "Companies", "building", None),
     ("discovery", "/discovery", "Discovery", "radar", None),
     ("applications", "/applications", "Applications", "doc", "packets"),
+    ("profile", "/profile", "Profile", "spark", None),
     ("ops", "/ops", "Ops", "pulse", None),
 )
 
 
 def template_ctx(version: str, active: str, counts: dict) -> dict:
     """Common context every template receives."""
+    profile_missing = counts.pop("profile_missing", 0) if counts else 0
     return {
+        "profile_missing": profile_missing,
         "version": version,
         "active": active,
         "nav_items": [
@@ -252,3 +265,119 @@ def template_ctx(version: str, active: str, counts: dict) -> dict:
         "sort_options": SORT_OPTIONS,
         "size_options": SIZE_OPTIONS,
     }
+
+
+# ── signal rendering helpers ─────────────────────────────────────────────────
+
+_URL_RE = re.compile(r"https?://[^\s)\"'<>,;]+")
+
+
+def linkify(text: str):
+    """Escape text, turning embedded URLs into highlighted chips.
+
+    The non-URL parts are html-escaped here; templates render the result
+    unescaped.
+    """
+    if not text:
+        return Markup("")
+    out = []
+    pos = 0
+    for m in _URL_RE.finditer(text):
+        out.append(_html.escape(text[pos:m.start()]))
+        url = m.group(0).rstrip(".!?")
+        if url:
+            shown = url.removeprefix("https://").removeprefix("http://")
+            out.append(
+                f'<a class="signal__url" href="{_html.escape(url)}" '
+                f'target="_blank" rel="noopener">{_html.escape(shown)}</a>'
+            )
+        pos = m.end()
+    out.append(_html.escape(text[pos:]))
+    return Markup("".join(out))
+
+
+# what each signal kind means — the legend on the companies page
+SIGNAL_KINDS = {
+    "news": "Google News match — a headline mentioning the company together "
+            "with hiring/expansion vocabulary (funding, growth, layoffs). "
+            "Earliest public signal that headcount is moving.",
+    "sitemap_new_url": "A new job URL appeared in the company sitemap. "
+                       "CMS generates the URL the moment a draft posting is "
+                       "saved — often days before it goes live.",
+    "careers_page_changed": "The careers page content hash changed since the "
+                            "last daily check; the job-title diff shows what "
+                            "was added or removed.",
+    "github_activity": "A repo under the company's GitHub org was pushed "
+                       "within the last 7 days — active engineering.",
+    "hn": "Who-is-hiring thread comment by or about the company "
+          "(monthly Hacker News thread).",
+    "hn_mention": "Recent Hacker News comment mentioning the company in a "
+                  "hiring context, outside the Who-is-hiring thread.",
+    "funding": "RSS funding-feed match (TechCrunch etc.) — new money "
+               "usually precedes new roles.",
+    "ats_found": "A public ATS board token was discovered for a previously "
+                 "dark-pool company (watchlist self-heal).",
+}
+
+_SIGNAL_ICON_HINTS = {
+    "news": "news", "github_activity": "github", "funding": "bolt",
+    "hn": "radar", "hn_mention": "radar", "careers_page_changed": "sitemap",
+    "sitemap_new_url": "sitemap", "ats_found": "building",
+}
+
+
+def signal_kind_meta(kind: str) -> dict:
+    """(label, explanation, icon) for a signal kind — used by templates."""
+    return {
+        "label": kind.replace("_", " "),
+        "desc": SIGNAL_KINDS.get(kind, "signal emitted by a discovery source"),
+        "icon": _SIGNAL_ICON_HINTS.get(kind, "radar"),
+    }
+
+
+# ── sortable inbox headers ───────────────────────────────────────────────────
+
+# column -> (ascending sort key, descending sort key)
+SORT_COLUMNS = {
+    "score": ("score_asc", "score"),
+    "title": ("title", "title_desc"),
+    "company": ("company", "company_desc"),
+    "location": ("location", "location_desc"),
+    "level": ("level", "level_desc"),
+    "first_seen": ("oldest", "newest"),
+}
+
+
+def sort_href(filters: InboxFilters, next_sort: str) -> str:
+    """URL for the inbox with `sort` changed and page reset to 1."""
+    qs = filters.query_string(sort=next_sort)
+    parts = ["page=1"]
+    if qs:
+        parts.append(qs)
+    return "/?" + "&".join(parts)
+
+
+def inbox_sort_headers(filters: InboxFilters) -> list[dict]:
+    """Header spec for the inbox table: label, href, direction, active."""
+    specs = []
+    columns = (
+        ("score", "score"), ("title", "title"), ("company", "company"),
+        ("location", "location"), ("level", "level"),
+        ("source", None), ("first seen", "first_seen"),
+    )
+    for label, key in columns:
+        if key is None:
+            specs.append({"label": label, "href": None, "dir": None,
+                          "active": False})
+            continue
+        asc, desc = SORT_COLUMNS[key]
+        active = filters.sort in (asc, desc)
+        nxt = desc if filters.sort == asc else asc
+        specs.append({
+            "label": label,
+            "href": sort_href(filters, nxt),
+            "dir": "asc" if filters.sort == asc
+                   else "desc" if filters.sort == desc else None,
+            "active": active,
+        })
+    return specs

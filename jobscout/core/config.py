@@ -96,7 +96,7 @@ def set_discovery_mode(mode: str) -> None:
                 in_block = False  # left the discovery block
                 continue
             if line.strip().startswith("mode:"):
-                lines[i] = re.sub(r"mode:\s*\w+", f"mode: {mode}", line)
+                lines[i] = re.sub(r'mode:\s*.*$', f'mode: "{mode}"', line)
                 changed = True
                 break
     if not changed:

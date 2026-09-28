@@ -400,10 +400,18 @@ FROM postings p LEFT JOIN companies c ON p.company_id = c.id
 # sorting options for list_postings (webapp inbox)
 _SORTS = {
     "newest": "p.first_seen DESC, COALESCE(p.posted_at, '') DESC",
+    "oldest": "p.first_seen ASC, COALESCE(p.posted_at, '') ASC",
     "score": "COALESCE(p.final_score, -1) DESC, p.first_seen DESC",
+    "score_asc": "p.final_score IS NULL, p.final_score ASC, p.first_seen DESC",
     "posted": "COALESCE(p.posted_at, '') DESC",
     "company": "c.name COLLATE NOCASE, p.first_seen DESC",
-    "title": "p.title COLLATE NOCASE",
+    "company_desc": "c.name COLLATE NOCASE DESC, p.first_seen DESC",
+    "title": "p.title COLLATE NOCASE, p.first_seen DESC",
+    "title_desc": "p.title COLLATE NOCASE DESC, p.first_seen DESC",
+    "location": "COALESCE(p.location, '') COLLATE NOCASE, p.first_seen DESC",
+    "location_desc": "COALESCE(p.location, '') COLLATE NOCASE DESC, p.first_seen DESC",
+    "level": "COALESCE(p.seniority, 'zzz') COLLATE NOCASE, p.first_seen DESC",
+    "level_desc": "COALESCE(p.seniority, '') COLLATE NOCASE DESC, p.first_seen DESC",
 }
 
 

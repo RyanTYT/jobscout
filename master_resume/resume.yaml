@@ -10,20 +10,20 @@
 #
 # This skeleton passes validation with placeholders. Replace every "…" / null.
 
-version: 3
+version: 4
 
 identity:
-  full_name: "…"
-  preferred_name: "…"
-  email: "…"
-  phone: "…"
+  full_name: "Jane Doe"
+  preferred_name: null
+  email: "jane@example.com"
+  phone: null
   location:
-    city: "…"
-    region: "…"
-    country: "…"
+    city: null
+    region: null
+    country: null
     timezone: "…"
   links:                      # ← the personal-website section
-    personal_website: null    # e.g. https://ryantan.dev
+    personal_website: null
     linkedin: null
     github: null
     extra: []
@@ -37,7 +37,15 @@ work_authorization: []
 #   sponsorship_needed: false
 #   note: "…"
 
-education: []
+education:
+- id: EDUCUR                    # highest degree (profile editor)
+  school: "NUS"
+  degree: "BS"
+  field: null
+  dates: {start: "", end: null}
+  gpa: null
+  honors: []
+  highlights: []
 # - id: EDU1
 #   school: "…"
 #   degree: "BS"
@@ -47,7 +55,18 @@ education: []
 #   honors: []
 #   highlights: []              # thesis, notable coursework
 
-experience: []
+experience:
+- id: EXPCUR                    # current role (profile editor)
+  company: "Acme Trading"
+  domain: ""
+  context: "current role"
+  title: "Senior Software Engineer"
+  titles: []
+  dates: {start: "2019-06", end: present}
+  location: ""
+  employment: full-time
+  tech: []
+  bullets: []
 # - id: EXP1
 #   company: "…"
 #   domain: "company.com"       # auto-probed for ATS board tokens + careers page
@@ -97,15 +116,18 @@ extras:                       # ← the additional-information section
     policy: "defer to conversation"
     floor: null
     currency: USD
-  notice_period: "…"
-  availability: "…"
+  notice_period: null
+  availability: null
   languages_spoken: []
   interests: []                # cover-letter color, humanizing details
   referrals:
     policy: "company careers page"   # honest default for "how did you hear about us?"
   eeo:
     policy: decline            # decline | provide — EEO fields, declined by default
-  other: []
+other:
+  - id: XPORTFOLIO1
+    label: "portfolio"
+    value: "https://janedoe.dev"
   # - id: X1
   #   label: "willing to relocate"
   #   value: "…"

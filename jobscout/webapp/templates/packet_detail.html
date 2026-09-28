@@ -29,6 +29,12 @@
   </div>
 
   <div class="page-head__actions">
+    {% if manifest.posting_url %}
+    <a class="btn btn--primary btn--lg" href="{{ manifest.posting_url }}"
+       target="_blank" rel="noopener">
+      {{ m.icon("external", 14) }} Open employer application form
+    </a>
+    {% endif %}
     {% if pk.status not in ("applied", "withdrawn") %}
     <form method="post" action="/packet/{{ pk.id }}/status" data-busy-submit
           style="display: contents">
@@ -66,6 +72,10 @@
     {% for r in manifest.reasons %}
     {{ m.callout(r, "warning") }}
     {% endfor %}
+    <a class="btn btn--primary btn--block" href="/profile">
+      {{ m.icon("spark", 14) }} Fill these in your profile —
+      packets pick the values up on the next prepare
+    </a>
   </div>
 </div>
 {% endif %}

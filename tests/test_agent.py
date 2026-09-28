@@ -144,8 +144,8 @@ def test_set_discovery_mode_roundtrip(tmp_path, monkeypatch):
     settings_file.write_text(src)
     monkeypatch.setattr(core_config, "config_dir", lambda: tmp_path)
     core_config.set_discovery_mode("agent")
-    assert "mode: agent" in settings_file.read_text()
+    assert "mode: \"agent\"" in settings_file.read_text()
     core_config.set_discovery_mode("off")
-    assert "mode: off" in settings_file.read_text()
+    assert 'mode: "off"' in settings_file.read_text()
     with pytest.raises(core_config.ConfigError):
         core_config.set_discovery_mode("bogus")
