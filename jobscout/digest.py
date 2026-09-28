@@ -79,10 +79,15 @@ def write_daily(
             lines.append(f"- {_esc(e)}")
         lines.append("")
 
+    scored = run_meta.get("scored")
+    scoring_line = ""
+    if scored:
+        cap_note = " · CAP HIT, rest deferred" if scored.get("capped") else ""
+        scoring_line = f" · scored {scored.get('scored', 0)}{cap_note}"
     lines.append("---")
     lines.append(
         f"run {run_meta.get('run_id')} · {run_meta.get('companies', 0)} companies · "
-        f"{run_meta.get('postings_seen', 0)} postings seen · cost $0.00 · mode: pipeline (no LLM yet)"
+        f"{run_meta.get('postings_seen', 0)} postings seen{scoring_line} · mode: pipeline"
     )
 
     p.write_text("\n".join(lines) + "\n", encoding="utf-8")

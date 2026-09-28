@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="filters" method="get" action="/">
+  <label>status
+    <select name="status">
+      {% for s in ["new", "interested", "dismissed", "all"] %}
+      <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>tier
+    <select name="tier">
+      <option value="">any</option>
+      {% for t in ["A", "B", "C"] %}
+      <option value="{{ t }}" {% if filters.tier == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>search <input name="q" value="{{ filters.q }}" placeholder="title or company"></label>
+  <label>min score <input name="min_score" value="{{ filters.min_score }}" size="3" placeholder="0"></label>
+  <label class="chk"><input type="checkbox" name="all_postings" value="1" {% if filters.all %}checked{% endif %}> include rule-excluded</label>
+  <button type="submit">filter</button>
+</form>
+
+<p class="dim">{{ rows | length }} postings (top 200 by score · unscored last)</p>
+
+<table>
+  <thead>
+    <tr><th>score</th><th>title</th><th>company</th><th>location</th><th>level</th><th>source</th><th>first seen</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for p in rows %}{% include "_row.html" %}{% endfor %}
+  </tbody>
+</table>
+{% if not rows %}<p class="dim">nothing matches these filters</p>{% endif %}
+{% endblock %}

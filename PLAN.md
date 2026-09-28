@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Version** | 2.0 (pinned 2026-09-28) |
-| **Status** | P1 complete — 37-company watchlist seeded (24 live-verified boards, 13 dark-pool entries), first real digest generated · **Next: P2 — dashboard inbox + bulk LLM scoring** |
+| **Status** | P2 complete — dashboard live (inbox/companies/ops, 127.0.0.1:8787), bulk LLM scoring implemented + cached + capped (activates when the API key lands in .env) · **Next: P3 — careers crawler + ATS-absence detection** |
 | **Repo** | `/Users/user/Downloads/Personal Project/jobscout` (local only, no remote yet) |
 | **Sibling repos** | `../JobPilot` (the "hands", see §6) · `../rusty_trader` (unrelated) |
 | **Dev Mac rule** | This Mac develops only. **Never run `bootstrap.sh` here** — it installs launchd and belongs on the target/deployment Mac. |
@@ -477,17 +477,17 @@ Done when: a morning digest is generated from the watchlist's ATS boards — **g
 - [x] `jobscout run --daily` (no LLM): pull → dedup → filter → `digest/YYYY-MM-DD.md` + runs table + idempotency skip
 - [x] `jobscout add-company` verb (watchlist tier + ATS token probe) + `jobscout probe`
 - [x] Seed `watchlist.yaml` with 37 tier-A/B companies (web-researched + live-probed; 24 boards verified, 13 dark-pool)
-- [ ] `jobscout doctor` learns source-health checks (digest already carries per-source errors + stale-board detection; doctor check moved to P2)
+- [x] `jobscout doctor` learns source-health checks (landed with P2: last-run age + error count)
 
-### P2 — Dashboard inbox + bulk LLM scoring
-Done when: scoring runs cheap+cached and postings are browsable at 127.0.0.1:8787.
+### P2 — Dashboard inbox + bulk LLM scoring ✅ (2026-09-28)
+Done when: scoring runs cheap+cached and postings are browsable at 127.0.0.1:8787 — **dashboard verified live (all pages + HTMX row swap + persistence); LLM scoring verified by unit tests with a fake client; activates on API key.**
 
-- [ ] `llm.py`: OpenAI-compatible client, 3 tiers, spend meter, per-tier daily caps
-- [ ] `scoring/llm_bulk.py`: JSON {fit, stack, seniority, flags, rationale, red_flags, competition}, cached by (content_hash, profile_version)
-- [ ] `scoring/rules.py` wired into the pipeline before LLM (cuts volume ~10×)
-- [ ] Final score = fit×.6 + company×.25 + opportunity×.15
-- [ ] `webapp/`: FastAPI + Jinja2 + HTMX; Inbox + Posting detail + Ops pages
-- [ ] `jobscout serve`; interested/dismiss actions persist to DB
+- [x] `llm.py`: OpenAI-compatible client, 3 tiers, spend meter (`llm_calls` table), per-tier daily caps, 429/5xx retry, JSON-mode fallback, no-key degradation
+- [x] `scoring/llm_bulk.py`: JSON {fit, stack, seniority, flags, rationale, red_flags, competition}, cached by (content_hash, profile_version) — `rule_pass` column gates what gets scored
+- [x] `scoring/rules.py` wired into the pipeline before LLM (landed in P1; rule verdict now persisted as `rule_pass`)
+- [x] Final score = fit×.6 + company×.25 + opportunity×.15 (opportunity = ATS-weakness + competition adj)
+- [x] `webapp/`: FastAPI + Jinja2 + HTMX (vendored htmx.min.js, no npm); Inbox + Posting detail + Companies + Ops pages
+- [x] `jobscout serve` (loopback) + `jobscout score` (backfill) + `jobscout stats`; interested/dismiss/revert actions persist to DB via HTMX row swap
 
 ### P3 — Careers crawler + ATS-absence probe (dark-pool detection)
 Done when: a company with a careers page but no ATS board is tracked end-to-end.
@@ -576,6 +576,7 @@ Done when: [Fill for me] fills a real form headfully and returns an auditable fi
 | 2026-09-28 | Repo name: `jobscout` (working name — rename is cheap until first push) |
 | 2026-09-28 | watchlist.yaml = living company-first substrate: discovery appends `candidates` daily, owner promotes; git history = auditable growth (PLAN §5.9) |
 | 2026-09-28 | Probe rule: a board hit requires live postings — SmartRecruiters returns 200-empty for wrong ids (e.g. "JaneStreet"); Optiver's greenhouse board exists but is empty (they moved on) |
+| 2026-09-28 | Bulk scoring: cache key (profile_version, content_hash); per-tier daily caps in models.yaml degrade to rule-only; no-key runs are rule-only by design; first-run baseline scores only within cap (backfill via `jobscout score`) |
 | OPEN | Private remote vs local-only |
 | OPEN | Final name |
 
@@ -593,6 +594,6 @@ Done when: [Fill for me] fills a real form headfully and returns an auditable fi
 
 ## Appendix B — CLI surface
 
-Implemented (P0): `jobscout doctor` · `jobscout db init|status` · `jobscout config check|show` · `jobscout resume validate|fields` · `jobscout version`
+Implemented (P0–P2): `jobscout doctor` (incl. source health) · `jobscout db init|status` · `jobscout config check|show` · `jobscout resume validate|fields` · `jobscout run [--daily|--force]` · `jobscout add-company` · `jobscout probe` · `jobscout digest` · `jobscout serve` · `jobscout score` · `jobscout stats` · `jobscout version`
 
 Planned: `jobscout run [--daily]` (P1) · `jobscout add-company` (P1) · `jobscout serve` (P2) · `jobscout agent [--morning|--now]` (P5) · `jobscout prepare --posting ID` (P6) · `jobscout mark ID applied|dismissed|withdrawn` (P6) · `jobscout digest --today` (P1) · `jobscout stats` (P2) · `jobscout fill --packet ID` (P7)

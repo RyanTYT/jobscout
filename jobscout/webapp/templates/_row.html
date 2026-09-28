@@ -1,0 +1,34 @@
+<tr id="row-{{ p.id }}">
+  <td>
+    {% if p.final_score is not none %}
+      <span class="badge {{ 'good' if p.final_score >= 75 else ('ok' if p.final_score >= 50 else 'low') }}">{{ "%.0f" | format(p.final_score) }}</span>
+    {% else %}
+      <span class="badge dim">·</span>
+    {% endif %}
+  </td>
+  <td class="title"><a href="/posting/{{ p.id }}">{{ p.title or "(untitled)" }}</a></td>
+  <td>
+    {{ p.company_name or p.company_id }}
+    {% if p.tier %}<span class="chip tier-{{ p.tier | lower }}">{{ p.tier }}</span>{% endif %}
+    {% if p.non_ats %}<span class="chip dark" title="no public ATS board — dark-pool watch">dark</span>{% endif %}
+  </td>
+  <td class="dim">{{ (p.location or "—") | truncate(28) }}</td>
+  <td class="dim">{{ p.seniority or "—" }}</td>
+  <td class="dim">{{ (p.source or "") | replace("ats:", "") | truncate(24) }}</td>
+  <td class="dim">{{ (p.first_seen or "")[:10] }}</td>
+  <td class="actions">
+    {% if p.status == "new" %}
+      <button class="yes" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"interested"}' hx-target="#row-{{ p.id }}" hx-swap="outerHTML">✓</button>
+      <button class="no" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"dismissed"}' hx-target="#row-{{ p.id }}" hx-swap="outerHTML">✗</button>
+    {% elif p.status == "interested" %}
+      <span class="chip int">interested</span>
+      <button class="no" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"dismissed"}' hx-target="#row-{{ p.id }}" hx-swap="outerHTML">✗</button>
+    {% elif p.status == "dismissed" %}
+      <span class="chip dis">dismissed</span>
+      <button class="yes" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"new"}' hx-target="#row-{{ p.id }}" hx-swap="outerHTML">undo</button>
+    {% else %}
+      <span class="dim">{{ p.status }}</span>
+    {% endif %}
+    <a class="detail" href="/posting/{{ p.id }}">▸</a>
+  </td>
+</tr>

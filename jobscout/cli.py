@@ -215,9 +215,99 @@ def agent(morning: bool = typer.Option(False, "--morning")):
 
 
 @app.command()
-def serve() -> None:
-    """Serve the local dashboard at 127.0.0.1:8787 (P2)."""
-    _stub("serve", "P2", "FastAPI + Jinja2 + HTMX inbox")
+def serve(
+    host: str | None = typer.Option(None, "--host"),
+    port: int | None = typer.Option(None, "--port"),
+) -> None:
+    """Serve the local dashboard (P2) — 127.0.0.1:8787 by default."""
+    import uvicorn
+
+    from jobscout.core.config import load_settings as _ls
+    from jobscout.webapp import create_app
+
+    settings = _ls()
+    app_asgi = create_app()
+    uvicorn.run(
+        app_asgi,
+        host=host or settings.dashboard.host,
+        port=port or settings.dashboard.port,
+        log_level="info",
+    )
+
+
+@app.command()
+def score(limit: int = typer.Option(500, "--limit", help="Max postings to score this invocation")) -> None:
+    """Bulk-score rule-pass postings (tier A first, cap-respecting, cached)."""
+    from jobscout.core.config import load_profile as _lp
+    from jobscout.llm import LlmClient
+    from jobscout.scoring import llm_bulk
+
+    profile = _lp()
+    llm = LlmClient()
+    if not llm.available:
+        console.print("[red]no API key — set JOBSCOUT_LLM_API_KEY in .env[/]")
+        raise typer.Exit(1)
+    db.init_db()
+    conn = db.connect()
+    try:
+        rows = db.unscored_rule_pass(conn, limit=limit)
+        if not rows:
+            console.print("[green]nothing to score[/] — all eligible postings have final scores")
+            raise typer.Exit(0)
+        console.print(f"scoring {len(rows)} postings (tier {rows[0]['tier'] or '?'} first) …")
+        stats = llm_bulk.score_postings(conn, rows, profile, llm)
+    finally:
+        conn.close()
+    console.print(
+        f"[green]✓[/] scored {stats['scored']} ({stats['errors']} errors"
+        + (", [yellow]CAP HIT[/]" if stats["capped"] else "")
+        + ") · tokens metered in llm_calls (see `jobscout stats`)"
+    )
+
+
+@app.command()
+def stats() -> None:
+    """DB counts, LLM spend by tier, recent runs."""
+    status = db.db_status()
+    if not status["exists"]:
+        console.print("[yellow]database not initialised — run `jobscout db init`[/]")
+        raise typer.Exit(1)
+    conn = db.connect()
+    try:
+        t1 = Table(title="state")
+        t1.add_column("table")
+        t1.add_column("rows", justify="right")
+        for k, v in status["counts"].items():
+            t1.add_row(k, str(v))
+        console.print(t1)
+
+        t2 = Table(title="LLM spend (7 days)")
+        t2.add_column("tier")
+        t2.add_column("model")
+        t2.add_column("calls", justify="right")
+        t2.add_column("in tok", justify="right")
+        t2.add_column("out tok", justify="right")
+        t2.add_column("cost $", justify="right")
+        for r in db.llm_spend_by_tier(conn):
+            t2.add_row(
+                r["tier"], r["model"], str(r["calls"]),
+                f"{r['ptok'] or 0:,}", f"{r['ctok'] or 0:,}",
+                f"{(r['cost'] or 0):.4f}",
+            )
+        console.print(t2)
+
+        t3 = Table(title="recent runs")
+        t3.add_column("id", justify="right")
+        t3.add_column("kind")
+        t3.add_column("started")
+        t3.add_column("ok")
+        t3.add_column("cost $", justify="right")
+        for r in db.recent_runs(conn):
+            t3.add_row(str(r["id"]), r["kind"], (r["started"] or "")[:19],
+                       "✓" if r["ok"] else "✗", f"{(r['cost_usd'] or 0):.4f}")
+        console.print(t3)
+    finally:
+        conn.close()
 
 
 @app.command()

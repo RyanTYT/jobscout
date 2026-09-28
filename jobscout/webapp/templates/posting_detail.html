@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/">← back to inbox</a></p>
+
+<h1>{{ p.title or "(untitled)" }}</h1>
+<p class="sub">
+  {{ p.company_name or p.company_id }}
+  {% if p.tier %}<span class="chip tier-{{ p.tier | lower }}">tier {{ p.tier }}</span>{% endif %}
+  {% if p.non_ats %}<span class="chip dark">dark-pool company (no public board)</span>{% endif %}
+</p>
+
+{% if p.final_score is not none %}
+<div class="scores">
+  <div class="scorebox"><span class="big {{ 'good' if p.final_score >= 75 else ('ok' if p.final_score >= 50 else 'low') }}">{{ "%.0f" | format(p.final_score) }}</span> final</div>
+  <div class="scorebox"><span class="big">{{ "%.0f" | format(p.fit_score) }}</span> fit</div>
+  <div class="scorebox"><span class="big">{{ "%.0f" | format(p.company_score) }}</span> company</div>
+  <div class="scorebox"><span class="big">{{ "%.0f" | format(p.opportunity) }}</span> opportunity</div>
+</div>
+{% else %}
+<p class="dim">not scored yet — run `jobscout score` (needs an API key in .env)</p>
+{% endif %}
+
+{% if llm.rationale %}<blockquote>{{ llm.rationale }}</blockquote>{% endif %}
+{% if llm.red_flags %}
+<h2>red flags</h2>
+<ul>{% for f in llm.red_flags %}<li class="red">{{ f }}</li>{% endfor %}</ul>
+{% endif %}
+{% if llm.stack %}<p class="dim">stack: {{ llm.stack | join(", ") }}</p>{% endif %}
+{% if llm.flags %}<p class="dim">flags: {{ llm.flags | join(", ") }}</p>{% endif %}
+
+<table class="meta">
+  <tr><th>link</th><td><a href="{{ p.url }}" rel="noopener" target="_blank">{{ p.url }}</a></td></tr>
+  <tr><th>location</th><td>{{ p.location or "—" }}{% if p.remote %} · remote{% endif %}</td></tr>
+  <tr><th>level</th><td>{{ p.seniority or "—" }}{% if llm.seniority %} · LLM read: {{ llm.seniority }}{% endif %}</td></tr>
+  <tr><th>source</th><td>{{ p.source }}</td></tr>
+  <tr><th>posted</th><td>{{ p.posted_at or "—" }}</td></tr>
+  <tr><th>first seen</th><td>{{ p.first_seen }}</td></tr>
+  <tr><th>last seen</th><td>{{ p.last_seen }}</td></tr>
+  <tr><th>status</th><td>{{ p.status }} · rule_pass {{ "yes" if p.rule_pass else "no" }}</td></tr>
+</table>
+
+<div class="actions-page">
+  <button class="yes" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"interested"}' hx-target="#row-{{ p.id }}">mark interested</button>
+  <button class="no" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"dismissed"}'>dismiss</button>
+  <span class="dim">application packets land in P6 (prepare --posting {{ p.id }})</span>
+</div>
+
+{% if p.description %}
+<h2>description</h2>
+<pre class="desc">{{ p.description }}</pre>
+{% endif %}
+{% endblock %}

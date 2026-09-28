@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>companies — the living substrate</h1>
+<p class="dim">watchlist.yaml mirrors this table; discovery appends candidates daily (PLAN §5.9)</p>
+<table>
+  <thead><tr><th>company</th><th>tier</th><th>domain</th><th>boards</th><th>postings</th><th>new (rule-pass)</th><th>note</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td class="title">{{ r.name }}</td>
+    <td>{% if r.tier %}<span class="chip tier-{{ r.tier | lower }}">{{ r.tier }}</span>{% endif %}</td>
+    <td class="dim">{{ r.domain or "—" }}</td>
+    <td>
+      {% if boards.get(r.id) %}
+        {% for prov, tok in boards.get(r.id) %}<span class="chip">{{ prov }}:{{ tok }}</span>{% endfor %}
+      {% else %}
+        <span class="chip dark">none — dark-pool watch</span>
+      {% endif %}
+    </td>
+    <td class="num">{{ r.postings_total }}</td>
+    <td class="num">{{ r.rule_pass_new }}</td>
+    <td class="dim">{{ r.notes or "" }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

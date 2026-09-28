@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>ops</h1>
+
+<h2>database</h2>
+<table class="meta">
+  <tr><th>path</th><td>{{ db_status.path }}</td></tr>
+  <tr><th>schema</th><td>v{{ db_status.schema_version }} (expected v{{ db_status.expected_version }})</td></tr>
+  <tr><th>size</th><td>{{ "{{:,}}".format(db_status.size_bytes) }} bytes</td></tr>
+  {% for k, v in db_status.counts.items() %}
+  <tr><th>{{ k }}</th><td>{{ v }}</td></tr>
+  {% endfor %}
+</table>
+
+<h2>recent runs</h2>
+<table>
+  <thead><tr><th>id</th><th>kind</th><th>started</th><th>ok</th><th>cost $</th><th>companies</th><th>postings</th><th>rule-pass</th><th>errors</th><th>scoring</th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+  <tr>
+    <td>{{ r.row.id }}</td>
+    <td>{{ r.row.kind }}</td>
+    <td class="dim">{{ (r.row.started or "")[:19] }}</td>
+    <td>{{ "✓" if r.row.ok else "✗" }}</td>
+    <td class="num">{{ "%.4f" | format(r.row.cost_usd or 0) }}</td>
+    <td class="num">{{ r.stats.get("companies", "—") }}</td>
+    <td class="num">{{ r.stats.get("postings_seen", "—") }}</td>
+    <td class="num">{{ r.stats.get("rule_pass", "—") }}</td>
+    <td class="num">{{ r.stats.get("errors", "—") }}</td>
+    <td class="dim">
+      {% if r.stats.get("scoring") %}
+        scored {{ r.stats.scoring.get("scored", 0) }}{% if r.stats.scoring.get("capped") %} · <span class="chip dis">CAP</span>{% endif %}
+      {% else %}—{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>LLM spend (7 days)</h2>
+{% if spend %}
+<table>
+  <thead><tr><th>tier</th><th>model</th><th>calls</th><th>in tok</th><th>out tok</th><th>cost $</th></tr></thead>
+  <tbody>
+  {% for s in spend %}
+  <tr>
+    <td>{{ s.tier }}</td><td class="dim">{{ s.model }}</td>
+    <td class="num">{{ s.calls }}</td>
+    <td class="num">{{ "{:,}".format(s.ptok or 0) }}</td>
+    <td class="num">{{ "{:,}".format(s.ctok or 0) }}</td>
+    <td class="num">{{ "%.4f" | format(s.cost or 0) }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="dim">no LLM calls recorded (key not set or nothing scored yet)</p>{% endif %}
+
+<h2>source health (last daily run)</h2>
+{% if last_stats %}
+<p class="dim">
+  {{ last_stats.get("companies", "—") }} companies · {{ last_stats.get("postings_seen", "—") }} postings ·
+  {{ last_stats.get("errors", 0) }} source errors — details in the day's digest footer
+</p>
+{% else %}<p class="dim">no runs yet</p>{% endif %}
+{% endblock %}

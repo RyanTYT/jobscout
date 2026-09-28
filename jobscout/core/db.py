@@ -15,7 +15,7 @@ from pathlib import Path
 
 from jobscout.core.paths import db_path, ensure_runtime_dirs
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -42,8 +42,9 @@ CREATE TABLE IF NOT EXISTS postings (
     remote        INTEGER,
     seniority     TEXT,
     job_type      TEXT,
+    rule_pass     INTEGER,                   -- 1 = passed deterministic rule filter (P2 scoring/dashboard gate)
     posted_at     TEXT,
-    description   TEXT,                     -- plain text, first ~4000 chars (P2 LLM input)
+    description   TEXT,                      -- plain text, first ~4000 chars (P2 LLM input)
     first_seen    TEXT NOT NULL,
     last_seen     TEXT NOT NULL,
     content_hash  TEXT,                     -- sha256(title|location|description) — dedup across sources
@@ -93,6 +94,18 @@ CREATE TABLE IF NOT EXISTS runs (
     ok          INTEGER NOT NULL DEFAULT 1
 );
 
+CREATE TABLE IF NOT EXISTS llm_calls (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    tier              TEXT NOT NULL,         -- bulk | agent | quality
+    model             TEXT NOT NULL,
+    cache_key         TEXT,
+    prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd          REAL NOT NULL DEFAULT 0,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_llm_calls_day ON llm_calls(tier, date(created_at));
+
 CREATE TABLE IF NOT EXISTS llm_cache (
     cache_key   TEXT PRIMARY KEY,          -- sha256(model + prompt) or (content_hash, profile_version)
     response    TEXT NOT NULL,
@@ -101,7 +114,7 @@ CREATE TABLE IF NOT EXISTS llm_cache (
 );
 """
 
-_COUNTED_TABLES = ("companies", "postings", "signals", "packets", "runs", "llm_cache")
+_COUNTED_TABLES = ("companies", "postings", "signals", "packets", "runs", "llm_cache", "llm_calls")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -145,6 +158,7 @@ def init_db() -> Path:
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(SCHEMA)
+        _migrate(conn)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         conn.commit()
     finally:
@@ -315,3 +329,148 @@ def last_ok_run(conn: sqlite3.Connection, kind: str) -> sqlite3.Row | None:
     return conn.execute(
         "SELECT * FROM runs WHERE kind = ? AND ok = 1 ORDER BY id DESC LIMIT 1", (kind,)
     ).fetchone()
+
+
+# ── migration ────────────────────────────────────────────────────────────────
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """In-place column additions for pre-existing DBs (CREATE IF NOT EXISTS
+    can't upgrade them). Safe to run repeatedly."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(postings)")}
+    if "rule_pass" not in cols:
+        conn.execute("ALTER TABLE postings ADD COLUMN rule_pass INTEGER")
+
+
+# ── P2: rule verdicts, scores, statuses ──────────────────────────────────────
+
+ALLOWED_STATUSES = ("new", "interested", "dismissed", "withdrawn")
+
+
+def set_rule_pass(conn: sqlite3.Connection, posting_id: str, passed: bool) -> None:
+    conn.execute("UPDATE postings SET rule_pass = ? WHERE id = ?", (1 if passed else 0, posting_id))
+    conn.commit()
+
+
+def update_posting_scores(
+    conn: sqlite3.Connection,
+    posting_id: str,
+    *,
+    fit: float,
+    company_quality: float,
+    opportunity: float,
+    final: float,
+    llm_json: str,
+    cache_key: str,
+) -> None:
+    conn.execute(
+        """UPDATE postings SET fit_score = ?, company_score = ?, opportunity = ?,
+               final_score = ?, llm_json = ?, llm_cache_key = ? WHERE id = ?""",
+        (fit, company_quality, opportunity, final, llm_json, cache_key, posting_id),
+    )
+    conn.commit()
+
+
+def set_posting_status(conn: sqlite3.Connection, posting_id: str, status: str) -> bool:
+    if status not in ALLOWED_STATUSES:
+        return False
+    cur = conn.execute(
+        "UPDATE postings SET status = ? WHERE id = ?", (status, posting_id)
+    )
+    conn.commit()
+    return cur.rowcount > 0
+
+
+_POSTING_SELECT = """
+SELECT p.*, c.name AS company_name, c.tier, c.non_ats, c.ats_tokens, c.domain AS company_domain
+FROM postings p LEFT JOIN companies c ON p.company_id = c.id
+"""
+
+
+def list_postings(
+    conn: sqlite3.Connection,
+    *,
+    status: str | None = "new",
+    tier: str | None = None,
+    q: str | None = None,
+    min_score: float | None = None,
+    only_rule_pass: bool = True,
+    limit: int = 200,
+    offset: int = 0,
+) -> list[sqlite3.Row]:
+    where, params = [], []
+    if status and status != "all":
+        where.append("p.status = ?")
+        params.append(status)
+    if only_rule_pass:
+        where.append("p.rule_pass = 1")
+    if tier:
+        where.append("c.tier = ?")
+        params.append(tier)
+    if min_score is not None:
+        where.append("p.final_score >= ?")
+        params.append(min_score)
+    if q:
+        where.append("(p.title LIKE ? OR c.name LIKE ?)")
+        like = f"%{q}%"
+        params.extend([like, like])
+    sql = _POSTING_SELECT
+    if where:
+        sql += "WHERE " + " AND ".join(where) + " "
+    sql += "ORDER BY COALESCE(p.final_score, -1) DESC, p.first_seen DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+    return conn.execute(sql, params).fetchall()
+
+
+def get_posting(conn: sqlite3.Connection, posting_id: str) -> sqlite3.Row | None:
+    return conn.execute(
+        _POSTING_SELECT + "WHERE p.id = ?", (posting_id,)
+    ).fetchone()
+
+
+def unscored_rule_pass(conn: sqlite3.Connection, limit: int = 200) -> list[sqlite3.Row]:
+    """Rule-pass, still-eligible postings lacking a final score — tier A first."""
+    return conn.execute(
+        _POSTING_SELECT
+        + """WHERE p.status IN ('new', 'interested') AND p.rule_pass = 1
+             AND p.final_score IS NULL
+           ORDER BY CASE c.tier WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 ELSE 3 END,
+                    p.first_seen
+           LIMIT ?""",
+        (limit,),
+    ).fetchall()
+
+
+# ── P2: dashboard aggregates ─────────────────────────────────────────────────
+
+
+def company_summary(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT c.*, 
+               (SELECT COUNT(*) FROM postings p WHERE p.company_id = c.id) AS postings_total,
+               (SELECT COUNT(*) FROM postings p WHERE p.company_id = c.id AND p.status = 'new'
+                  AND p.rule_pass = 1) AS rule_pass_new
+        FROM companies c
+        ORDER BY CASE c.tier WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 ELSE 3 END, c.name
+        """
+    ).fetchall()
+
+
+def llm_spend_by_tier(conn: sqlite3.Connection, days: int = 7) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT tier, model, COUNT(*) AS calls, SUM(prompt_tokens) AS ptok,
+               SUM(completion_tokens) AS ctok, SUM(cost_usd) AS cost
+        FROM llm_calls
+        WHERE date(created_at) >= date('now', ?)
+        GROUP BY tier, model ORDER BY tier
+        """,
+        (f"-{days} days",),
+    ).fetchall()
+
+
+def recent_runs(conn: sqlite3.Connection, limit: int = 10) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,)
+    ).fetchall()

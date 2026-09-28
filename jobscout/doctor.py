@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from dataclasses import dataclass
 
@@ -104,6 +105,37 @@ def run_checks() -> list[Check]:
         checks.append(Check("env:cse", "ok", "key + cx set"))
     else:
         checks.append(Check("env:cse", "warn", "Google CSE not set (needed for agent discovery, P5)"))
+
+    # source health (P2): last daily run + errors
+    if status["exists"]:
+        conn = db.connect()
+        try:
+            last = db.last_ok_run(conn, "daily")
+            if last is None:
+                checks.append(Check("sources", "warn", "no successful daily run yet — run `jobscout run --daily`"))
+            else:
+                try:
+                    stats = json.loads(last["stats"] or "{}")
+                except ValueError:
+                    stats = {}
+                errors = int(stats.get("errors") or 0)
+                age_h = None
+                if last["started"]:
+                    try:
+                        from datetime import UTC, datetime
+                        age_h = (datetime.now(UTC) - datetime.fromisoformat(
+                            last["started"].replace("Z", "+00:00"))).total_seconds() / 3600
+                    except ValueError:
+                        pass
+                age_txt = f"{age_h:.0f}h ago" if age_h is not None else "unknown age"
+                if errors:
+                    checks.append(Check("sources", "warn", f"last run {age_txt}: {errors} source errors (see digest)"))
+                elif age_h is not None and age_h > 36:
+                    checks.append(Check("sources", "warn", f"last daily run {age_txt} — is the schedule running?"))
+                else:
+                    checks.append(Check("sources", "ok", f"last daily run {age_txt}, 0 source errors"))
+        finally:
+            conn.close()
 
     # sidecar (P7) — informational only
     sidecar = (root / "../JobPilot").resolve()

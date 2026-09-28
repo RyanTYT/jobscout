@@ -257,6 +257,8 @@ class TierCfg(BaseModel):
     model: str
     max_daily_usd: float
     purpose: str
+    price_in_per_mtok: float | None = None   # USD per 1M input tokens (for the spend meter)
+    price_out_per_mtok: float | None = None  # USD per 1M output tokens
 
 
 class CapsCfg(BaseModel):

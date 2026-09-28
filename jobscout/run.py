@@ -101,12 +101,35 @@ def run_daily(force: bool = False) -> int:
     for row in new_rows:
         ns = SimpleNamespace(**dict(row))
         ok, _ = rule_filter(ns, profile)
+        db.set_rule_pass(conn, row["id"], ok)
         if ok:
             filtered.append(row)
         else:
             excluded += 1
 
     closing = db.stale_postings(conn, days=14)
+
+    # ── tier-1 bulk scoring (P2): cheap LLM on rule-pass, cap-respecting ─────
+    scored_stats: dict | None = None
+    try:
+        from jobscout.llm import LlmClient
+        from jobscout.scoring import llm_bulk
+
+        llm = LlmClient(conn=conn)
+        if llm.available:
+            wanted = {r["id"] for r in filtered}
+            join_rows = [
+                r for r in db.unscored_rule_pass(conn, limit=10_000) if r["id"] in wanted
+            ]
+            if join_rows:
+                scored_stats = llm_bulk.score_postings(conn, join_rows, profile, llm)
+        else:
+            print(
+                "LLM scoring skipped (no API key) — rule-only digest "
+                "(set JOBSCOUT_LLM_API_KEY in .env)"
+            )
+    except Exception as e:  # noqa: BLE001 — scoring must never break the digest
+        print(f"LLM scoring failed: {e} — digest is rule-only")
 
     today = datetime.now(UTC).strftime("%Y-%m-%d")
     path = digest.write_daily(
@@ -120,6 +143,7 @@ def run_daily(force: bool = False) -> int:
             "run_id": run_id,
             "companies": len(entries),
             "postings_seen": postings_seen,
+            "scored": scored_stats,
         },
     )
 
@@ -132,8 +156,9 @@ def run_daily(force: bool = False) -> int:
             "new": len(new_rows),
             "rule_pass": len(filtered),
             "errors": len(errors),
+            "scoring": scored_stats,
         },
-        cost_usd=0.0,
+        cost_usd=(scored_stats or {}).get("cost", 0.0),
         ok=True,
     )
     conn.close()
