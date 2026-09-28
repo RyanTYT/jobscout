@@ -3,3 +3,4 @@ src-tauri/target/
 src-tauri/gen/schemas/
 binaries/
 build/
+freeze/jobscout-server.spec
