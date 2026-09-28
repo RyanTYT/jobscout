@@ -683,6 +683,17 @@ attribute so semantic tokens never flipped. Now wired end to end:
   subtle neutral chip in both modes; .text-bg-purple added for the
   dark-pool/interested tone.
 
+Control typography + field states (same day, follow-up request):
+Bootstrap ships 1rem/400 controls that dwarfed the 13px body — buttons,
+inputs, dropdown items, and pagination now follow the token scale
+(buttons: 13px medium + tight tracking; btn-lg/btn-sm stepped).
+Unfilled form fields read as open slots: dashed outline + sunken well
++ muted placeholder (via :placeholder-shown; every input carries a
+placeholder — the region field got one; js-select toggles flag
+.is-empty server-side and app.js keeps it in sync). Bootstrap's
+hardcoded blue focus glow (#86b7fe/rgba(13,110,253)) on form controls
+now routes through the --focus-ring token.
+
 ### P8 — Polish + agent-generated plugins
 - [ ] Agent-generated ScraperPlugins for new watchlist companies (JobPilot plugin interface)
 - [ ] LinkedIn opt-in channel (interactive only, rate-limited)
