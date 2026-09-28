@@ -1,8 +1,16 @@
 /* ============================================================================
    tokens.css — THE single source of truth for every design decision.
-   All other stylesheets reference these variables exclusively; no raw
-   colors, sizes, shadows, or durations may appear anywhere else.
-   Change the design here — the whole app re-skins.
+
+   Layer 1 of 3:
+     1. tokens.css   — this file: the palette + semantic theme (BOTH modes)
+     2. bootstrap    — vendored framework (spacing, components, behavior)
+     3. app.css      — maps the semantic tokens onto Bootstrap's --bs-* vars
+
+   The semantic block below defines the app's colors ONCE; the
+   [data-bs-theme="dark"] block flips them. app.css forwards them into
+   Bootstrap, so every framework component follows the same theme with
+   zero hardcoded colors downstream. All literal values in the app live
+   in this file.
    ========================================================================== */
 
 :root {
@@ -57,200 +65,238 @@
   --c-blue-700:  #1d4ed8;
 
   --c-violet-50: #f5f3ff;
-  --c-violet-100:#ede9fe;
-  --c-violet-500:#8b5cf6;
-  --c-violet-600:#7c3aed;
+  --c-violet-100: #ede9fe;
+  --c-violet-500: #8b5cf6;
+  --c-violet-600: #7c3aed;
 
-  /* ── semantic: surfaces & text ──────────────────────────────────────── */
-  --bg-app:        var(--c-slate-100);   /* page background          */
-  --bg-raised:     var(--c-slate-50);    /* cards, panels            */
-  --bg-sunken:     var(--c-slate-150);   /* wells, table headers     */
-  --bg-inset:      var(--c-slate-200);   /* hover fill on rows       */
-  --bg-overlay:    rgba(10, 18, 32, calc(var(--dim-overlay) * 1%));
+  /* ── rgb companions (for rgba() alpha compositing) ─────────────────── */
+  --c-indigo-200-rgb: 199, 210, 254;
+  --c-indigo-300-rgb: 165, 180, 252;
+  --c-indigo-400-rgb: 129, 140, 248;
+  --c-indigo-500-rgb: 99, 102, 241;
+  --c-indigo-600-rgb: 79, 70, 229;
+  --c-indigo-700-rgb: 67, 56, 202;
+  --c-violet-500-rgb: 139, 92, 246;
+  --c-green-500-rgb:  34, 197, 94;
+  --c-green-600-rgb:  22, 163, 74;
+  --c-green-700-rgb:  21, 128, 61;
+  --c-amber-500-rgb:  245, 158, 11;
+  --c-amber-700-rgb:  180, 83, 9;
+  --c-red-500-rgb:    239, 68, 68;
+  --c-red-600-rgb:    220, 38, 38;
+  --c-blue-500-rgb:   59, 130, 246;
+  --c-blue-600-rgb:   37, 99, 235;
+  --c-slate-50-rgb:   248, 250, 252;
+  --c-slate-100-rgb:  241, 245, 249;
+  --c-slate-150-rgb:  233, 238, 245;
+  --c-slate-300-rgb:  203, 213, 225;
+  --c-slate-500-rgb:  100, 116, 139;
+  --c-slate-600-rgb:  71, 85, 105;
+  --c-slate-800-rgb:  30, 41, 59;
+  --c-slate-850-rgb:  23, 32, 51;
+  --c-slate-900-rgb:  15, 23, 42;
+  --c-slate-950-rgb:  10, 18, 32;
 
-  --bg-nav:        var(--c-slate-900);   /* sidebar                  */
-  --bg-nav-hover:  var(--c-slate-800);
-  --bg-nav-active: var(--c-slate-850);
+  /* ══ semantic theme — LIGHT ════════════════════════════════════════════ */
 
-  --text-1:        var(--c-slate-900);   /* primary                  */
-  --text-2:        var(--c-slate-600);   /* secondary                */
-  --text-3:        var(--c-slate-400);   /* muted / meta             */
-  --text-inverse:  var(--c-slate-50);
+  /* surfaces & text */
+  --bg-app:        var(--c-slate-100);   /* page background            */
+  --bg-raised:     var(--c-slate-50);    /* cards, dropdowns, topbar   */
+  --bg-sunken:     var(--c-slate-150);   /* wells, table headers       */
+  --bg-inset:      var(--c-slate-200);   /* hover fill, inset controls */
+
+  --text-1:        var(--c-slate-900);   /* primary                    */
+  --text-1-rgb:    var(--c-slate-900-rgb);
+  --text-2:        var(--c-slate-600);   /* secondary                  */
+  --text-3:        var(--c-slate-400);   /* muted / meta               */
+  --text-inverse:  var(--c-slate-50);    /* on accent surfaces         */
   --text-nav:      var(--c-slate-300);
   --text-nav-dim:  var(--c-slate-500);
 
   --border:        var(--c-slate-200);
   --border-strong: var(--c-slate-300);
+  --focus-ring-color: var(--c-indigo-200);
+
+  /* sidebar (stays dark in both themes — app chrome) */
+  --bg-nav:        var(--c-slate-900);
+  --bg-nav-hover:  var(--c-slate-800);
+  --bg-nav-active: var(--c-slate-850);
   --border-nav:    var(--c-slate-800);
-  --w-border:      1px;
 
-  /* ── semantic: accent & feedback ────────────────────────────────────── */
-  --accent:        var(--c-indigo-600);
-  --accent-hover:  var(--c-indigo-700);
-  --accent-soft:   var(--c-indigo-50);
-  --accent-border: var(--c-indigo-200);
-  --on-accent:     #ffffff;
+  /* accent (indigo) */
+  --accent:            var(--c-indigo-600);
+  --accent-rgb:        var(--c-indigo-600-rgb);
+  --accent-hover:      var(--c-indigo-700);
+  --accent-hover-rgb:  var(--c-indigo-700-rgb);
+  --accent-text:       var(--c-indigo-700);   /* text on soft bg        */
+  --accent-soft:       rgba(var(--c-indigo-500-rgb), 0.10);
+  --accent-border:     rgba(var(--c-indigo-500-rgb), 0.32);
 
-  --success:       var(--c-green-600);
-  --success-soft:  var(--c-green-50);
-  --success-text:  var(--c-green-700);
+  /* neutral (secondary buttons/badges) */
+  --neutral:       var(--c-slate-600);
+  --neutral-rgb:   var(--c-slate-600-rgb);
 
-  --warning:       var(--c-amber-500);
-  --warning-soft:  var(--c-amber-50);
-  --warning-text:  var(--c-amber-700);
+  /* feedback: each with solid / rgb / text / soft / border */
+  --success:         var(--c-green-600);
+  --success-rgb:     var(--c-green-600-rgb);
+  --success-text:    var(--c-green-700);
+  --success-soft:    rgba(var(--c-green-500-rgb), 0.12);
+  --success-border:  rgba(var(--c-green-500-rgb), 0.35);
 
-  --danger:        var(--c-red-600);
-  --danger-hover:  var(--c-red-700);
-  --danger-soft:   var(--c-red-50);
-  --danger-text:   var(--c-red-700);
+  --warning:         var(--c-amber-500);
+  --warning-rgb:     var(--c-amber-500-rgb);
+  --warning-text:    var(--c-amber-700);
+  --warning-soft:    rgba(var(--c-amber-500-rgb), 0.12);
+  --warning-border:  rgba(var(--c-amber-500-rgb), 0.35);
 
-  --info:          var(--c-blue-600);
-  --info-soft:     var(--c-blue-50);
-  --info-text:     var(--c-blue-700);
+  --danger:          var(--c-red-600);
+  --danger-rgb:      var(--c-red-600-rgb);
+  --danger-text:     var(--c-red-700);
+  --danger-soft:     rgba(var(--c-red-500-rgb), 0.12);
+  --danger-border:   rgba(var(--c-red-500-rgb), 0.35);
 
-  --neutral-soft:  var(--c-slate-150);
-  --neutral-text:  var(--c-slate-600);
+  --info:            var(--c-blue-600);
+  --info-rgb:        var(--c-blue-600-rgb);
+  --info-text:       var(--c-blue-700);
+  --info-soft:       rgba(var(--c-blue-500-rgb), 0.12);
+  --info-border:     rgba(var(--c-blue-500-rgb), 0.35);
 
-  --special:       var(--c-violet-500);  /* interested / dark-pool   */
-  --special-soft:  var(--c-violet-50);
+  /* special (violet — interested / dark-pool) */
+  --special:         var(--c-violet-500);
+  --special-rgb:     var(--c-violet-500-rgb);
+  --special-text:    var(--c-violet-600);
+  --special-soft:    rgba(var(--c-violet-500-rgb), 0.12);
+  --special-border:  rgba(var(--c-violet-500-rgb), 0.35);
+
+  /* skeletons */
+  --skeleton-base: var(--c-slate-200);
+  --skeleton-shine: var(--c-slate-50);
 
   /* ── spacing scale (px) ─────────────────────────────────────────────── */
-  --sp-0:  0px;
-  --sp-1:  2px;
-  --sp-2:  4px;
-  --sp-3:  8px;
-  --sp-4:  12px;
-  --sp-5:  16px;
-  --sp-6:  20px;
-  --sp-7:  24px;
-  --sp-8:  32px;
-  --sp-9:  48px;
-  --sp-10: 64px;
+  --sp-0:  0px;   --sp-1:  2px;   --sp-2:  4px;   --sp-3:  8px;
+  --sp-4:  12px;  --sp-5:  16px;  --sp-6:  20px;  --sp-7:  24px;
+  --sp-8:  32px;  --sp-9:  48px;  --sp-10: 64px;
 
   /* ── typography ─────────────────────────────────────────────────────── */
   --font-sans: "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont,
                "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas,
                monospace;
-
-  --fs-2xs: 10px;
-  --fs-xs:  11px;
-  --fs-sm:  12px;
-  --fs-md:  13px;
-  --fs-lg:  15px;
-  --fs-xl:  18px;
-  --fs-2xl: 24px;
-
-  --lh-tight:   1.25;
-  --lh-normal:  1.5;
-  --lh-relaxed: 1.65;
-
-  --fw-regular:  400;
-  --fw-medium:   500;
-  --fw-semibold: 600;
-  --fw-bold:     700;
-
-  --tracking-caps: 0.08em;   /* small-caps labels */
+  --fs-2xs: 10px;  --fs-xs: 11px;  --fs-sm: 12px;  --fs-md: 13px;
+  --fs-lg: 15px;   --fs-xl: 18px;  --fs-2xl: 24px;
+  --lh-tight: 1.25;  --lh-normal: 1.5;  --lh-relaxed: 1.65;
+  --fw-regular: 400;  --fw-medium: 500;  --fw-semibold: 600;  --fw-bold: 700;
+  --tracking-caps: 0.08em;
 
   /* ── radii ──────────────────────────────────────────────────────────── */
-  --r-sm:   4px;
-  --r-md:   8px;
-  --r-lg:   12px;
-  --r-round: 999px;
+  --r-sm: 4px;  --r-md: 8px;  --r-lg: 12px;  --r-round: 999px;
 
   /* ── shadows ────────────────────────────────────────────────────────── */
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 2px 8px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.14);
+  --shadow-sm: 0 1px 2px rgba(var(--c-slate-900-rgb), 0.06);
+  --shadow-md: 0 2px 8px rgba(var(--c-slate-900-rgb), 0.08);
+  --shadow-lg: 0 8px 24px rgba(var(--c-slate-900-rgb), 0.14);
 
   /* ── motion ─────────────────────────────────────────────────────────── */
-  --tr-fast: 120ms;
-  --tr-base: 200ms;
-  --tr-slow: 400ms;
+  --tr-fast: 120ms;  --tr-base: 200ms;  --tr-slow: 400ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
-  --spin-duration: 0.8s;
-  --pulse-duration: 1.6s;
   --flash-duration: 1s;
 
   /* ── layout dimensions ──────────────────────────────────────────────── */
-  --bp-narrow:      900px;   /* below: sidebar collapses to top bar      */
-  --bp-wide:        1100px;  /* above: two-column page grids            */
-  --nav-w:          236px;
-  --topbar-h:       60px;
-  --content-max:    1280px;
-  --content-pad:    var(--sp-8);
-  --row-h:          52px;
-  --table-min-w:    720px;   /* below: table scrolls horizontally     */
-  --field-min-w:    200px;   /* grid form-field minimum column        */
-  --menu-max-h:     280px;   /* dropdown popover scroll limit         */
+  --bp-narrow: 900px;    /* media queries cannot use var() — documented here */
+  --bp-wide: 1100px;     /* and repeated as literals in app.css @media only */
+  --nav-w: 236px;
+  --topbar-h: 60px;
+  --content-max: 1280px;
+  --field-min-w: 200px;
+  --menu-max-h: 280px;
+  --table-min-w: 720px;
 
   /* ── z-index scale ──────────────────────────────────────────────────── */
-  --z-base:   1;
-  --z-sticky: 10;
-  --z-nav:    100;
-  --z-toast:  1000;
-
-  /* ── misc ───────────────────────────────────────────────────────────── */
-  --dim-overlay: 40;              /* % darkness for modal scrims          */
-  --focus-ring: 0 0 0 3px var(--c-indigo-100);
-  --skeleton-base: var(--c-slate-200);
-  --skeleton-shine: var(--c-slate-50);
+  --z-base: 1;  --z-sticky: 10;  --z-nav: 100;  --z-toast: 1090;
 }
 
-/* ── dark theme: only semantic tokens are redefined; components follow ── */
-[data-theme="dark"] {
+/* ══ semantic theme — DARK ══════════════════════════════════════════════
+   Same token names, flipped values. app.css forwards these into
+   Bootstrap, so the whole framework re-skins with this one block.
+   (app.js toggles data-bs-theme on <html> — Bootstrap's own switch.) */
+[data-bs-theme="dark"] {
+  /* surfaces & text */
   --bg-app:        var(--c-slate-950);
   --bg-raised:     var(--c-slate-900);
   --bg-sunken:     var(--c-slate-850);
   --bg-inset:      var(--c-slate-850);
-  --bg-nav:        var(--c-slate-900);
-  --bg-nav-hover:  var(--c-slate-800);
-  --bg-nav-active: var(--c-slate-850);
 
   --text-1:        var(--c-slate-50);
+  --text-1-rgb:    var(--c-slate-50-rgb);
   --text-2:        var(--c-slate-300);
   --text-3:        var(--c-slate-500);
+  --text-inverse:  var(--c-slate-950);   /* dark text on bright accent */
   --text-nav:      var(--c-slate-300);
   --text-nav-dim:  var(--c-slate-600);
 
   --border:        var(--c-slate-800);
   --border-strong: var(--c-slate-700);
+  --focus-ring-color: var(--c-indigo-700);
+
+  /* sidebar */
+  --bg-nav:        var(--c-slate-950);
+  --bg-nav-hover:  var(--c-slate-800);
+  --bg-nav-active: var(--c-slate-850);
   --border-nav:    var(--c-slate-850);
 
-  --accent:        var(--c-indigo-400);
-  --accent-hover:  var(--c-indigo-300);
-  --accent-soft:   var(--c-slate-850);
-  --accent-border: var(--c-indigo-700);
-  --on-accent:     var(--c-slate-950);
+  /* accent brightens for dark surfaces */
+  --accent:            var(--c-indigo-400);
+  --accent-rgb:        var(--c-indigo-400-rgb);
+  --accent-hover:      var(--c-indigo-300);
+  --accent-hover-rgb:  var(--c-indigo-300-rgb);
+  --accent-text:       var(--c-indigo-300);
+  --accent-soft:       rgba(var(--c-indigo-500-rgb), 0.16);
+  --accent-border:     rgba(var(--c-indigo-500-rgb), 0.38);
 
-  --success-soft:  rgba(34, 197, 94, calc(var(--dim-success-soft) * 1%));
-  --warning-soft:  rgba(245, 158, 11, calc(var(--dim-warning-soft) * 1%));
-  --danger-soft:   rgba(239, 68, 68, calc(var(--dim-danger-soft) * 1%));
-  --info-soft:     rgba(59, 130, 246, calc(var(--dim-info-soft) * 1%));
-  --neutral-soft:  var(--c-slate-850);
-  --special-soft:  rgba(139, 92, 246, calc(var(--dim-special-soft) * 1%));
+  --neutral:       var(--c-slate-500);
+  --neutral-rgb:   var(--c-slate-500-rgb);
+
+  --success:         var(--c-green-500);
+  --success-rgb:     var(--c-green-500-rgb);
+  --success-text:    var(--c-green-500);
+  --success-soft:    rgba(var(--c-green-500-rgb), 0.14);
+  --success-border:  rgba(var(--c-green-500-rgb), 0.38);
+
+  --warning:         var(--c-amber-500);
+  --warning-rgb:     var(--c-amber-500-rgb);
+  --warning-text:    var(--c-amber-500);
+  --warning-soft:    rgba(var(--c-amber-500-rgb), 0.14);
+  --warning-border:  rgba(var(--c-amber-500-rgb), 0.38);
+
+  --danger:          var(--c-red-500);
+  --danger-rgb:      var(--c-red-500-rgb);
+  --danger-text:     var(--c-red-500);
+  --danger-soft:     rgba(var(--c-red-500-rgb), 0.14);
+  --danger-border:   rgba(var(--c-red-500-rgb), 0.38);
+
+  --info:            var(--c-blue-500);
+  --info-rgb:        var(--c-blue-500-rgb);
+  --info-text:       var(--c-blue-500);
+  --info-soft:       rgba(var(--c-blue-500-rgb), 0.14);
+  --info-border:     rgba(var(--c-blue-500-rgb), 0.38);
+
+  --special:         var(--c-violet-500);
+  --special-rgb:     var(--c-violet-500-rgb);
+  --special-text:    var(--c-violet-500);
+  --special-soft:    rgba(var(--c-violet-500-rgb), 0.16);
+  --special-border:  rgba(var(--c-violet-500-rgb), 0.38);
 
   --skeleton-base: var(--c-slate-850);
   --skeleton-shine: var(--c-slate-800);
-}
 
-/* alpha-channel helpers used by the dark theme above (kept here so all
-   numbers live in one file) */
-:root {
-  --dim-success-soft: 12;
-  --dim-warning-soft: 12;
-  --dim-danger-soft:  12;
-  --dim-info-soft:    12;
-  --dim-special-soft: 12;
+  --shadow-sm: 0 1px 2px rgba(var(--c-slate-950-rgb), 0.4);
+  --shadow-md: 0 2px 8px rgba(var(--c-slate-950-rgb), 0.45);
+  --shadow-lg: 0 8px 24px rgba(var(--c-slate-950-rgb), 0.55);
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --tr-fast: 0ms;
-    --tr-base: 0ms;
-    --tr-slow: 0ms;
-    --spin-duration: 0s;
-    --pulse-duration: 0s;
-    --flash-duration: 0s;
+    --tr-fast: 0ms;  --tr-base: 0ms;  --tr-slow: 0ms;
+    --flash-duration: 0ms;
   }
 }
