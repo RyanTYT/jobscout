@@ -39,19 +39,21 @@
 {# ── apply bar: select + launch. Automated URLs run in a visible browser
    via the JobPilot filler; the rest open tiled at the apply URL. ──────── #}
 <div class="card">
-  <div class="card-body d-flex flex-wrap align-items-center gap-3 py-2">
-    <div class="form-check mb-0">
-      <input class="form-check-input" type="checkbox" id="select-all"
-             data-select-all>
-      <label class="form-check-label small" for="select-all">select all</label>
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap align-items-center gap-3">
+      <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" id="select-all"
+               data-select-all>
+        <label class="form-check-label small" for="select-all">select all</label>
+      </div>
+      <span class="small text-secondary" data-count>0 selected</span>
+      <div class="flex-grow-1"></div>
+      <button class="btn btn-primary btn-sm" type="submit" data-apply-button
+              disabled>
+        {{ m.icon("arrow-right", 12) }} apply to selected
+      </button>
     </div>
-    <span class="small text-secondary" data-count>0 selected</span>
-    <div class="flex-grow-1"></div>
-    <button class="btn btn-primary btn-sm" type="submit" data-apply-button
-            disabled>
-      {{ m.icon("arrow-right", 12) }} apply to selected
-    </button>
-    <div class="small text-secondary">
+    <div class="small text-secondary mt-2">
       automated forms get filled in a visible browser ·
       the rest open tiled for you
     </div>
