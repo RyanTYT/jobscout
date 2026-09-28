@@ -6,67 +6,51 @@
 
 {% block content %}
 
-<div class="page-head">
-  <div class="page-head__title">
-    <h1>Discovery &amp; agent</h1>
-    <span class="page-head__sub">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+  <div>
+    <h1 class="h4 mb-1">Discovery &amp; agent</h1>
+    <div class="text-secondary small">
       how much autonomy the pipeline gets — deterministic sources always run in
       <em>pipeline</em>, <em>agent</em> and <em>hybrid</em> modes
-    </span>
+    </div>
   </div>
-  <div class="page-head__actions">
-    <form method="post" action="/discovery/run" data-busy-submit>
-      <button class="btn btn--primary" type="submit">
-        <span class="spinner spinner--light" style="display: none" data-run-spinner></span>
-        {{ m.icon("bolt", 14) }} Run agent now
-      </button>
-    </form>
-  </div>
+  <form method="post" action="/discovery/run" data-busy-submit>
+    <button class="btn btn-primary" type="submit">
+      {{ m.icon("bolt", 14) }} Run agent now
+    </button>
+  </form>
 </div>
 
-<p class="dim" style="font-size: var(--fs-xs)">
+<p class="text-secondary small mb-0">
   runs the deterministic sweep + agent harness (if key present) as a subprocess,
   bounded by the caps below — the button stays busy while it runs (up to 15 min)
 </p>
 
-{# ── mode switch: segmented control ───────────────────────────────────── #}
+{# ── mode switch: Bootstrap segmented buttons + per-mode explanations ──── #}
 <div class="card">
-  <header class="card__header">
-    <h2 class="card__title">Mode</h2>
-    <span class="dim" style="font-size: var(--fs-xs)">persists to settings.yaml</span>
-  </header>
-  <div class="card__body">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Mode</h2>
+    <span class="text-secondary small">persists to settings.yaml</span>
+  </div>
+  <div class="card-body">
     <form method="post" action="/discovery/mode" id="mode-form">
-      <input type="hidden" name="mode" value="{{ settings.discovery.mode }}"
-             id="mode-value">
-      <div class="segmented" role="radiogroup" aria-label="Discovery mode">
+      <input type="hidden" name="mode" value="{{ settings.discovery.mode }}" id="mode-value">
+      <div class="btn-group d-flex flex-wrap" role="group" aria-label="Discovery mode">
         {% for mkey, mdesc in [
           ("off", "nothing runs automatically"),
           ("pipeline", "deterministic + cheap LLM (~$1/mo)"),
           ("agent", "morning agent on top"),
           ("hybrid", "agent N days + on spikes"),
         ] %}
-        <button type="button" class="segmented__item{% if settings.discovery.mode == mkey %} segmented__item--active{% endif %}"
+        <button type="button"
+                class="btn btn-outline-secondary{{ ' active' if settings.discovery.mode == mkey }}"
                 data-mode="{{ mkey }}" title="{{ mdesc }}">
           {{ mkey }}
         </button>
         {% endfor %}
-        <button type="submit" class="segmented__item" style="display: none"
+        <button type="submit" class="btn btn-outline-secondary d-none"
                 id="mode-submit">save</button>
       </div>
-      <noscript>
-        <select class="select" name="mode" onchange="this.form.submit()">
-          {% for mkey, mdesc, mdetail in [
-            ("off", "nothing runs automatically", ""),
-            ("pipeline", "deterministic + cheap LLM only (~$1/mo)", ""),
-            ("agent", "morning agent rides on top", ""),
-            ("hybrid", "agent N days/week + on-demand", ""),
-          ] %}
-          <option value="{{ mkey }}" {% if settings.discovery.mode == mkey %}selected{% endif %}>{{ mkey }}</option>
-          {% endfor %}
-        </select>
-        <button class="btn btn--secondary btn--sm" type="submit">set mode</button>
-      </noscript>
 
       <div class="mode-legend" id="mode-legend">
         {% for mkey, mdesc, mdetail in [
@@ -88,84 +72,85 @@
       </div>
     </form>
 
-    <div class="kv" style="margin-top: var(--sp-5)">
-      <span class="kv__key">schedule</span>
-      <span class="kv__value">{{ settings.discovery.agent.schedule }}</span>
-      <span class="kv__key">step cap</span>
-      <span class="kv__value">{{ settings.discovery.agent.max_steps }} steps</span>
-      <span class="kv__key">cost cap</span>
-      <span class="kv__value">${{ "%.2f" | format(settings.discovery.agent.max_cost_usd) }}/day</span>
-      <span class="kv__key">on signal</span>
-      <span class="kv__value">{{ "on" if settings.discovery.agent.run_on_signal else "off" }}</span>
-      <span class="kv__key">launchd</span>
-      <span class="kv__value">com.jobscout.agent 07:00 (bootstrap --with-agent)</span>
-    </div>
+    <dl class="row mb-0 small mt-3">
+      <dt class="col-6 col-md-3 text-secondary fw-normal">schedule</dt>
+      <dd class="col-6 col-md-9">{{ settings.discovery.agent.schedule }}</dd>
+      <dt class="col-6 col-md-3 text-secondary fw-normal">step cap</dt>
+      <dd class="col-6 col-md-9">{{ settings.discovery.agent.max_steps }} steps</dd>
+      <dt class="col-6 col-md-3 text-secondary fw-normal">cost cap</dt>
+      <dd class="col-6 col-md-9">${{ "%.2f" | format(settings.discovery.agent.max_cost_usd) }}/day</dd>
+      <dt class="col-6 col-md-3 text-secondary fw-normal">on signal</dt>
+      <dd class="col-6 col-md-9">{{ "on" if settings.discovery.agent.run_on_signal else "off" }}</dd>
+      <dt class="col-6 col-md-3 text-secondary fw-normal">launchd</dt>
+      <dd class="col-6 col-md-9">com.jobscout.agent 07:00 (bootstrap --with-agent)</dd>
+    </dl>
   </div>
 </div>
 
 {# ── agent spend ──────────────────────────────────────────────────────── #}
-<div class="stats card">
-  {{ m.stat("agent calls (30d)", agent_spend["calls"] | string) }}
-  {{ m.stat("tokens", "{:,}".format(agent_spend["tokens"])) }}
-  {{ m.stat("spend", "$%.4f" | format(agent_spend["cost"]),
-            hint="metered in llm_calls · capped per tier in models.yaml") }}
+<div class="row g-3">
+  <div class="col-4">{{ m.stat("agent calls (30d)", agent_spend["calls"] | string) }}</div>
+  <div class="col-4">{{ m.stat("tokens", "{:,}".format(agent_spend["tokens"])) }}</div>
+  <div class="col-4">{{ m.stat("spend", "$%.4f" | format(agent_spend["cost"]),
+                              hint="metered in llm_calls · capped per tier") }}</div>
 </div>
 
 {% if run_output %}
 <div class="card">
-  <header class="card__header"><h2 class="card__title">Last run output</h2></header>
-  <div class="card__body"><pre>{{ run_output }}</pre></div>
+  <div class="card-header"><h2 class="card-title mb-0 h6">Last run output</h2></div>
+  <div class="card-body"><pre class="mb-0 small">{{ run_output }}</pre></div>
 </div>
 {% endif %}
 
 {# ── recent runs (the Ops view, scoped to the agent) ─────────────────── #}
 <div class="card">
-  <header class="card__header">
-    <h2 class="card__title">Recent runs</h2>
-    <a class="btn btn--ghost btn--sm" href="/ops">full history &amp; spend →</a>
-  </header>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Recent runs</h2>
+    <a class="btn btn-link btn-sm" href="/ops">full history &amp; spend →</a>
+  </div>
   {% if recent_runs %}
-  <div class="table-wrap" style="border: none; box-shadow: none; border-radius: 0">
-    <table class="table">
-      <thead>
-        <tr><th>kind</th><th>started</th><th>ok</th><th>cost</th><th>companies</th><th>postings</th></tr>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th scope="col">kind</th><th scope="col">started</th><th scope="col">ok</th>
+            <th scope="col">cost</th><th scope="col">companies</th><th scope="col">postings</th></tr>
       </thead>
       <tbody>
         {% for r in recent_runs %}
         <tr>
-          <td>{{ m.badge(r["kind"], "outline") }}</td>
-          <td class="table__cell--dim table__cell--mono">{{ (r["started"] or "")[:19] | replace("T", " ") }}</td>
+          <td>{{ m.badge(r["kind"], "light") }}</td>
+          <td class="small text-secondary font-monospace text-nowrap">{{ (r["started"] or "")[:19] | replace("T", " ") }}</td>
           <td>{% if r["ok"] %}{{ m.badge("ok", "success") }}{% else %}{{ m.badge("fail", "danger") }}{% endif %}</td>
-          <td class="table__cell--mono">${{ "%.3f" | format(r["cost_usd"] or 0) }}</td>
-          <td class="table__cell--mono dim">{{ r.stats.get("companies", "—") }}</td>
-          <td class="table__cell--mono dim">{{ r.stats.get("postings_seen", "—") }}</td>
+          <td class="font-monospace">${{ "%.3f" | format(r["cost_usd"] or 0) }}</td>
+          <td class="font-monospace text-secondary">{{ r.stats.get("companies", "—") }}</td>
+          <td class="font-monospace text-secondary">{{ r.stats.get("postings_seen", "—") }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% else %}
-  <div class="card__body">{{ m.empty("No runs yet", "The daily launchd job and agent runs land here.", "pulse") }}</div>
+  <div class="card-body">{{ m.empty("No runs yet", "The daily launchd job and agent runs land here.", "pulse") }}</div>
   {% endif %}
 </div>
 
 {# ── morning reports ──────────────────────────────────────────────────── #}
 <div class="card">
-  <header class="card__header">
-    <h2 class="card__title">Morning reports</h2>
-    {% if reports %}<span class="dim" style="font-size: var(--fs-xs)">{{ reports | length }} archived</span>{% endif %}
-  </header>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Morning reports</h2>
+    {% if reports %}<span class="text-secondary small">{{ reports | length }} archived</span>{% endif %}
+  </div>
   {% if latest_report %}
-  <div class="card__body">
-    <div class="row" style="margin-bottom: var(--sp-4)">
+  <div class="card-body">
+    <div class="d-flex flex-wrap gap-1 mb-3">
       {% for r in reports %}
-      <span class="badge badge--neutral">{{ r[:10] }}</span>
+      <span class="badge text-bg-light">{{ r[:10] }}</span>
       {% endfor %}
     </div>
-    <pre>{{ latest_report.content }}</pre>
+    <pre class="mb-0 small">{{ latest_report.content }}</pre>
   </div>
   {% else %}
-  <div class="card__body">
+  <div class="card-body">
     {{ m.empty("No morning reports yet",
                "Run `jobscout agent --morning` from a terminal, or press Run agent now.",
                "doc") }}
@@ -174,23 +159,23 @@
 </div>
 
 <script>
-  // segmented mode switch → hidden input + submit (no-JS fallback above)
+  // mode buttons → hidden input + legend highlight + submit
   (function () {
     var form = document.getElementById("mode-form");
+    if (!form) return;
     var hidden = document.getElementById("mode-value");
     form.querySelectorAll("[data-mode]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var mode = btn.getAttribute("data-mode");
         form.querySelectorAll("[data-mode]").forEach(function (b) {
-          b.classList.remove("segmented__item--active");
+          b.classList.remove("active");
         });
-        btn.classList.add("segmented__item--active");
+        btn.classList.add("active");
         document.querySelectorAll("[data-mode-row]").forEach(function (row) {
           row.classList.toggle("mode-legend__row--active",
                                row.getAttribute("data-mode-row") === mode);
         });
         hidden.value = mode;
-        // submit immediately via the hidden real submit button
         document.getElementById("mode-submit").click();
       });
     });

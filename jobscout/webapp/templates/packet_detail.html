@@ -6,7 +6,7 @@
 
 {% block content %}
 
-<a class="btn btn--ghost btn--sm" href="/applications">
+<a class="btn btn-outline-secondary btn-sm" href="/applications">
   {{ m.icon("arrow-left", 12) }} packet board
 </a>
 
@@ -15,22 +15,25 @@
              "Nothing is ever auto-submitted; you press submit on the employer's site.",
              "success") }}
 {% endif %}
+{% if error %}
+{{ m.callout(error, "danger") }}
+{% endif %}
 
-<div class="page-head">
-  <div class="page-head__title">
-    <h1>{{ manifest.posting_title or "packet" }}</h1>
-    <span class="page-head__sub">
-      {{ manifest.company or pk.company_id }} ·
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+  <div>
+    <h1 class="h4 mb-1">{{ manifest.posting_title or "packet" }}</h1>
+    <div class="text-secondary small d-flex flex-wrap align-items-center gap-2">
+      <span>{{ manifest.company or pk.company_id }} ·</span>
       <a href="{{ manifest.posting_url }}" target="_blank" rel="noopener">posting</a> ·
       <a href="/posting/{{ pk.posting_id }}">posting detail</a> ·
       {{ m.status(pk.status) }}
-      {% if manifest.dry_run %}{{ m.badge("dry-run", "outline") }}{% endif %}
-    </span>
+      {% if manifest.dry_run %}{{ m.badge("dry-run", "light") }}{% endif %}
+    </div>
   </div>
 
-  <div class="page-head__actions">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
     {% if manifest.posting_url %}
-    <a class="btn btn--primary btn--lg" href="{{ manifest.posting_url }}"
+    <a class="btn btn-primary btn-lg" href="{{ manifest.posting_url }}"
        target="_blank" rel="noopener">
       {{ m.icon("external", 14) }} Open employer application form
     </a>
@@ -39,14 +42,14 @@
     <form method="post" action="/packet/{{ pk.id }}/status" data-busy-submit
           style="display: contents">
       <input type="hidden" name="status" value="filled">
-      <button class="btn btn--secondary" type="submit">
+      <button class="btn btn-outline-secondary" type="submit">
         {{ m.icon("check", 14) }} Mark filled
       </button>
     </form>
     <form method="post" action="/packet/{{ pk.id }}/status" data-busy-submit
           style="display: contents">
       <input type="hidden" name="status" value="applied">
-      <button class="btn btn--primary" type="submit"
+      <button class="btn btn-primary" type="submit"
               data-confirm="Mark applied? This also marks the posting applied.">
         {{ m.icon("external", 14) }} Applied — pressed submit
       </button>
@@ -54,25 +57,25 @@
     <form method="post" action="/packet/{{ pk.id }}/status" data-busy-submit
           style="display: contents">
       <input type="hidden" name="status" value="withdrawn">
-      <button class="btn btn--danger" type="submit">Withdraw</button>
+      <button class="btn btn-outline-danger" type="submit">Withdraw</button>
     </form>
     {% else %}
-    <span class="dim">final state — files remain in {{ pk.dir }}</span>
+    <span class="text-secondary small">final state — files remain in {{ pk.dir }}</span>
     {% endif %}
   </div>
 </div>
 
 {% if manifest.reasons %}
 <div class="card">
-  <header class="card__header">
-    <h2 class="card__title">Needs your input</h2>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Needs your input</h2>
     {{ m.badge("needs input", "warning") }}
-  </header>
-  <div class="card__body" style="display: flex; flex-direction: column; gap: var(--sp-3)">
+  </div>
+  <div class="card-body d-flex flex-column gap-2">
     {% for r in manifest.reasons %}
     {{ m.callout(r, "warning") }}
     {% endfor %}
-    <a class="btn btn--primary btn--block" href="/profile">
+    <a class="btn btn-primary" href="/profile">
       {{ m.icon("spark", 14) }} Fill these in your profile —
       packets pick the values up on the next prepare
     </a>
@@ -84,22 +87,25 @@
 
 {% if claims %}
 <div class="card">
-  <header class="card__header">
-    <h2 class="card__title">Claim check</h2>
-    <span class="dim" style="font-size: var(--fs-xs)">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Claim check</h2>
+    <span class="text-secondary small">
       {{ claims | length }} claims · {{ unsupported }} unsupported
       (deterministic gate — no LLM)
     </span>
-  </header>
-  <div class="table-wrap" style="border: none; box-shadow: none; border-radius: 0">
-    <table class="table">
-      <thead><tr><th>section</th><th>kind</th><th>claim</th><th>status</th></tr></thead>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th scope="col">section</th><th scope="col">kind</th>
+            <th scope="col">claim</th><th scope="col">status</th></tr>
+      </thead>
       <tbody>
         {% for c in claims %}
         <tr>
-          <td class="table__cell--dim">{{ c.section }}</td>
-          <td>{{ m.badge(c.kind, "outline") }}</td>
-          <td class="table__cell--main">{{ c.claim }}</td>
+          <td class="text-secondary">{{ c.section }}</td>
+          <td>{{ m.badge(c.kind, "light") }}</td>
+          <td>{{ c.claim }}</td>
           <td>
             {% if c.status == "verified" %}{{ m.badge("verified", "success") }}
             {% else %}{{ m.badge("unsupported", "danger") }}{% endif %}
@@ -115,22 +121,25 @@
 {% if fill_sheet %}
 {% set missing = fill_sheet | selectattr("confidence", "equalto", "missing") | selectattr("required") | list | length %}
 <div class="card">
-  <header class="card__header">
-    <h2 class="card__title">Fill sheet</h2>
-    <span class="dim" style="font-size: var(--fs-xs)">{{ missing }} required missing</span>
-  </header>
-  <div class="table-wrap" style="border: none; box-shadow: none; border-radius: 0">
-    <table class="table">
-      <thead><tr><th>field</th><th>value</th><th>source</th><th>confidence</th></tr></thead>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Fill sheet</h2>
+    <span class="text-secondary small">{{ missing }} required missing</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th scope="col">field</th><th scope="col">value</th>
+            <th scope="col">source</th><th scope="col">confidence</th></tr>
+      </thead>
       <tbody>
         {% for f in fill_sheet %}
         <tr>
-          <td class="table__cell--main">{{ f.label }}{% if f.required %} <span style="color: var(--danger)">*</span>{% endif %}</td>
-          <td class="dim-2">{{ f.value if f.value is not none else "—" }}</td>
-          <td class="table__cell--dim"><span class="truncate">{{ f.value_source or "—" }}</span></td>
+          <td class="fw-medium">{{ f.label }}{% if f.required %} <span class="text-danger">*</span>{% endif %}</td>
+          <td class="text-secondary">{{ f.value if f.value is not none else "—" }}</td>
+          <td class="small text-secondary text-truncate" style="max-width: 14rem;">{{ f.value_source or "—" }}</td>
           <td>
             {% if f.confidence == "missing" %}{{ m.badge("missing", "danger") }}
-            {% elif f.confidence == "policy" %}{{ m.badge("policy", "neutral") }}
+            {% elif f.confidence == "policy" %}{{ m.badge("policy", "secondary") }}
             {% else %}{{ m.badge(f.confidence, "success") }}{% endif %}
           </td>
         </tr>
@@ -143,33 +152,35 @@
 
 {% if tailor and (tailor.keyword_alignment or tailor.summary) %}
 <div class="card">
-  <header class="card__header"><h2 class="card__title">Tailor plan</h2></header>
-  <div class="card__body">
-    <div class="kv">
-      <span class="kv__key">emphasis</span>
-      <span class="kv__value">{{ (tailor.skills_emphasis or []) | join(", ") or "—" }}</span>
-      <span class="kv__key">gaps</span>
-      <span class="kv__value">{{ (tailor.keyword_alignment.gaps or []) | join(", ") or "—" }} (not papered over)</span>
-    </div>
+  <div class="card-header"><h2 class="card-title mb-0 h6">Tailor plan</h2></div>
+  <div class="card-body">
+    <dl class="row mb-0 small">
+      <dt class="col-6 col-md-3 text-secondary fw-normal">emphasis</dt>
+      <dd class="col-6 col-md-9">{{ (tailor.skills_emphasis or []) | join(", ") or "—" }}</dd>
+      <dt class="col-6 col-md-3 text-secondary fw-normal">gaps</dt>
+      <dd class="col-6 col-md-9">{{ (tailor.keyword_alignment.gaps or []) | join(", ") or "—" }} (not papered over)</dd>
+    </dl>
   </div>
 </div>
 {% endif %}
 
 {% if resume_md %}
 <div class="card">
-  <header class="card__header"><h2 class="card__title">Tailored resume</h2>
-    <span class="dim mono" style="font-size: var(--fs-xs)">{{ pk.dir }}/resume.md</span>
-  </header>
-  <div class="card__body"><pre>{{ resume_md }}</pre></div>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Tailored resume</h2>
+    <span class="text-secondary font-monospace small">{{ pk.dir }}/resume.md</span>
+  </div>
+  <div class="card-body"><pre class="mb-0 small">{{ resume_md }}</pre></div>
 </div>
 {% endif %}
 
 {% if cover_letter %}
 <div class="card">
-  <header class="card__header"><h2 class="card__title">Cover letter</h2>
-    <span class="dim mono" style="font-size: var(--fs-xs)">{{ pk.dir }}/cover_letter.md</span>
-  </header>
-  <div class="card__body"><pre>{{ cover_letter }}</pre></div>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Cover letter</h2>
+    <span class="text-secondary font-monospace small">{{ pk.dir }}/cover_letter.md</span>
+  </div>
+  <div class="card-body"><pre class="mb-0 small">{{ cover_letter }}</pre></div>
 </div>
 {% endif %}
 

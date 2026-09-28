@@ -6,88 +6,90 @@
 
 {% block content %}
 
-<a class="btn btn--ghost btn--sm" href="/">{{ m.icon("arrow-left", 12) }} back to inbox</a>
+<a class="btn btn-outline-secondary btn-sm" href="/">{{ m.icon("arrow-left", 12) }} back to inbox</a>
 
-<div class="page-head">
-  <div class="page-head__title">
-    <h1>{{ p.title or "(untitled)" }}</h1>
-    <span class="page-head__sub">
-      {{ p.company_name or p.company_id }}
-      {% if p.tier %} · tier {{ p.tier }}{% endif %}
-      {% if p.non_ats %} · {{ m.badge("dark-pool", "special", "no public ATS board") }}{% endif %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+  <div>
+    <h1 class="h4 mb-1">{{ p.title or "(untitled)" }}</h1>
+    <div class="text-secondary small d-flex flex-wrap align-items-center gap-2">
+      <span>{{ p.company_name or p.company_id }}</span>
+      {% if p.tier %}<span>· tier {{ p.tier }}</span>{% endif %}
+      {% if p.non_ats %}{{ m.badge("dark-pool", "purple", "no public ATS board") }}{% endif %}
       {{ m.status(p.status) }}
-    </span>
+    </div>
   </div>
 
-  <div class="page-head__actions">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
     {% if p.status == "new" %}
-    <button class="btn btn--secondary" hx-post="/posting/{{ p.id }}/status"
+    <button class="btn btn-outline-secondary" type="button"
+            hx-post="/posting/{{ p.id }}/status"
             hx-vals='{"status":"interested"}' hx-swap="none">
       {{ m.icon("check", 14) }} Mark interested
     </button>
     {% endif %}
     {% if packet %}
-    <a class="btn btn--primary" href="/packet/{{ packet.id }}">
+    <a class="btn btn-primary" href="/packet/{{ packet.id }}">
       {{ m.icon("doc", 14) }} Open application packet
     </a>
     {% else %}
     <form method="post" action="/posting/{{ p.id }}/prepare" data-busy-submit
           style="display: contents">
       <input type="hidden" name="dry_run" value="false">
-      <button class="btn btn--primary btn--lg" type="submit">
+      <button class="btn btn-primary btn-lg" type="submit">
         {{ m.icon("spark", 14) }} Prepare application
       </button>
     </form>
     <form method="post" action="/posting/{{ p.id }}/prepare" data-busy-submit
           style="display: contents">
       <input type="hidden" name="dry_run" value="true">
-      <button class="btn btn--secondary" type="submit" data-confirm="Dry-run uses scripted fake models — continue?">
+      <button class="btn btn-outline-secondary" type="submit"
+              data-confirm="Dry-run uses scripted fake models — continue?">
         dry-run
       </button>
     </form>
     {% endif %}
-    <a class="btn btn--secondary" href="{{ p.url }}" target="_blank"
+    <a class="btn btn-outline-secondary" href="{{ p.url }}" target="_blank"
        rel="noopener">
       {{ m.icon("external", 14) }} View on employer site
     </a>
   </div>
 </div>
 
-<p class="dim" style="font-size: var(--fs-xs)">
+<p class="text-secondary small mb-0">
   dry-run uses scripted fake models — full tailoring needs the LLM key in .env
 </p>
 
 {% if p.final_score is not none %}
-<div class="stats card">
-  {{ m.stat("final", "%.0f" | format(p.final_score),
-            hint="fit×.6 + company×.25 + opportunity×.15",
-            tone="success" if p.final_score >= 75 else "") }}
-  {{ m.stat("fit", "%.0f" | format(p.fit_score or 0)) }}
-  {{ m.stat("company", "%.0f" | format(p.company_score or 0)) }}
-  {{ m.stat("opportunity", "%.0f" | format(p.opportunity or 0)) }}
+<div class="row g-3">
+  <div class="col-6 col-md-3">{{ m.stat("final", "%.0f" | format(p.final_score), hint="fit×.6 + company×.25 + opportunity×.15") }}</div>
+  <div class="col-6 col-md-3">{{ m.stat("fit", "%.0f" | format(p.fit_score or 0)) }}</div>
+  <div class="col-6 col-md-3">{{ m.stat("company", "%.0f" | format(p.company_score or 0)) }}</div>
+  <div class="col-6 col-md-3">{{ m.stat("opportunity", "%.0f" | format(p.opportunity or 0)) }}</div>
 </div>
 {% else %}
 {{ m.callout("Not scored yet — add an LLM key to .env, then run `jobscout score`. "
              "The rule filter has already vetted this posting.", "info") }}
 {% endif %}
 
-<div class="grid grid--sidebar">
+<div class="row g-3">
 
-  <div class="stack">
+  <div class="col-lg-8 d-flex flex-column gap-3">
 
     {% if llm.rationale %}
-    <div class="card"><div class="card__body">
-      <div class="caps" style="margin-bottom: var(--sp-3)">LLM rationale</div>
-      <div class="description"><p>{{ llm.rationale }}</p></div>
-      {% if llm.stack %}<p class="dim">stack: {{ llm.stack | join(", ") }}</p>{% endif %}
-      {% if llm.flags %}<p class="dim">flags: {{ llm.flags | join(", ") }}</p>{% endif %}
-    </div></div>
+    <div class="card">
+      <div class="card-header"><h2 class="card-title mb-0 h6">LLM rationale</h2></div>
+      <div class="card-body description">
+        <p class="mb-2">{{ llm.rationale }}</p>
+        {% if llm.stack %}<p class="text-secondary small mb-1">stack: {{ llm.stack | join(", ") }}</p>{% endif %}
+        {% if llm.flags %}<p class="text-secondary small mb-0">flags: {{ llm.flags | join(", ") }}</p>{% endif %}
+      </div>
+    </div>
     {% endif %}
 
     {% if llm.red_flags %}
     <div class="card">
-      <header class="card__header"><h2 class="card__title">Red flags</h2></header>
-      <div class="card__body" style="display: flex; flex-direction: column; gap: var(--sp-3)">
+      <div class="card-header"><h2 class="card-title mb-0 h6">Red flags</h2></div>
+      <div class="card-body d-flex flex-column gap-2">
         {% for f in llm.red_flags %}
         {{ m.callout(f, "danger") }}
         {% endfor %}
@@ -97,53 +99,52 @@
 
     {% if p.description %}
     <div class="card">
-      <header class="card__header"><h2 class="card__title">Description</h2>
-        <span class="dim">source: {{ (p.source or "") | replace("ats:", "") }}</span>
-      </header>
-      <div class="card__body">
-        <div class="description">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="card-title mb-0 h6">Description</h2>
+        <span class="text-secondary small">source: {{ (p.source or "") | replace("ats:", "") }}</span>
+      </div>
+      <div class="card-body description">
         {% set cleaned = p.description | replace("<br>", "\n") | replace("<br/>", "\n") | replace("<br />", "\n") %}
         {% for para in cleaned.split("\n") if para.strip() %}
         <p>{{ para | striptags }}</p>
         {% endfor %}
-        </div>
       </div>
     </div>
     {% endif %}
 
   </div>
 
-  <div class="stack stack--sm">
+  <div class="col-lg-4 d-flex flex-column gap-3">
     <div class="card">
-      <header class="card__header"><h2 class="card__title">Details</h2></header>
-      <div class="card__body">
-        <div class="kv">
-          <span class="kv__key">link</span>
-          <span class="kv__value"><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.url | truncate(60) }}</a></span>
-          <span class="kv__key">location</span>
-          <span class="kv__value">{{ p.location or "—" }}{% if p.remote %} · remote{% endif %}</span>
-          <span class="kv__key">level</span>
-          <span class="kv__value">{{ p.seniority or "—" }}{% if llm.seniority %} · LLM read: {{ llm.seniority }}{% endif %}</span>
-          <span class="kv__key">source</span>
-          <span class="kv__value">{{ p.source }}</span>
-          <span class="kv__key">posted</span>
-          <span class="kv__value">{{ (p.posted_at or "—")[:10] }}</span>
-          <span class="kv__key">first seen</span>
-          <span class="kv__value">{{ (p.first_seen or "—")[:19] | replace("T", " ") }}</span>
-          <span class="kv__key">last seen</span>
-          <span class="kv__value">{{ (p.last_seen or "—")[:19] | replace("T", " ") }}</span>
-          <span class="kv__key">rule filter</span>
-          <span class="kv__value">{{ m.badge("passed", "success") if p.rule_pass else m.badge("excluded", "neutral") }}</span>
-        </div>
+      <div class="card-header"><h2 class="card-title mb-0 h6">Details</h2></div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-secondary fw-normal">link</dt>
+          <dd class="col-7 text-truncate"><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.url | truncate(60) }}</a></dd>
+          <dt class="col-5 text-secondary fw-normal">location</dt>
+          <dd class="col-7">{{ p.location or "—" }}{% if p.remote %} · remote{% endif %}</dd>
+          <dt class="col-5 text-secondary fw-normal">level</dt>
+          <dd class="col-7">{{ p.seniority or "—" }}{% if llm.seniority %} · LLM: {{ llm.seniority }}{% endif %}</dd>
+          <dt class="col-5 text-secondary fw-normal">source</dt>
+          <dd class="col-7">{{ p.source }}</dd>
+          <dt class="col-5 text-secondary fw-normal">posted</dt>
+          <dd class="col-7">{{ (p.posted_at or "—")[:10] }}</dd>
+          <dt class="col-5 text-secondary fw-normal">first seen</dt>
+          <dd class="col-7">{{ (p.first_seen or "—")[:19] | replace("T", " ") }}</dd>
+          <dt class="col-5 text-secondary fw-normal">last seen</dt>
+          <dd class="col-7">{{ (p.last_seen or "—")[:19] | replace("T", " ") }}</dd>
+          <dt class="col-5 text-secondary fw-normal">rule filter</dt>
+          <dd class="col-7">{{ m.badge("passed", "success") if p.rule_pass else m.badge("excluded", "secondary") }}</dd>
+        </dl>
       </div>
     </div>
 
     {% if boards %}
     <div class="card">
-      <header class="card__header"><h2 class="card__title">ATS boards</h2></header>
-      <div class="card__body" style="display: flex; gap: var(--sp-2); flex-wrap: wrap">
+      <div class="card-header"><h2 class="card-title mb-0 h6">ATS boards</h2></div>
+      <div class="card-body d-flex flex-wrap gap-1">
         {% for prov, tok in boards %}
-        {{ m.badge(prov, "accent", tok) }}
+        {{ m.badge(prov, "primary", tok) }}
         {% endfor %}
       </div>
     </div>

@@ -1,14 +1,15 @@
 {% import "components/macros.html" as m %}
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}jobscout{% endblock %}</title>
   <link rel="stylesheet" href="/static/css/tokens.css">
-  <link rel="stylesheet" href="/static/css/base.css">
-  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/app.css">
   <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/vendor/bootstrap.bundle.min.js" defer></script>
   <script src="/static/js/app.js" defer></script>
 </head>
 <body>
@@ -38,20 +39,21 @@
 
     <div class="nav__footer">
       <div>v{{ version }}</div>
-      <div style="margin-top: var(--sp-1)">daily 06:30 · agent 07:00</div>
+      <div style="margin-top: 2px">daily 06:30 · agent 07:00</div>
     </div>
   </nav>
 
   <div class="app__main">
     <header class="topbar">
-      <span class="topbar__title">{% block topbar_title %}{% endblock %}</span>
+      <h1 class="topbar__title">{% block topbar_title %}{% endblock %}</h1>
       <span class="topbar__spacer"></span>
-      <span class="topbar__progress" aria-hidden="true">
-        <span class="spinner spinner--light"></span> working…
+      <span class="topbar__progress d-none d-inline-flex align-items-center gap-2 small text-secondary">
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        working…
       </span>
       {% block topbar_actions %}
-      <button class="btn btn--secondary btn--sm" data-theme-toggle
-              title="Toggle light / dark theme">
+      <button class="btn btn-outline-secondary btn-sm" data-theme-toggle
+              title="Toggle light / dark theme" type="button">
         {{ m.icon("moon", 14) }}
       </button>
       {% endblock %}

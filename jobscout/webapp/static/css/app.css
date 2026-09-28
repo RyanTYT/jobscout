@@ -1,0 +1,327 @@
+/* ============================================================================
+   app.css — the jobscout theme layer over vendored Bootstrap 5.3.
+
+   Architecture (fixed once, centrally):
+     1. tokens.css        — the design palette (colors, fonts, radii)
+     2. vendor/bootstrap  — the framework: spacing, forms, tables, dropdowns,
+                            toasts, pagination, dark mode (data-bs-theme)
+     3. this file         — maps our tokens onto Bootstrap's --bs-* variables
+                            + the few custom pieces Bootstrap doesn't ship
+                            (sidebar, signal feed, sort arrows, mode legend)
+
+   Form spacing, gutters, table rhythm etc. come from Bootstrap — one
+   standard, not per-page CSS.
+   ========================================================================== */
+
+:root {
+  /* jobscout identity mapped onto Bootstrap */
+  --bs-primary: var(--c-indigo-600);
+  --bs-primary-rgb: 79, 70, 229;
+  --bs-link-color: var(--c-indigo-600);
+  --bs-link-color-rgb: 79, 70, 229;
+  --bs-link-hover-color: var(--c-indigo-700);
+  --bs-link-hover-color-rgb: 67, 56, 202;
+  --bs-body-font-family: var(--font-sans);
+  --bs-font-monospace: var(--font-mono);
+  --bs-body-font-size: 0.875rem;         /* 14px — denser ops console */
+  --bs-border-radius: var(--r-sm);
+  --bs-border-radius-sm: var(--r-sm);
+  --bs-border-radius-lg: var(--r-lg);
+  --bs-focus-ring-color: var(--c-indigo-100);
+}
+
+[data-bs-theme="dark"] {
+  --bs-primary: var(--c-indigo-400);
+  --bs-primary-rgb: 129, 140, 248;
+  --bs-link-color: var(--c-indigo-400);
+  --bs-link-color-rgb: 129, 140, 248;
+  --bs-link-hover-color: var(--c-indigo-300);
+  --bs-link-hover-color-rgb: 165, 180, 252;
+  --bs-focus-ring-color: var(--c-indigo-700);
+}
+
+/* denser small-caps labels for meta text */
+.form-label, .card-title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.25rem;
+}
+
+/* ── app shell: sidebar + main ─────────────────────────────────────────── */
+
+.app { display: flex; min-height: 100vh; }
+
+.nav {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: var(--nav-w);
+  flex-shrink: 0;
+  background: var(--c-slate-900);
+  display: flex;
+  flex-direction: column;
+  z-index: var(--z-nav);
+}
+
+[data-bs-theme="dark"] .nav { background: var(--c-slate-950); }
+
+.nav__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  color: var(--c-slate-50);
+  font-size: 1.125rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.nav__brand-mark {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, var(--c-indigo-400), var(--c-violet-500));
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.nav__section {
+  padding: 0.75rem 1rem 0.25rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-slate-600);
+}
+
+.nav__link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0 0.5rem;
+  border-radius: var(--r-md);
+  color: var(--c-slate-300);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 120ms var(--ease), color 120ms var(--ease);
+}
+
+.nav__link:hover { background: var(--c-slate-800); color: var(--c-slate-50); }
+
+.nav__link--active {
+  background: var(--c-slate-850);
+  color: var(--c-slate-50);
+  box-shadow: inset 2px 0 0 0 var(--c-indigo-400);
+}
+
+.nav__link-icon { color: var(--c-slate-500); flex-shrink: 0; }
+.nav__link--active .nav__link-icon,
+.nav__link:hover .nav__link-icon { color: var(--c-indigo-400); }
+
+.nav__count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--c-slate-500);
+  background: var(--c-slate-800);
+  padding: 1px 0.4rem;
+  border-radius: 999px;
+}
+
+.nav__footer {
+  margin-top: auto;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--c-slate-800);
+  color: var(--c-slate-600);
+  font-size: 0.625rem;
+}
+
+.app__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.content {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  flex: 1;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  min-height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 1.5rem;
+  background: var(--bs-body-bg);
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.topbar__title { font-size: 1.125rem; font-weight: 600; margin: 0; }
+.topbar__spacer { flex: 1; }
+
+@media (max-width: 900px) {
+  .nav { display: none; }
+}
+
+/* ── sortable headers (server-side links + generic client-side) ────────── */
+
+.th-sort {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.th-sort:hover { color: var(--bs-emphasis-color); }
+.th-sort--active { color: var(--bs-primary); }
+
+.th-sort::after,
+.table[data-sortable] th[data-sort-key]::after {
+  content: "↕";
+  font-size: 0.625rem;
+  opacity: 0.45;
+}
+
+.th-sort--asc::after,
+.table[data-sortable] th[data-sort-key][data-sort-dir="asc"]::after {
+  content: "↑";
+  opacity: 1;
+}
+
+.th-sort--desc::after,
+.table[data-sortable] th[data-sort-key][data-sort-dir="desc"]::after {
+  content: "↓";
+  opacity: 1;
+}
+
+.table[data-sortable] th[data-sort-key] { cursor: pointer; user-select: none; }
+.table[data-sortable] th[data-sort-key][data-sort-dir="asc"]::after,
+.table[data-sortable] th[data-sort-key][data-sort-dir="desc"]::after {
+  color: var(--bs-primary);
+}
+
+/* row freshly swapped by HTMX — flash highlight */
+@keyframes row-flash {
+  0% { background: var(--bs-primary-bg-subtle); }
+  100% { background: transparent; }
+}
+.tr--flash { animation: row-flash 1s var(--ease); }
+
+/* ── signal feed (companies page) ──────────────────────────────────────── */
+
+.signal {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+.signal:last-child { border-bottom: none; }
+.signal:hover { background: var(--bs-secondary-bg); }
+
+.signal__icon {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: var(--r-md);
+  display: grid;
+  place-items: center;
+  background: var(--bs-secondary-bg);
+  color: var(--bs-secondary-color);
+}
+.signal__icon--news { background: var(--bs-info-bg-subtle); color: var(--bs-info-text-emphasis); }
+.signal__icon--github { background: var(--bs-secondary-bg); color: var(--bs-emphasis-color); }
+.signal__icon--monitor, .signal__icon--sitemap { background: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); }
+.signal__icon--hn { background: var(--bs-warning-bg-subtle); color: var(--bs-warning-text-emphasis); }
+.signal__icon--funding { background: var(--bs-primary-bg-subtle); color: var(--bs-primary-text-emphasis); }
+.signal__icon--ats { background: var(--bs-purple-bg-subtle, #f5f3ff); color: var(--c-violet-600); }
+
+.signal__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.125rem; }
+.signal__note { font-size: 0.8125rem; color: var(--bs-body-color); overflow-wrap: anywhere; }
+.signal__meta { font-size: 0.6875rem; color: var(--bs-secondary-color); display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+/* extracted URLs inside signal notes */
+.signal__url {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--bs-primary-text-emphasis);
+  background: var(--bs-primary-bg-subtle);
+  border: 1px solid var(--bs-primary-border-subtle);
+  border-radius: var(--r-sm);
+  padding: 1px 0.5rem;
+  margin: 1px 0;
+  text-decoration: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.signal__url:hover { background: var(--bs-primary); color: #fff; }
+
+/* ── kind legend + mode legend ─────────────────────────────────────────── */
+
+.legend { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.legend__row {
+  display: grid;
+  grid-template-columns: minmax(11rem, max-content) 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.legend__desc { font-size: 0.6875rem; color: var(--bs-secondary-color); padding-top: 0.2rem; }
+
+.mode-legend { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 1rem; }
+
+.mode-legend__row {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, max-content) 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--r-sm);
+}
+.mode-legend__row--active {
+  background: var(--bs-primary-bg-subtle);
+  outline: 1px solid var(--bs-primary-border-subtle);
+}
+.mode-legend__name {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--bs-secondary-color);
+  padding-top: 0.15rem;
+}
+.mode-legend__row--active .mode-legend__name { color: var(--bs-primary); }
+.mode-legend__desc { font-size: 0.6875rem; color: var(--bs-secondary-color); }
+
+/* ── dropdown-selects (Bootstrap dropdown + hidden native select) ──────── */
+
+.js-select .dropdown-toggle,
+.js-select .dropdown-menu { width: 100%; }
+.js-select .dropdown-toggle { text-align: left; }
+.js-select .dropdown-item { white-space: normal; }
+.js-select .dropdown-menu { max-height: 18rem; overflow-y: auto; }
+
+/* ── posting description prose ─────────────────────────────────────────── */
+
+.description { font-size: 0.875rem; line-height: 1.65; color: var(--bs-body-color); }
+.description p { margin-bottom: 0.75rem; max-width: 75ch; }
+
+/* toast container sits above everything */
+.toast-container { z-index: 1090; }

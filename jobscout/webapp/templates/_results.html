@@ -1,36 +1,42 @@
 {% import "components/macros.html" as m %}
 <div id="results" data-skeleton-rows="{{ [pg.page_size, 10] | min }}">
 
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          {% for h in sort_headers %}
-          <th>
-            {% if h.href %}
-            <a class="th-sort{{ ' th-sort--active' if h.active }}{{ ' th-sort--' + h.dir if h.dir }}"
-               href="{{ h.href }}"
-               hx-get="{{ h.href }}" hx-target="#results" hx-swap="outerHTML"
-               hx-push-url="true" title="Sort by {{ h.label }}">{{ h.label }}</a>
-            {% else %}
-            {{ h.label }}
-            {% endif %}
-          </th>
-          {% endfor %}
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in rows %}{% include "_row.html" %}{% endfor %}
-      </tbody>
-    </table>
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            {% for h in sort_headers %}
+            <th class="text-nowrap" scope="col">
+              {% if h.href %}
+              <a class="th-sort{{ ' th-sort--active' if h.active }}{{ ' th-sort--' + h.dir if h.dir }}"
+                 href="{{ h.href }}"
+                 hx-get="{{ h.href }}" hx-target="#results" hx-swap="outerHTML"
+                 hx-push-url="true" title="Sort by {{ h.label }}">{{ h.label }}</a>
+              {% else %}
+              {{ h.label }}
+              {% endif %}
+            </th>
+            {% endfor %}
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in rows %}{% include "_row.html" %}{% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% if not rows %}
-    {{ m.empty(
-       "Nothing matches these filters",
-       "Loosen a filter or reset them all — every rule-passing posting in the DB is reachable here.",
-       "search") }}
+    <div class="card-body">
+      {{ m.empty(
+         "Nothing matches these filters",
+         "Loosen a filter or reset them all — every rule-passing posting in the DB is reachable here.",
+         "search") }}
+    </div>
     {% endif %}
+    <div class="card-body pt-2">
+      {{ m.pagination(pg, filters) }}
+    </div>
   </div>
 
-  {{ m.pagination(pg, filters) }}
 </div>

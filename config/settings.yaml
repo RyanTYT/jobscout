@@ -6,7 +6,7 @@ discovery:
   # pipeline : deterministic sources + cheap LLM scoring only (~$1/mo)
   # agent    : morning agent rides ON TOP of the always-running pipeline
   # hybrid   : agent N days/week + on-demand runs on signal spikes
-  mode: "hybrid"
+  mode: "off"
 
   agent:
     schedule: weekdays      # daily | weekdays | mon-wed-fri | manual

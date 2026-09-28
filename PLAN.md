@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Version** | 2.0 (pinned 2026-09-28) |
-| **Status** | P7 + P8 dark-pool extension + UI overhaul complete: 5 monitoring/discovery signal sources live (207 news + 199 sitemap + 3 GitHub + 2 HN-mention signals on first run); dashboard rebuilt on the tokens.css design system (single source of every style decision, zero hardcoded values), Jinja2 component macros, sidebar nav, server-side pagination over ALL postings, full filter panel, skeleton loading, toasts, dark mode ·  · **ALL 8 PHASES + EXTENSIONS COMPLETE** |
+| **Status** | P7 + P8 dark-pool extension + UI overhaul complete: 5 monitoring/discovery signal sources live (207 news + 199 sitemap + 3 GitHub + 2 HN-mention signals on first run); dashboard rebuilt on vendored Bootstrap 5.3 (the framework — standardized forms/tables/dropdowns/toasts/dark-mode with zero hand-rolled layout CSS) + a token→--bs-* theme layer (app.css) + Jinja2 component macros as the component functions; sidebar nav, server-side pagination over ALL postings, full filter panel, skeleton loading, toasts, dark mode ·  · **ALL 8 PHASES + EXTENSIONS COMPLETE** |
 | **Repo** | `/Users/user/Downloads/Personal Project/jobscout` (local only, no remote yet) |
 | **Sibling repos** | `../JobPilot` (the "hands", see §6) · `../rusty_trader` (unrelated) |
 | **Dev Mac rule** | This Mac develops only. **Never run `bootstrap.sh` here** — it installs launchd and belongs on the target/deployment Mac. |
@@ -620,6 +620,41 @@ swapping the row. Now prefix-matched; row swap + toast verified live.
 DB additions (no migration): `_posting_filters()` shared WHERE builder,
 `count_postings()`, `filter_options()`; `list_postings()` gained
 level/location/company/source/remote/sort params. 74/74 tests.
+
+### P8 extension III — Framework migration (2026-09-28)
+
+The hand-rolled CSS kept producing layout bugs (three rounds of spacing
+fixes: sticky-th offsets, 96px grid min-columns). Root cause: we were
+re-implementing solved problems. Fix: adopt a framework.
+
+- **Vendored Bootstrap 5.3.3** (CSS 232KB + bundle JS 80KB) into
+  static/vendor/ — no build step, no CDN, offline-safe; the portable
+  bootstrap mandate is preserved.
+- **app.css (~300 lines, was 970 across two files)** is now purely a
+  theme layer: maps tokens.css palette onto Bootstrap's --bs-* variables
+  (accent, fonts, radii, focus rings; dark mode via data-bs-theme) plus
+  the few custom pieces Bootstrap doesn't ship (sidebar, signal feed,
+  sort arrows, legends).
+- **Form spacing is now Bootstrap's**: every form (inbox filters, profile,
+  packet actions) uses row/col grid with g-3 gutters and responsive col
+  classes. The spacing question is answered once, centrally, by the
+  framework.
+- **Components are Bootstrap components**: badges (text-bg-*), buttons
+  (btn-*), cards, alerts, pagination, tables (table-hover + table-light
+  + table-responsive = horizontal scroll for free), dropdowns (Bootstrap
+  Dropdown + hidden native select; app.js syncs + fires real change
+  events so htmx auto-submit keeps working), toasts (bootstrap.Toast),
+  skeletons (placeholder-glow), dark mode (data-bs-theme).
+- **macros.html = the component API** (unchanged call sites): field,
+  select, select_noscript, check, button, badge, status, score, card,
+  stat, empty, callout, pagination, signal, icon. Same macro names and
+  arguments; new Bootstrap markup underneath. All 87 tests passed
+  unchanged through the migration — the contract held.
+
+Decision: Bootstrap over Tailwind/Pico/htmx-only because it needs no
+build step (vendored files, portable bootstrap), ships the full
+component set (dropdowns, toasts, dark mode) without JS we'd otherwise
+hand-write, and is the industry default that future maintainers know.
 
 ### P8 — Polish + agent-generated plugins
 - [ ] Agent-generated ScraperPlugins for new watchlist companies (JobPilot plugin interface)

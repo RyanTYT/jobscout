@@ -6,74 +6,118 @@
 
 {% block content %}
 
-{# ── filter panel (outside #results — survives pagination swaps) ──────── #}
-<form class="filters" method="get" action="/"
+{# ── filter panel: Bootstrap's standardized row/col gutters (g-3) ───────
+   This is the spacing fix: 12-column grid with g-3 gutters and responsive
+   col classes — the framework's rhythm, not hand-rolled CSS. ──────────── #}
+<form class="card card-body" method="get" action="/"
       id="inbox-filters" data-busy-submit>
+  <div class="row g-3 align-items-end">
 
-  {# htmx wiring shared by all auto-submitting controls: swap #results in
-     place and push the URL — full-page GET still works without JS #}
-  {% set hx = {
-    "hx-get": "/", "hx-target": "#results", "hx-swap": "outerHTML",
-    "hx-push-url": "true", "hx-include": "closest form",
-    "hx-trigger": "change",
-  } %}
-  {% set hx_text = {
-    "hx-get": "/", "hx-target": "#results", "hx-swap": "outerHTML",
-    "hx-push-url": "true", "hx-include": "closest form",
-    "hx-trigger": "keyup changed delay:400ms",
-  } %}
+    {# htmx wiring shared by all auto-submitting controls: swap #results
+       in place and push the URL — full-page GET still works without JS #}
+    {% set hx = {
+      "hx-get": "/", "hx-target": "#results", "hx-swap": "outerHTML",
+      "hx-push-url": "true", "hx-include": "closest form",
+    } %}
+    {% set hx_text = {
+      "hx-get": "/", "hx-target": "#results", "hx-swap": "outerHTML",
+      "hx-push-url": "true", "hx-include": "closest form",
+      "hx-trigger": "keyup changed delay:400ms",
+    } %}
+    {# attrs land on the hidden native select; app.js fires a real change
+       on it when a dropdown item is picked, so htmx picks it up ──────── #}
+    {% set hx_silent = {
+      "hx-trigger": "change",
+    } %}
 
-  {{ m.field("Status", "status",
-    m.select("status", filters.status, status_options, attrs=hx)) }}
+    <div class="col-6 col-md-4 col-xl-2">
+      {{ m.field("Status", "status",
+        m.select("status", filters.status, status_options, attrs=hx_silent)) }}
+    </div>
 
-  {{ m.field("Company", "company",
-    m.select("company", filters.company, options.companies,
-             placeholder="any", attrs=hx)) }}
+    <div class="col-6 col-md-4 col-xl-2">
+      {{ m.field("Company", "company",
+        m.select("company", filters.company, options.companies,
+                 placeholder="any", attrs=hx_silent)) }}
+    </div>
 
-  {{ m.field("Level", "level",
-    m.select("level", filters.level, options.levels,
-             placeholder="any", attrs=hx)) }}
+    <div class="col-6 col-md-4 col-xl-2">
+      {{ m.field("Level", "level",
+        m.select("level", filters.level, options.levels,
+                 placeholder="any", attrs=hx_silent)) }}
+    </div>
 
-  {{ m.field("Location", "location",
-    m.text_input("location", filters.location, "city or region…", attrs=hx_text)) }}
+    <div class="col-6 col-md-4 col-xl-2">
+      {{ m.field("Location", "location",
+        m.text_input("location", filters.location, "city or region…",
+                     attrs=hx_text)) }}
+    </div>
 
-  {{ m.field("Source", "source",
-    m.select("source", filters.source, options.sources,
-             placeholder="any", attrs=hx)) }}
+    <div class="col-6 col-md-4 col-xl-2">
+      {{ m.field("Source", "source",
+        m.select("source", filters.source, options.sources,
+                 placeholder="any", attrs=hx_silent)) }}
+    </div>
 
-  {{ m.field("Tier", "tier",
-    m.select("tier", filters.tier, tier_options,
-             placeholder="any", attrs=hx)) }}
+    <div class="col-6 col-md-4 col-xl-2">
+      {{ m.field("Tier", "tier",
+        m.select("tier", filters.tier, tier_options,
+                 placeholder="any", attrs=hx_silent)) }}
+    </div>
 
-  {{ m.field("Sort", "sort",
-    m.select("sort", filters.sort, sort_options, attrs=hx)) }}
+    <div class="col-6 col-md-4 col-xl-2">
+      {{ m.field("Sort", "sort",
+        m.select("sort", filters.sort, sort_options, attrs=hx_silent)) }}
+    </div>
 
-  {{ m.field("Per page", "page_size",
-    m.select("page_size", pg.page_size | string, size_options, attrs=hx)) }}
+    <div class="col-6 col-md-4 col-xl-2">
+      {{ m.field("Per page", "page_size",
+        m.select("page_size", pg.page_size | string, size_options,
+                 attrs=hx_silent)) }}
+    </div>
 
-  {{ m.field("Min score", "min_score",
-    m.text_input("min_score", filters.min_score, "0", attrs=hx_text)) }}
+    <div class="col-6 col-md-4 col-xl-2">
+      {{ m.field("Min score", "min_score",
+        m.text_input("min_score", filters.min_score, "0", attrs=hx_text)) }}
+    </div>
 
-  <label class="check">
-    <input type="checkbox" name="remote" value="1"
-           {% if filters.remote %}checked{% endif %} {{ hx | xmlattr }}>
-    remote only
-  </label>
+    <div class="col-6 col-md-4 col-xl-2 d-flex align-items-end">
+      {{ m.check("remote", "remote only", filters.remote, attrs=hx) }}
+    </div>
 
-  <label class="check">
-    <input type="checkbox" name="all_postings" value="1"
-           {% if filters.all_postings %}checked{% endif %} {{ hx | xmlattr }}>
-    show rule-excluded
-  </label>
+    <div class="col-6 col-md-4 col-xl-2 d-flex align-items-end">
+      {{ m.check("all_postings", "show rule-excluded",
+                 filters.all_postings, attrs=hx) }}
+    </div>
 
-  <div class="filters__actions">
-    {{ m.button("Filter", "primary", icon_name="search") }}
-
-    {% if filters.is_filtered() %}
-    <a class="btn btn--ghost" href="/">Reset</a>
-    {% endif %}
+    <div class="col-12 d-flex justify-content-end gap-2">
+      <noscript>
+        {# without JS the dropdowns are inert buttons — plain selects that
+           submit with the Filter button instead #}
+        <button class="btn btn-outline-secondary btn-sm" type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#noscript-selects">plain selects</button>
+      </noscript>
+      {{ m.button("Filter", "primary", icon_name="search", attrs={"type": "submit"}) }}
+      {% if filters.is_filtered() %}
+      <a class="btn btn-link" href="/">Reset</a>
+      {% endif %}
+    </div>
   </div>
 </form>
+
+<noscript>
+  <div class="collapse card card-body mb-3" id="noscript-selects">
+    <div class="row g-3">
+      <div class="col-md-4">{{ m.select_noscript("status", filters.status, status_options) }}</div>
+      <div class="col-md-4">{{ m.select_noscript("company", filters.company, options.companies, placeholder="any") }}</div>
+      <div class="col-md-4">{{ m.select_noscript("level", filters.level, options.levels, placeholder="any") }}</div>
+      <div class="col-md-4">{{ m.select_noscript("source", filters.source, options.sources, placeholder="any") }}</div>
+      <div class="col-md-4">{{ m.select_noscript("tier", filters.tier, tier_options, placeholder="any") }}</div>
+      <div class="col-md-4">{{ m.select_noscript("sort", filters.sort, sort_options) }}</div>
+    </div>
+  </div>
+</noscript>
 
 {# ── results (swapped by htmx on pagination + filter changes) ─────────── #}
 {% include "_results.html" %}

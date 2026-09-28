@@ -6,89 +6,99 @@
 
 {% block content %}
 
-<div class="page-head">
-  <div class="page-head__title">
-    <h1>The living substrate</h1>
-    <span class="page-head__sub">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+  <div>
+    <h1 class="h4 mb-1">The living substrate</h1>
+    <div class="text-secondary small">
       watchlist.yaml mirrors this table · discovery appends candidates daily (PLAN §5.9)
-    </span>
+    </div>
   </div>
-  <div class="page-head__actions">
-    {{ m.stat("companies", rows | length) }}
-    {{ m.stat("signals", signals | length) }}
+  <div class="row g-2 mw-100" style="width: auto">
+    <div class="col-6">{{ m.stat("companies", rows | length) }}</div>
+    <div class="col-6">{{ m.stat("signals", signals | length) }}</div>
   </div>
 </div>
 
-<div class="grid grid--sidebar">
+<div class="row g-3">
 
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>company</th><th>tier</th><th>domain</th><th>boards</th>
-          <th>careers</th><th>postings</th><th>new</th><th>signals</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in rows %}
-        <tr>
-          <td class="table__cell--main">{{ r.name }}</td>
-          <td>{% if r.tier %}{{ m.badge(r.tier, "outline") }}{% endif %}</td>
-          <td class="table__cell--dim"><span class="truncate">{{ r.domain or "—" }}</span></td>
-          <td>
-            {% if boards.get(r.id) %}
-              {% for prov, tok in boards.get(r.id) %}
-              {{ m.badge(prov, "accent", tok) }}
-              {% endfor %}
-            {% else %}
-              {{ m.badge("dark-pool", "special", "no public board — monitored via signals") }}
-            {% endif %}
-          </td>
-          <td>
-            {% if r.career_url %}
-            <a class="btn btn--ghost btn--sm" href="{{ r.career_url }}" target="_blank"
-               rel="noopener">link {{ m.icon("external", 10) }}</a>
-            {% else %}<span class="dim">—</span>{% endif %}
-          </td>
-          <td class="table__cell--mono">{{ r.postings_total }}</td>
-          <td class="table__cell--mono">{{ r.rule_pass_new }}</td>
-          <td class="table__cell--mono">{{ r.signal_count }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% if not rows %}
-    {{ m.empty("No companies yet", "Run `jobscout run --daily` to seed the watchlist.", "building") }}
-    {% endif %}
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th data-sort-key="company" scope="col">company</th>
+              <th scope="col">tier</th>
+              <th scope="col">domain</th>
+              <th scope="col">boards</th>
+              <th scope="col">careers</th>
+              <th data-sort-key="postings" scope="col">postings</th>
+              <th data-sort-key="new" scope="col">new</th>
+              <th data-sort-key="signals" scope="col">signals</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td class="fw-medium">{{ r.name }}</td>
+              <td>{% if r.tier %}{{ m.badge(r.tier, "light") }}{% endif %}</td>
+              <td class="small text-secondary text-truncate" style="max-width: 12rem;">{{ r.domain or "—" }}</td>
+              <td>
+                {% if boards.get(r.id) %}
+                  {% for prov, tok in boards.get(r.id) %}
+                  {{ m.badge(prov, "primary", tok) }}
+                  {% endfor %}
+                {% else %}
+                  {{ m.badge("dark-pool", "purple", "no public board — monitored via signals") }}
+                {% endif %}
+              </td>
+              <td>
+                {% if r.career_url %}
+                <a class="btn btn-outline-secondary btn-sm" href="{{ r.career_url }}" target="_blank"
+                   rel="noopener">link {{ m.icon("external", 10) }}</a>
+                {% else %}<span class="text-secondary">—</span>{% endif %}
+              </td>
+              <td class="font-monospace">{{ r.postings_total }}</td>
+              <td class="font-monospace">{{ r.rule_pass_new }}</td>
+              <td class="font-monospace">{{ r.signal_count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if not rows %}
+      <div class="card-body">{{ m.empty("No companies yet", "Run `jobscout run --daily` to seed the watchlist.", "building") }}</div>
+      {% endif %}
+    </div>
   </div>
 
-  <div class="stack stack--sm">
+  <div class="col-lg-4 d-flex flex-column gap-3">
     <div class="card">
-      <header class="card__header">
-        <h2 class="card__title">Signal feed</h2>
-        <span class="dim" style="font-size: var(--fs-xs)">latest {{ signals | length }}</span>
-      </header>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="card-title mb-0 h6">Signal feed</h2>
+        <span class="text-secondary small">latest {{ signals | length }}</span>
+      </div>
       {% for s in signals %}
         {{ m.signal(s) }}
       {% else %}
-      <div class="card__body">{{ m.empty("No signals yet", "Signals accumulate as sources run daily.", "radar") }}</div>
+      <div class="card-body">{{ m.empty("No signals yet", "Signals accumulate as sources run daily.", "radar") }}</div>
       {% endfor %}
     </div>
 
     {% if kinds %}
     <div class="card">
-      <header class="card__header">
-        <h2 class="card__title">Signal kinds</h2>
-        <span class="dim" style="font-size: var(--fs-xs)">what each detection means</span>
-      </header>
-      <div class="card__body">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="card-title mb-0 h6">Signal kinds</h2>
+        <span class="text-secondary small">what each detection means</span>
+      </div>
+      <div class="card-body">
         <div class="legend">
           {% for k in kinds %}
           {% set meta = kind_meta(k.kind) %}
           <div class="legend__row">
-            <span class="row" style="gap: var(--sp-2); flex-wrap: nowrap">
-              {{ m.badge(meta.label, "outline") }}
-              <span class="mono dim" style="font-size: var(--fs-2xs)">{{ k.n }}</span>
+            <span class="d-flex align-items-center gap-1">
+              {{ m.badge(meta.label, "light") }}
+              <span class="font-monospace text-secondary small">{{ k.n }}</span>
             </span>
             <span class="legend__desc">{{ meta.desc }}</span>
           </div>

@@ -6,13 +6,13 @@
 
 {% block content %}
 
-<div class="page-head">
-  <div class="page-head__title">
-    <h1>Packet board</h1>
-    <span class="page-head__sub">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+  <div>
+    <h1 class="h4 mb-1">Packet board</h1>
+    <div class="text-secondary small">
       packets live in applications/ · status flow:
       drafting → needs_input → ready → filled → applied
-    </span>
+    </div>
   </div>
 </div>
 
@@ -29,41 +29,42 @@
 {% set stage_rows = packets | selectattr("row.status", "equalto", stage) | list %}
 {% if stage_rows %}
 <div class="card">
-  <header class="card__header">
-    <h2 class="card__title">{{ label }}</h2>
-    <span class="row" style="gap: var(--sp-3)">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">{{ label }}</h2>
+    <span class="d-flex align-items-center gap-2">
       {% if stage == "packet:needs_input" and profile_missing %}
-      <a class="btn btn--secondary btn--sm" href="/profile">
+      <a class="btn btn-outline-primary btn-sm" href="/profile">
         {{ m.icon("spark", 11) }} provide missing info ({{ profile_missing }})
       </a>
       {% endif %}
-      <span class="dim" style="font-size: var(--fs-xs)">{{ stage_rows | length }}</span>
+      <span class="badge text-bg-light">{{ stage_rows | length }}</span>
     </span>
-  </header>
-  <div class="table-wrap" style="border: none; box-shadow: none; border-radius: 0">
-    <table class="table">
-      <thead>
-        <tr><th>posting</th><th>company</th><th>cost</th><th>updated</th><th></th></tr>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th scope="col">posting</th><th scope="col">company</th>
+            <th scope="col">cost</th><th scope="col">updated</th><th scope="col"></th></tr>
       </thead>
       <tbody>
         {% for item in stage_rows %}
         {% set pk = item.row %}
         {% set man = item.manifest %}
         <tr>
-          <td class="table__cell--main">
-            <a href="/packet/{{ pk.id }}" class="truncate">
+          <td class="text-truncate" style="max-width: 24rem;">
+            <a href="/packet/{{ pk.id }}" class="fw-medium text-decoration-none">
               {{ pk.posting_title or pk.id }}
             </a>
-            {% if man.dry_run %}{{ m.badge("dry-run", "outline") }}{% endif %}
+            {% if man.dry_run %}{{ m.badge("dry-run", "light") }}{% endif %}
           </td>
-          <td class="dim-2">
-            {{ pk.company_name or pk.company_id or "—" }}
-            {% if pk.tier %}{{ m.badge(pk.tier, "outline") }}{% endif %}
+          <td class="text-nowrap">
+            <span class="text-secondary">{{ pk.company_name or pk.company_id or "—" }}</span>
+            {% if pk.tier %}{{ m.badge(pk.tier, "light") }}{% endif %}
           </td>
-          <td class="table__cell--mono dim">${{ "%.4f" | format(pk.cost_usd or 0) }}</td>
-          <td class="table__cell--dim table__cell--mono">{{ (pk.updated_at or "")[:16] | replace("T", " ") }}</td>
-          <td class="table__cell--actions">
-            <a class="btn btn--secondary btn--sm" href="/packet/{{ pk.id }}">
+          <td class="font-monospace text-secondary">${{ "%.4f" | format(pk.cost_usd or 0) }}</td>
+          <td class="small text-secondary font-monospace text-nowrap">{{ (pk.updated_at or "")[:16] | replace("T", " ") }}</td>
+          <td class="text-end">
+            <a class="btn btn-outline-primary btn-sm" href="/packet/{{ pk.id }}">
               open {{ m.icon("arrow-right", 11) }}
             </a>
           </td>
@@ -79,22 +80,26 @@
 {% set other = packets | rejectattr("row.status", "in", ["packet:needs_input", "packet:ready", "filled", "applied"]) | list %}
 {% if other %}
 <div class="card">
-  <header class="card__header"><h2 class="card__title">Other</h2></header>
-  <div class="card__body" style="display: flex; flex-direction: column; gap: var(--sp-3)">
+  <div class="card-header"><h2 class="card-title mb-0 h6">Other</h2></div>
+  <div class="card-body d-flex flex-column gap-2">
     {% for item in other %}
     {% set pk = item.row %}
-    <a href="/packet/{{ pk.id }}">{{ pk.posting_title or pk.id }} — {{ pk.status }}</a>
+    <a href="/packet/{{ pk.id }}" class="text-decoration-none">{{ pk.posting_title or pk.id }} — {{ pk.status }}</a>
     {% endfor %}
   </div>
 </div>
 {% endif %}
 
 {% else %}
-{{ m.empty(
-     "No packets yet",
-     "Mark a posting interested, then press “Prepare application” on its detail page — "
-     "or run `jobscout prepare --posting <id> --dry-run`.",
-     "doc") }}
+<div class="card">
+  <div class="card-body">
+    {{ m.empty(
+       "No packets yet",
+       "Mark a posting interested, then press “Prepare application” on its detail page — "
+       "or run `jobscout prepare --posting <id> --dry-run`.",
+       "doc") }}
+  </div>
+</div>
 {% endif %}
 
 {% endblock %}

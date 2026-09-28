@@ -1,13 +1,16 @@
 {# ============================================================================
-   macros.html — the component library. Every page composes from these;
-   no page template may duplicate this markup. Server-rendered components
-   (the stack is deliberately no-build: Jinja2 macros play the role of
-   component functions).
+   macros.html — the jobscout component library, built on vendored
+   Bootstrap 5.3. Every page composes from these macros; no page template
+   may duplicate this markup. Markup + spacing = Bootstrap standards;
+   identity = tokens.css via app.css theme mapping.
+
+   Stack stays deliberately no-build (portable bootstrap mandate):
+   Jinja2 macros are the component functions, Bootstrap is the framework.
    ============================================================================ #}
 
 {# ── icons: single source of 16px stroke icons ─────────────────────────── #}
 {% macro icon(name, size=16) -%}
-<svg class="icon icon--{{ name }}" width="{{ size }}" height="{{ size }}"
+<svg class="icon" width="{{ size }}" height="{{ size }}"
      viewBox="0 0 16 16" fill="none" stroke="currentColor"
      stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
      aria-hidden="true">
@@ -55,15 +58,16 @@
 </svg>
 {%- endmacro %}
 
-{# ── badge / status / score ──────────────────────────────────────────────── #}
-{% macro badge(text, tone="neutral", title="") -%}
-<span class="badge badge--{{ tone }}" {% if title %}title="{{ title }}"{% endif %}>{{ text }}</span>
+{# ── badges / status / score ─────────────────────────────────────────────── #}
+{% macro badge(text, tone="secondary", title="") -%}
+<span class="badge text-bg-{{ tone }}{% if not text %} bg-secondary{% endif %}"
+      {% if title %}title="{{ title }}"{% endif %}>{{ text or "—" }}</span>
 {%- endmacro %}
 
 {% macro status(value) -%}
 {%- set tone_map = {
-  "new": "info", "interested": "special", "dismissed": "neutral",
-  "applied": "success", "withdrawn": "neutral",
+  "new": "primary", "interested": "purple", "dismissed": "secondary",
+  "applied": "success", "withdrawn": "secondary",
   "packet:drafting": "warning", "packet:needs_input": "warning",
   "packet:ready": "success", "filled": "success",
 } -%}
@@ -71,132 +75,182 @@
   "packet:needs_input": "needs input", "packet:ready": "ready",
   "packet:drafting": "drafting",
 } -%}
-{%- set cls = (value or "neutral").split(":")[0] -%}
-<span class="status status--{{ cls }}">
-  {{ badge(label_map.get(value, value or "—"), tone_map.get(value, "neutral")) }}
-</span>
+{{ badge(label_map.get(value, value or "—"), tone_map.get(value, "secondary")) }}
 {%- endmacro %}
 
 {% macro score(value) -%}
 {%- if value is none -%}
-<span class="score score--none" title="LLM scoring not run yet">—</span>
+<span class="badge text-bg-secondary" title="LLM scoring not run yet">—</span>
 {%- elif value >= 75 -%}
-<span class="score score--high">{{ "%.0f" | format(value) }}</span>
+<span class="badge text-bg-success">{{ "%.0f" | format(value) }}</span>
 {%- elif value >= 55 -%}
-<span class="score score--mid">{{ "%.0f" | format(value) }}</span>
+<span class="badge text-bg-primary">{{ "%.0f" | format(value) }}</span>
 {%- else -%}
-<span class="score score--low">{{ "%.0f" | format(value) }}</span>
+<span class="badge text-bg-secondary">{{ "%.0f" | format(value) }}</span>
 {%- endif -%}
 {%- endmacro %}
 
 {# ── buttons ─────────────────────────────────────────────────────────────── #}
-{% macro button(label, variant="secondary", size="", icon_name=None,
-                attrs={}) -%}
-<button class="btn btn--{{ variant }}{{ ' btn--' + size if size }}"
+{% macro button(label, variant="secondary", size="", icon_name=None, attrs={}) -%}
+<button class="btn btn-{{ variant }}{{ ' btn-' + size if size }}"
+        type="submit"
         {%- for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
-  {%- if icon_name %}{{ icon(icon_name) }}{% endif -%}
-  <span>{{ label }}</span>
+  {%- if icon_name %}{{ icon(icon_name) }} {% endif -%}
+  {{ label }}
 </button>
 {%- endmacro %}
 
+{# ── form field: Bootstrap's standardized label+control+gutter rhythm ──── #}
+{% macro field(label, name, control, hint="") -%}
+<div>
+  <label class="form-label" for="f-{{ name }}">{{ label }}</label>
+  {{ control }}
+  {%- if hint %}<div class="form-text">{{ hint }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{# ── select: Bootstrap dropdown + hidden native select (theme-proof).
+     Selecting an item syncs the hidden select and fires a real change
+     event, so htmx hx-trigger="change" keeps working. Without JS, the
+     dropdown items still submit via the noscript fallback in pages. ──── #}
+{% macro select(name, value, options, placeholder=None, attrs={}) -%}
+{%- set current_label = namespace(v=placeholder or (options[0][1] if options else "—")) -%}
+{%- for val, label, count in options -%}
+  {%- if value|string == val|string -%}
+    {%- set current_label.v = label -%}
+  {%- endif -%}
+{%- endfor -%}
+<div class="js-select dropdown">
+  <button class="btn btn-outline-secondary dropdown-toggle" type="button"
+          id="f-{{ name }}" data-bs-toggle="dropdown" data-bs-auto-close="true"
+          aria-expanded="false">
+    <span class="js-select-label">{{ current_label.v }}</span>
+  </button>
+  <ul class="dropdown-menu" aria-labelledby="f-{{ name }}">
+    {%- if placeholder is not none %}
+    <li><button class="dropdown-item{{ ' active' if not value }}" type="button"
+                data-value="">{{ placeholder }}</button></li>
+    {%- endif -%}
+    {%- for val, label, count in options %}
+    <li><button class="dropdown-item{{ ' active' if value|string == val|string }}"
+                type="button" data-value="{{ val }}">{{ label }}{% if count is not none %} <span class="badge text-bg-light ms-1">{{ count }}</span>{% endif %}</button></li>
+    {%- endfor %}
+  </ul>
+  <select class="d-none" name="{{ name }}"
+          {%- for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
+    {%- if placeholder is not none %}
+    <option value="" {% if not value %}selected{% endif %}>{{ placeholder }}</option>
+    {%- endif -%}
+    {%- for val, label, count in options %}
+    <option value="{{ val }}" {% if value|string == val|string %}selected{% endif %}>{{ label }}</option>
+    {%- endfor %}
+  </select>
+</div>
+{%- endmacro %}
+
+{# noscript fallback: a plain form-select with the same name ───────────── #}
+{% macro select_noscript(name, value, options, placeholder=None) -%}
+<select class="form-select" name="{{ name }}">
+  {%- if placeholder is not none %}
+  <option value="" {% if not value %}selected{% endif %}>{{ placeholder }}</option>
+  {%- endif -%}
+  {%- for val, label, count in options %}
+  <option value="{{ val }}" {% if value|string == val|string %}selected{% endif %}>{{ label }}</option>
+  {%- endfor %}
+</select>
+{%- endmacro %}
+
+{% macro text_input(name, value="", placeholder="", attrs={}) -%}
+<input class="form-control" type="text" name="{{ name }}" value="{{ value }}"
+       placeholder="{{ placeholder }}"
+       {%- for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
+{%- endmacro %}
+
+{% macro check(name, label, checked=False, attrs={}) -%}
+<div class="form-check form-switch">
+  <input class="form-check-input" type="checkbox" role="switch"
+         id="f-{{ name }}" name="{{ name }}" value="1"
+         {% if checked %}checked{% endif %}
+         {%- for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
+  <label class="form-check-label" for="f-{{ name }}">{{ label }}</label>
+</div>
+{%- endmacro %}
+
 {# ── cards ───────────────────────────────────────────────────────────────── #}
-{% macro card(title=None, actions="") -%}
+{% macro card(title=None) -%}
 <section class="card">
   {%- if title %}
-  <header class="card__header">
-    <h2 class="card__title">{{ title }}</h2>
-    <div class="card__actions">{{ actions }}</div>
-  </header>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">{{ title }}</h2>
+    {% if caller and false %}{% endif %}
+  </div>
   {%- endif %}
-  <div class="card__body card__body--flush">
+  <div class="card-body{% if not title %} p-0{% endif %}">
     {{ caller() }}
   </div>
 </section>
 {%- endmacro %}
 
 {% macro stat(label, value, hint="", tone="") -%}
-<div class="stat">
-  <span class="stat__label">{{ label }}</span>
-  <span class="stat__value{{ ' stat__value--' + tone if tone }}">{{ value }}</span>
-  {%- if hint %}<span class="stat__hint">{{ hint }}</span>{% endif %}
+<div class="card text-center h-100">
+  <div class="card-body py-2">
+    <div class="card-title mb-0">{{ label }}</div>
+    <div class="fs-4 fw-semibold{{ ' text-' + tone if tone }}">{{ value }}</div>
+    {%- if hint %}<div class="form-text mb-0">{{ hint }}</div>{% endif %}
+  </div>
 </div>
 {%- endmacro %}
 
 {# ── empty state ─────────────────────────────────────────────────────────── #}
 {% macro empty(title, hint="", icon_name="search") -%}
-<div class="empty">
-  <span class="dim">{{ icon(icon_name, 24) }}</span>
-  <span class="empty__title">{{ title }}</span>
-  {%- if hint %}<span class="empty__hint">{{ hint }}</span>{% endif %}
+<div class="text-center text-secondary py-5 px-3">
+  <div class="mb-2 opacity-50">{{ icon(icon_name, 24) }}</div>
+  <div class="fw-semibold text-body-secondary">{{ title }}</div>
+  {%- if hint %}<div class="small">{{ hint }}</div>{% endif %}
 </div>
 {%- endmacro %}
 
-{# ── field controls (filters) ────────────────────────────────────────────── #}
-{% macro field(label, name, control) -%}
-<label class="field">
-  <span class="field__label">{{ label }}</span>
-  {{ control }}
-</label>
-{%- endmacro %}
-
-{% macro select(name, value, options, placeholder=None, attrs={}) -%}
-<select class="select" name="{{ name }}" id="f-{{ name }}"
-        {%- for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
-  {%- if placeholder is not none %}
-  <option value="" {% if not value %}selected{% endif %}>{{ placeholder }}</option>
-  {%- endif -%}
-  {%- for val, label, count in options %}
-  <option value="{{ val }}" {% if value|string == val|string %}selected{% endif %}>
-    {{- label }}{% if count is not none %} ({{ count }}){% endif -%}
-  </option>
-  {%- endfor %}
-</select>
-{%- endmacro %}
-
-{% macro text_input(name, value="", placeholder="", attrs={}) -%}
-<input class="input" type="text" name="{{ name }}" value="{{ value }}"
-       placeholder="{{ placeholder }}"
-       {%- for k, v in attrs.items() %} {{ k }}="{{ v }}"{% endfor %}>
-{%- endmacro %}
-
-{# ── pagination ──────────────────────────────────────────────────────────── #}
+{# ── pagination (Bootstrap component + the info line tests assert) ────── #}
 {% macro pagination(pg, filters) -%}
 {% if pg.pages > 1 %}
-<nav class="pagination" aria-label="Results pages">
-  <span class="pagination__info">
-    {{ pg.start }}–{{ pg.end }} of {{ pg.total }} postings
-  </span>
-  {# page links use plain hrefs (works without JS) + hx enhancement #}
-  {% if pg.page > 1 %}
-  <a class="pagination__page" href="/?{{ pg.qs_page(pg.page - 1) }}"
-     hx-get="/?{{ pg.qs_page(pg.page - 1) }}" hx-target="#results"
-     hx-swap="outerHTML" hx-push-url="true" aria-label="Previous page">
-    {{ icon("arrow-left", 12) }}</a>
-  {% endif %}
-  {% for p in pg.window %}
-    {% if p is none %}
-    <span class="pagination__page pagination__page--gap">…</span>
-    {% elif p == pg.page %}
-    <span class="pagination__page pagination__page--active" aria-current="page">{{ p }}</span>
-    {% else %}
-    <a class="pagination__page" href="/?{{ pg.qs_page(p) }}"
-       hx-get="/?{{ pg.qs_page(p) }}" hx-target="#results"
-       hx-swap="outerHTML" hx-push-url="true">{{ p }}</a>
+<nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Results pages">
+  <span class="text-body-secondary small me-auto">{{ pg.start }}–{{ pg.end }} of {{ pg.total }} postings</span>
+  <ul class="pagination pagination-sm mb-0">
+    {% if pg.page > 1 %}
+    <li class="page-item">
+      <a class="page-link" href="/?{{ pg.qs_page(pg.page - 1) }}" aria-label="Previous"
+         hx-get="/?{{ pg.qs_page(pg.page - 1) }}" hx-target="#results"
+         hx-swap="outerHTML" hx-push-url="true">{{ icon("arrow-left", 12) }}</a>
+    </li>
     {% endif %}
-  {% endfor %}
-  {% if pg.page < pg.pages %}
-  <a class="pagination__page" href="/?{{ pg.qs_page(pg.page + 1) }}"
-     hx-get="/?{{ pg.qs_page(pg.page + 1) }}" hx-target="#results"
-     hx-swap="outerHTML" hx-push-url="true" aria-label="Next page">
-    {{ icon("arrow-right", 12) }}</a>
-  {% endif %}
+    {% for p in pg.window %}
+      {% if p is none %}
+      <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% elif p == pg.page %}
+      <li class="page-item active" aria-current="page"><span class="page-link">{{ p }}</span></li>
+      {% else %}
+      <li class="page-item">
+        <a class="page-link" href="/?{{ pg.qs_page(p) }}"
+           hx-get="/?{{ pg.qs_page(p) }}" hx-target="#results"
+           hx-swap="outerHTML" hx-push-url="true">{{ p }}</a>
+      </li>
+      {% endif %}
+    {% endfor %}
+    {% if pg.page < pg.pages %}
+    <li class="page-item">
+      <a class="page-link" href="/?{{ pg.qs_page(pg.page + 1) }}" aria-label="Next"
+         hx-get="/?{{ pg.qs_page(pg.page + 1) }}" hx-target="#results"
+         hx-swap="outerHTML" hx-push-url="true">{{ icon("arrow-right", 12) }}</a>
+    </li>
+    {% endif %}
+  </ul>
 </nav>
 {% elif pg.total > 0 %}
-<span class="pagination__info pagination">{{ pg.total }} postings</span>
+<span class="text-body-secondary small">{{ pg.total }} postings</span>
 {% endif %}
 {%- endmacro %}
 
-{# ── signal feed item ────────────────────────────────────────────────────── #}
+{# ── signal feed item (URLs highlighted via ui.linkify) ────────────────── #}
 {% macro signal(s) -%}
 {%- set icon_map = {
   "news": "news", "github_activity": "github", "funding": "bolt",
@@ -204,23 +258,37 @@
   "careers_page_changed": "sitemap", "sitemap_new_url": "sitemap",
   "ats_found": "building",
 } -%}
+{%- set icon_key = icon_map.get(s.kind, "radar") -%}
+{%- set tone = {
+  "news": "news", "github_activity": "github", "funding": "funding",
+  "hn": "hn", "hn_mention": "hn",
+  "careers_page_changed": "sitemap", "sitemap_new_url": "sitemap",
+}.get(s.kind, "monitor") -%}
 <div class="signal">
-  <span class="signal__icon signal__icon--{{ icon_map.get(s.kind, 'radar') }}"
-        title="{{ kind_desc(s.kind) }}">
-    {{ icon(icon_map.get(s.kind, "radar"), 14) }}
+  <span class="signal__icon signal__icon--{{ tone }}" title="{{ kind_desc(s.kind) }}">
+    {{ icon(icon_key, 14) }}
   </span>
   <div class="signal__body">
     <span class="signal__note">{{ linkify(s.note or s.key) }}</span>
     <span class="signal__meta">
       <span>{{ s.company_name or s.company_id or "—" }}</span>
       {%- if s.created_at %}<span>{{ s.created_at[:16] | replace("T", " ") }}</span>{% endif -%}
-      <span>{{ badge(s.kind | replace("_", " "), "outline") }}</span>
+      <span>{{ badge(s.kind | replace("_", " "), "light", kind_desc(s.kind)) }}</span>
     </span>
   </div>
 </div>
 {%- endmacro %}
 
-{# ── callout ─────────────────────────────────────────────────────────────── #}
+{# ── callout (Bootstrap alert) ───────────────────────────────────────────── #}
 {% macro callout(text, tone="info") -%}
-<div class="callout callout--{{ tone }}">{{ text }}</div>
+<div class="alert alert-{{ tone }} mb-0 py-2 small">{{ text }}</div>
+{%- endmacro %}
+
+{# ── table wrapper: Bootstrap table + responsive horizontal scroll ─────── #}
+{% macro table() -%}
+<div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    {{ caller() }}
+  </table>
+</div>
 {%- endmacro %}

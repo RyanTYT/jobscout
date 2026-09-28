@@ -1,21 +1,17 @@
-/* jobscout dashboard interactions — vanilla JS, no build step.
-   Progressive enhancement only: every page works without this file. */
+/* jobscout dashboard interactions — built on vendored Bootstrap 5.3.
+   Progressive enhancement: every page works without this file. */
 
 (function () {
   "use strict";
 
   var body = document.body;
 
-  /* ── theme toggle ─────────────────────────────────────────────────────── */
+  /* ── theme (Bootstrap's data-bs-theme) ──────────────────────────────── */
 
   var THEME_KEY = "jobscout-theme";
 
   function applyTheme(theme) {
-    if (theme === "dark") {
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-    }
+    document.documentElement.setAttribute("data-bs-theme", theme);
   }
 
   applyTheme(localStorage.getItem(THEME_KEY) || "light");
@@ -23,40 +19,43 @@
   document.addEventListener("click", function (e) {
     var toggle = e.target.closest("[data-theme-toggle]");
     if (!toggle) return;
-    var next = document.documentElement.getAttribute("data-theme") === "dark"
+    var next = document.documentElement.getAttribute("data-bs-theme") === "dark"
       ? "light" : "dark";
     localStorage.setItem(THEME_KEY, next);
     applyTheme(next);
-    toast("Theme: " + next, "info");
+    toast("Theme: " + next, "primary");
   });
 
-  /* ── toasts ───────────────────────────────────────────────────────────── */
+  /* ── toasts (bootstrap.Toast) ───────────────────────────────────────── */
 
-  var toastsEl = null;
+  var toastContainer = null;
 
   function toast(message, tone) {
-    if (!toastsEl) {
-      toastsEl = document.createElement("div");
-      toastsEl.className = "toasts";
-      toastsEl.setAttribute("aria-live", "polite");
-      body.appendChild(toastsEl);
+    if (!window.bootstrap || !bootstrap.Toast) return;
+    if (!toastContainer) {
+      toastContainer = document.createElement("div");
+      toastContainer.className =
+        "toast-container position-fixed bottom-0 end-0 p-3";
+      body.appendChild(toastContainer);
     }
-    var t = document.createElement("div");
-    t.className = "toast toast--" + (tone || "info");
-    t.textContent = message;
-    toastsEl.appendChild(t);
-    var ttl = message.length > 90 ? 7000 : 4000;
-    setTimeout(function () {
-      t.classList.add("toast--leaving");
-      setTimeout(function () { t.remove(); }, 300);
-    }, ttl);
+    var el = document.createElement("div");
+    el.className = "toast align-items-center border-0 text-bg-" +
+      (tone === "danger" ? "danger" : tone === "success" ? "success" : "primary");
+    el.setAttribute("role", "status");
+    el.innerHTML =
+      '<div class="d-flex"><div class="toast-body"></div>' +
+      '<button type="button" class="btn-close btn-close-white me-2 m-auto" ' +
+      'data-bs-dismiss="toast" aria-label="Close"></button></div>';
+    el.querySelector(".toast-body").textContent = message;
+    toastContainer.appendChild(el);
+    new bootstrap.Toast(el, { delay: 4000 }).show();
+    el.addEventListener("hidden.bs.toast", function () { el.remove(); });
   }
 
   window.jobscoutToast = toast;
 
-  /* ── htmx wiring ──────────────────────────────────────────────────────── */
+  /* ── htmx wiring ────────────────────────────────────────────────────── */
 
-  // global busy indicator (topbar) while any htmx request flies
   document.body.addEventListener("htmx:beforeRequest", function () {
     body.classList.add("htmx-busy");
   });
@@ -70,48 +69,38 @@
     if (!xhr || !xhr.getResponseHeader) return;
     var msg = xhr.getResponseHeader("X-Toast");
     if (msg) {
-      var tone = xhr.getResponseHeader("X-Toast-Tone") || "info";
+      var tone = xhr.getResponseHeader("X-Toast-Tone") || "success";
       try { msg = decodeURIComponent(msg); } catch (err) { /* keep raw */ }
       toast(msg, tone);
     }
   });
 
-  // swap skeletons into a results container before its content arrives
+  // skeleton placeholders while results load (Bootstrap .placeholder)
   document.body.addEventListener("htmx:beforeRequest", function (e) {
     var target = e.detail.elt;
-    if (!target || !target.matches) return;
+    if (!target || !target.closest) return;
     var results = target.closest("[data-skeleton-rows]");
     if (results && e.detail.xhr) {
-      var n = parseInt(results.getAttribute("data-skeleton-rows") || "10", 10);
-      var frag = document.createDocumentFragment();
+      var n = parseInt(results.getAttribute("data-skeleton-rows") || "8", 10);
+      var html = '<div class="placeholder-glow p-3">';
       for (var i = 0; i < n; i++) {
-        var row = document.createElement("div");
-        row.className = "skeleton skeleton--row";
-        frag.appendChild(row);
+        html += '<div class="placeholder col-12 py-3 mb-1 rounded"></div>';
       }
-      var wrap = document.createElement("div");
-      wrap.className = "stack--sm";
-      wrap.style.display = "flex";
-      wrap.style.flexDirection = "column";
-      wrap.style.gap = "4px";
-      wrap.appendChild(frag);
-      results.innerHTML = "";
-      results.appendChild(wrap);
+      html += "</div>";
+      results.innerHTML = html;
     }
   });
 
-  // flash rows that were swapped in by a POST (status change)
+  // flash rows swapped in by a POST (status change)
   document.body.addEventListener("htmx:afterSwap", function (e) {
     if (e.detail.requestConfig && e.detail.requestConfig.verb !== "get") {
       var target = e.detail.target;
-      var rows = target && target.matches ? [target] : [];
+      var rows = [];
+      if (target && target.tagName === "TR") rows.push(target);
       if (target && target.querySelectorAll) {
-        rows = rows.concat(Array.prototype.slice.call(
-          target.querySelectorAll("tr")));
+        rows = rows.concat([].slice.call(target.querySelectorAll("tr")));
       }
-      rows.forEach(function (r) {
-        if (r.tagName === "TR") r.classList.add("tr--flash");
-      });
+      rows.forEach(function (r) { r.classList.add("tr--flash"); });
     }
   });
 
@@ -125,8 +114,7 @@
     if (el && el.matches && el.matches("button")) el.removeAttribute("aria-busy");
   });
 
-  /* ── confirm-before-send on destructive controls ──────────────────────── */
-
+  // confirm-before-send on destructive controls
   document.body.addEventListener("htmx:confirm", function (e) {
     var el = e.detail.elt;
     if (!el || !el.hasAttribute || !el.hasAttribute("data-confirm")) return;
@@ -136,131 +124,48 @@
     }
   });
 
-  /* ── plain (non-htmx) form feedback: disable submit while pending ─────── */
-
+  // plain forms: disable submit while pending
   document.addEventListener("submit", function (e) {
     var form = e.target;
     if (!form.matches("form[data-busy-submit]")) return;
     var btn = form.querySelector('button[type="submit"]');
     if (btn) {
       btn.setAttribute("aria-busy", "true");
-      window.setTimeout(function () { btn.removeAttribute("aria-busy"); }, 20000);
+      setTimeout(function () { btn.removeAttribute("aria-busy"); }, 20000);
     }
   });
 
-  /* ── themed dropdowns (progressive enhancement over <select>) ────────── */
+  /* ── dropdown-selects (Bootstrap Dropdown + hidden native select) ───── */
 
-  function enhanceSelect(sel) {
-    if (sel.closest(".select-wrap")) return;           // already enhanced
-    var wrap = document.createElement("div");
-    wrap.className = "select-wrap";
-    sel.parentNode.insertBefore(wrap, sel);
-    wrap.appendChild(sel);
+  // Selecting an option syncs the hidden <select>, updates the toggle label,
+  // and fires a real change event so htmx hx-trigger="change" picks it up.
+  document.addEventListener("click", function (e) {
+    var item = e.target.closest(".js-select .dropdown-item");
+    if (!item) return;
+    var wrap = item.closest(".js-select");
+    var select = wrap.querySelector("select");
+    var toggle = wrap.querySelector(".dropdown-toggle");
+    if (!select || !toggle) return;
 
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "select-btn";
-    btn.setAttribute("aria-haspopup", "listbox");
-    var label = document.createElement("span");
-    label.className = "select-btn__label";
-    var chev = document.createElement("span");
-    chev.className = "select-btn__chevron";
-    chev.textContent = "▾";
-    btn.appendChild(label);
-    btn.appendChild(chev);
-
-    var menu = document.createElement("div");
-    menu.className = "select-menu";
-    menu.setAttribute("role", "listbox");
-
-    function currentText() {
-      var opt = sel.options[sel.selectedIndex];
-      return opt ? opt.textContent : "";
-    }
-
-    function syncBtn() {
-      label.textContent = currentText() || "—";
-      btn.setAttribute("aria-expanded", wrap.classList.contains("select-wrap--open"));
-    }
-
-    function buildMenu() {
-      menu.innerHTML = "";
-      Array.prototype.forEach.call(sel.options, function (opt) {
-        var row = document.createElement("div");
-        row.className = "select-option" +
-          (opt.selected ? " select-option--selected" : "");
-        row.setAttribute("role", "option");
-        var text = document.createElement("span");
-        text.textContent = opt.textContent;
-        row.appendChild(text);
-        menu.appendChild(row);
-        row.addEventListener("click", function () {
-          sel.value = opt.value;
-          Array.prototype.forEach.call(sel.options, function (o) {
-            o.selected = o.value === opt.value;
-          });
-          buildMenu();
-          close();
-          syncBtn();
-          // fire a real change so htmx hx-trigger=change picks it up
-          sel.dispatchEvent(new Event("change", { bubbles: true }));
-        });
-      });
-    }
-
-    function open() {
-      closeAllDropdowns();
-      wrap.classList.add("select-wrap--open");
-      syncBtn();
-    }
-    function close() {
-      wrap.classList.remove("select-wrap--open");
-      syncBtn();
-    }
-
-    btn.addEventListener("click", function () {
-      if (wrap.classList.contains("select-wrap--open")) close();
-      else open();
+    select.value = item.getAttribute("data-value") || "";
+    [].forEach.call(select.options, function (o) {
+      o.selected = o.value === select.value;
     });
-    document.addEventListener("click", function (e) {
-      if (!wrap.contains(e.target)) close();
+    toggle.querySelector(".js-select-label").textContent =
+      item.textContent.trim() || "—";
+
+    [].forEach.call(wrap.querySelectorAll(".dropdown-item"), function (i) {
+      i.classList.toggle("active", i === item);
     });
-    sel.addEventListener("change", function () { buildMenu(); syncBtn(); });
-
-    wrap.appendChild(btn);
-    wrap.appendChild(menu);
-    wrap.classList.add("select-wrap--enhanced");
-    buildMenu();
-    syncBtn();
-  }
-
-  var closeAllDropdowns = (function () {
-    var listeners = [];
-    return function () {
-      document.querySelectorAll(".select-wrap--open").forEach(function (w) {
-        w.classList.remove("select-wrap--open");
-      });
-    };
-  })();
-
-  function enhanceAllSelects(root) {
-    (root || document).querySelectorAll("select.select").forEach(enhanceSelect);
-  }
-
-  enhanceAllSelects(document);
-  document.body.addEventListener("htmx:afterSwap", function (e) {
-    enhanceAllSelects(e.detail.target);
+    select.dispatchEvent(new Event("change", { bubbles: true }));
   });
 
-  /* ── table sorting: a property of every .table component ──────────────
-     app.js flags each table automatically; th[data-sort-key] columns sort
-     client-side (numeric-aware). Tables with .th-sort headers (the inbox)
-     use server-side sorting and are skipped here. */
+  /* ── table sorting: a property of every .table component ────────────── */
 
   function ensureSortKeys(table) {
     var head = table.tHead;
     if (!head || !head.rows.length) return;
-    Array.prototype.forEach.call(head.rows[0].cells, function (th, i) {
+    [].forEach.call(head.rows[0].cells, function (th, i) {
       if (th.hasAttribute("data-sort-key")) return;
       if (th.querySelector(".th-sort")) return;      // server-side column
       if (!th.textContent.trim()) return;             // empty actions column
@@ -269,12 +174,13 @@
   }
 
   function autoEnableSorting(root) {
-    (root || document).querySelectorAll("table.table").forEach(function (t) {
-      if (t.hasAttribute("data-nosort")) return;
-      if (t.querySelector(".th-sort")) return;        // server-side table
-      t.setAttribute("data-sortable", "");
-      ensureSortKeys(t);
-    });
+    [].forEach.call((root || document).querySelectorAll("table.table"),
+      function (t) {
+        if (t.hasAttribute("data-nosort")) return;
+        if (t.querySelector(".th-sort")) return;      // server-side table
+        t.setAttribute("data-sortable", "");
+        ensureSortKeys(t);
+      });
   }
 
   autoEnableSorting(document);
@@ -287,23 +193,24 @@
     if (!th) return;
     var table = th.closest("table");
     var tbody = table.tBodies[0];
-    var idx = Array.prototype.indexOf.call(th.parentNode.children, th);
+    var idx = [].indexOf.call(th.parentNode.children, th);
     // first click sorts ascending; clicking the active column toggles
     var dir = (th.getAttribute("data-sort-active") === "1" &&
                th.getAttribute("data-sort-dir") === "asc") ? -1 : 1;
 
-    Array.prototype.slice.call(tbody.rows).sort(function (a, b) {
+    [].slice.call(tbody.rows).sort(function (a, b) {
       var ca = a.cells[idx] ? a.cells[idx].textContent.trim() : "";
       var cb = b.cells[idx] ? b.cells[idx].textContent.trim() : "";
-      var na = parseFloat(ca.replace(/[^\d.-]/g, ""));
-      var nb = parseFloat(cb.replace(/[^\d.-]/g, ""));
+      var na = parseFloat(ca.replace(/[^-\d.]/g, ""));
+      var nb = parseFloat(cb.replace(/[^-\d.]/g, ""));
       var cmp;
       if (!isNaN(na) && !isNaN(nb) && ca && cb) cmp = na - nb;
-      else cmp = ca.localeCompare(cb, undefined, { numeric: true, sensitivity: "base" });
+      else cmp = ca.localeCompare(cb, undefined,
+                                  { numeric: true, sensitivity: "base" });
       return cmp * dir;
     }).forEach(function (row) { tbody.appendChild(row); });
 
-    table.querySelectorAll("th[data-sort-key]").forEach(function (h) {
+    [].forEach.call(table.querySelectorAll("th[data-sort-key]"), function (h) {
       h.removeAttribute("data-sort-active");
       h.removeAttribute("data-sort-dir");
     });
@@ -311,7 +218,7 @@
     th.setAttribute("data-sort-dir", dir === 1 ? "asc" : "desc");
   });
 
-  /* ── keyboard: "/" focuses the search box ─────────────────────────────── */
+  /* ── keyboard: "/" focuses the search box ───────────────────────────── */
 
   document.addEventListener("keydown", function (e) {
     if (e.key !== "/" || e.target.closest("input, textarea, select")) return;

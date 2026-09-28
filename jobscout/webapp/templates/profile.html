@@ -6,20 +6,18 @@
 
 {% block content %}
 
-<div class="page-head">
-  <div class="page-head__title">
-    <h1>Your profile</h1>
-    <span class="page-head__sub">
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+  <div>
+    <h1 class="h4 mb-1">Your profile</h1>
+    <div class="text-secondary small">
       feeds every application field — written straight into
-      <span class="mono">master_resume/resume.yaml</span> (the single source
+      <span class="font-monospace">master_resume/resume.yaml</span> (the single source
       of truth; its comments are preserved)
-    </span>
+    </div>
   </div>
-  <div class="page-head__actions">
-    <span class="dim" style="font-size: var(--fs-xs)">
-      {{ missing | length }} required field{{ "s" if missing | length != 1 }} still missing
-    </span>
-  </div>
+  <span class="text-secondary small">
+    {{ missing | length }} required field{{ "s" if missing | length != 1 }} still missing
+  </span>
 </div>
 
 {% if just_saved %}
@@ -36,26 +34,27 @@
      "warning") }}
 {% endif %}
 
-<form class="stack" method="post" action="/profile/save" data-busy-submit>
+<form class="vstack gap-3" method="post" action="/profile/save" data-busy-submit>
 
-  {# ── identity ────────────────────────────────────────────────────────── #}
+  {# ── identity: Bootstrap row g-3 gutters — standardized spacing ──────── #}
   <div class="card">
-    <header class="card__header">
-      <h2 class="card__title">Identity</h2>
-      <span class="dim" style="font-size: var(--fs-xs)">the basics every form asks</span>
-    </header>
-    <div class="card__body">
-      <div class="form-grid">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h2 class="card-title mb-0 h6">Identity</h2>
+      <span class="text-secondary small">the basics every form asks</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
         {% for f in fields if f.block == "identity" %}
-        <label class="field">
-          <span class="field__label">{{ f.label }}</span>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <label class="form-label" for="{{ f.input_name }}">{{ f.label }}</label>
           {% if f.kind == "select" %}
           {{ m.select(f.input_name, values[f.key], field_options[f.key]) }}
           {% else %}
-          <input class="input" type="text" name="{{ f.input_name }}"
-                 value="{{ values[f.key] }}" placeholder="{{ f.placeholder }}">
+          <input class="form-control" id="{{ f.input_name }}" type="text"
+                 name="{{ f.input_name }}" value="{{ values[f.key] }}"
+                 placeholder="{{ f.placeholder }}">
           {% endif %}
-        </label>
+        </div>
         {% endfor %}
       </div>
     </div>
@@ -63,18 +62,19 @@
 
   {# ── current job + education ─────────────────────────────────────────── #}
   <div class="card">
-    <header class="card__header">
-      <h2 class="card__title">Current role &amp; education</h2>
-      <span class="dim" style="font-size: var(--fs-xs)">derived fields (current company / title / years / degree) come from here</span>
-    </header>
-    <div class="card__body">
-      <div class="form-grid">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h2 class="card-title mb-0 h6">Current role &amp; education</h2>
+      <span class="text-secondary small">derived fields (current company / title / years / degree) come from here</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
         {% for f in fields if f.block == "experience" or f.block == "education" %}
-        <label class="field">
-          <span class="field__label">{{ f.label }}</span>
-          <input class="input" type="text" name="{{ f.input_name }}"
-                 value="{{ values[f.key] }}" placeholder="{{ f.placeholder }}">
-        </label>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <label class="form-label" for="{{ f.input_name }}">{{ f.label }}</label>
+          <input class="form-control" id="{{ f.input_name }}" type="text"
+                 name="{{ f.input_name }}" value="{{ values[f.key] }}"
+                 placeholder="{{ f.placeholder }}">
+        </div>
         {% endfor %}
       </div>
     </div>
@@ -82,21 +82,20 @@
 
   {# ── work authorization + extras ─────────────────────────────────────── #}
   <div class="card">
-    <header class="card__header">
-      <h2 class="card__title">Work authorization &amp; availability</h2>
-    </header>
-    <div class="card__body">
-      <div class="form-grid">
+    <div class="card-header"><h2 class="card-title mb-0 h6">Work authorization &amp; availability</h2></div>
+    <div class="card-body">
+      <div class="row g-3">
         {% for f in fields if f.block == "work_authorization" or f.block == "extras" %}
-        <label class="field">
-          <span class="field__label">{{ f.label }}</span>
+        <div class="col-12 col-sm-6 col-lg-4">
+          <label class="form-label" for="{{ f.input_name }}">{{ f.label }}</label>
           {% if f.kind == "select" %}
           {{ m.select(f.input_name, values[f.key], field_options[f.key]) }}
           {% else %}
-          <input class="input" type="text" name="{{ f.input_name }}"
-                 value="{{ values[f.key] }}" placeholder="{{ f.placeholder }}">
+          <input class="form-control" id="{{ f.input_name }}" type="text"
+                 name="{{ f.input_name }}" value="{{ values[f.key] }}"
+                 placeholder="{{ f.placeholder }}">
           {% endif %}
-        </label>
+        </div>
         {% endfor %}
       </div>
     </div>
@@ -104,41 +103,46 @@
 
   {# ── custom fields ───────────────────────────────────────────────────── #}
   <div class="card">
-    <header class="card__header">
-      <h2 class="card__title">Custom fields</h2>
-      <span class="dim" style="font-size: var(--fs-xs)">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h2 class="card-title mb-0 h6">Custom fields</h2>
+      <span class="text-secondary small">
         extra label/value pairs — land on forms as “other:&lt;label&gt;”
       </span>
-    </header>
-    <div class="card__body" style="display: flex; flex-direction: column; gap: var(--sp-3)">
-      <div id="custom-rows" style="display: flex; flex-direction: column; gap: var(--sp-3)">
+    </div>
+    <div class="card-body d-flex flex-column gap-2">
+      <div id="custom-rows" class="d-flex flex-column gap-2">
         {% for c in custom %}
-        <div class="row" data-custom-row>
-          <input class="input" type="text" name="cf_label_{{ loop.index }}"
-                 value="{{ c.label }}" placeholder="label (e.g. portfolio)"
-                 style="flex: 1">
-          <input class="input" type="text" name="cf_value_{{ loop.index }}"
-                 value="{{ c.value }}" placeholder="value" style="flex: 2">
-          <button class="btn btn--ghost btn--sm" type="button"
-                  onclick="this.closest('[data-custom-row]').remove()">✕</button>
+        <div class="row g-2" data-custom-row>
+          <div class="col-5">
+            <input class="form-control" type="text" name="cf_label_{{ loop.index }}"
+                   value="{{ c.label }}" placeholder="label (e.g. portfolio)">
+          </div>
+          <div class="col-6">
+            <input class="form-control" type="text" name="cf_value_{{ loop.index }}"
+                   value="{{ c.value }}" placeholder="value">
+          </div>
+          <div class="col-1 d-flex align-items-center">
+            <button class="btn btn-outline-secondary btn-sm" type="button"
+                    onclick="this.closest('[data-custom-row]').remove()">✕</button>
+          </div>
         </div>
         {% endfor %}
         {% if not custom %}
-        <p class="dim" style="font-size: var(--fs-sm)">
+        <p class="text-secondary small mb-0">
           none yet — add pairs for anything forms keep asking that isn't above
         </p>
         {% endif %}
       </div>
       <div>
-        <button class="btn btn--secondary btn--sm" type="button"
+        <button class="btn btn-outline-secondary btn-sm" type="button"
                 id="add-custom-row">{{ m.icon("spark", 12) }} Add field</button>
       </div>
       <input type="hidden" name="cf_touched" id="cf-touched" value="">
     </div>
   </div>
 
-  <div class="filters__actions">
-    <button class="btn btn--primary btn--lg" type="submit">
+  <div class="d-flex justify-content-end gap-2">
+    <button class="btn btn-primary btn-lg" type="submit">
       {{ m.icon("check", 14) }} Save profile
     </button>
   </div>
@@ -152,14 +156,15 @@
       n += 1;
       touched.value = "1";
       var row = document.createElement("div");
-      row.className = "row";
+      row.className = "row g-2";
       row.setAttribute("data-custom-row", "");
       row.innerHTML =
-        '<input class="input" type="text" name="cf_label_' + n + '" ' +
-        'placeholder="label (e.g. portfolio)" style="flex: 1">' +
-        '<input class="input" type="text" name="cf_value_' + n + '" ' +
-        'placeholder="value" style="flex: 2">' +
-        '<button class="btn btn--ghost btn--sm" type="button">✕</button>';
+        '<div class="col-5"><input class="form-control" type="text" ' +
+        'name="cf_label_' + n + '" placeholder="label (e.g. portfolio)"></div>' +
+        '<div class="col-6"><input class="form-control" type="text" ' +
+        'name="cf_value_' + n + '" placeholder="value"></div>' +
+        '<div class="col-1 d-flex align-items-center">' +
+        '<button class="btn btn-outline-secondary btn-sm" type="button">✕</button></div>';
       row.querySelector("button").addEventListener("click", function () {
         touched.value = "1";
         row.remove();

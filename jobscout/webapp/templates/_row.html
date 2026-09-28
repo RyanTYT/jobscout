@@ -1,29 +1,29 @@
 {% import "components/macros.html" as m %}
 <tr id="row-{{ p.id }}">
-  <td class="table__cell--mono">{{ m.score(p.final_score) }}</td>
-  <td class="table__cell--main">
-    <a href="/posting/{{ p.id }}" class="truncate">{{ p.title or "(untitled)" }}</a>
+  <td class="font-monospace">{{ m.score(p.final_score) }}</td>
+  <td class="text-truncate" style="max-width: 24rem;">
+    <a href="/posting/{{ p.id }}" class="text-decoration-none fw-medium">{{ p.title or "(untitled)" }}</a>
   </td>
-  <td>
-    <span class="dim-2">{{ p.company_name or p.company_id }}</span>
-    {% if p.tier %} {{ m.badge(p.tier, "outline") }}{% endif %}
-    {% if p.non_ats %} {{ m.badge("dark", "special", "no public ATS board — dark-pool watch") }}{% endif %}
+  <td class="text-nowrap">
+    <span class="text-secondary">{{ p.company_name or p.company_id }}</span>
+    {% if p.tier %} {{ m.badge(p.tier, "light") }}{% endif %}
+    {% if p.non_ats %} {{ m.badge("dark", "purple", "no public ATS board — dark-pool watch") }}{% endif %}
   </td>
-  <td class="table__cell--dim"><span class="truncate">{{ p.location or "—" }}</span></td>
-  <td class="table__cell--dim table__cell--nowrap">
-    {% if p.seniority %}{{ m.badge(p.seniority, "outline") }}{% else %}<span class="dim">—</span>{% endif %}
+  <td class="small text-secondary text-truncate" style="max-width: 14rem;">{{ p.location or "—" }}</td>
+  <td class="small text-secondary text-nowrap">
+    {% if p.seniority %}{{ m.badge(p.seniority, "light") }}{% else %}<span class="text-secondary">—</span>{% endif %}
   </td>
-  <td class="table__cell--dim table__cell--nowrap">{{ (p.source or "") | replace("ats:", "") | truncate(22) }}</td>
-  <td class="table__cell--dim table__cell--mono">{{ (p.first_seen or "")[:10] }}</td>
-  <td class="table__cell--actions">
+  <td class="small text-secondary text-nowrap">{{ (p.source or "") | replace("ats:", "") | truncate(22) }}</td>
+  <td class="small text-secondary font-monospace text-nowrap">{{ (p.first_seen or "")[:10] }}</td>
+  <td class="text-end text-nowrap">
     {% if p.status == "new" %}
-    <button class="btn btn--success btn--sm" title="Mark interested"
+    <button class="btn btn-success btn-sm" title="Mark interested" type="button"
             hx-post="/posting/{{ p.id }}/status"
             hx-vals='{"status":"interested"}'
             hx-target="#row-{{ p.id }}" hx-swap="outerHTML">
       {{ m.icon("check", 12) }}
     </button>
-    <button class="btn btn--ghost btn--sm" title="Dismiss"
+    <button class="btn btn-outline-secondary btn-sm" title="Dismiss" type="button"
             hx-post="/posting/{{ p.id }}/status"
             hx-vals='{"status":"dismissed"}'
             hx-target="#row-{{ p.id }}" hx-swap="outerHTML">
@@ -31,7 +31,7 @@
     </button>
     {% elif p.status == "interested" %}
     {{ m.status(p.status) }}
-    <button class="btn btn--ghost btn--sm" title="Dismiss"
+    <button class="btn btn-outline-secondary btn-sm" title="Dismiss" type="button"
             hx-post="/posting/{{ p.id }}/status"
             hx-vals='{"status":"dismissed"}'
             hx-target="#row-{{ p.id }}" hx-swap="outerHTML">
@@ -39,14 +39,14 @@
     </button>
     {% elif p.status == "dismissed" %}
     {{ m.status(p.status) }}
-    <button class="btn btn--ghost btn--sm" title="Undo — back to new"
+    <button class="btn btn-outline-secondary btn-sm" title="Undo — back to new" type="button"
             hx-post="/posting/{{ p.id }}/status"
             hx-vals='{"status":"new"}'
             hx-target="#row-{{ p.id }}" hx-swap="outerHTML">undo</button>
     {% else %}
     {{ m.status(p.status) }}
     {% endif %}
-    <a class="btn btn--ghost btn--sm btn--icon" title="Open detail"
-       href="/posting/{{ p.id }}">{{ m.icon("arrow-right", 12) }}</a>
+    <a class="btn btn-outline-secondary btn-sm" title="Open detail" href="/posting/{{ p.id }}">
+      {{ m.icon("arrow-right", 12) }}</a>
   </td>
 </tr>
