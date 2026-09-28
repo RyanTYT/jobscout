@@ -621,6 +621,32 @@ DB additions (no migration): `_posting_filters()` shared WHERE builder,
 `count_postings()`, `filter_options()`; `list_postings()` gained
 level/location/company/source/remote/sort params. 74/74 tests.
 
+#### P9 — Apply launcher (2026-09-28, user request)
+
+Detail-page back links are quiet inline .backlink components (the old
+outline buttons stretched full-width because .content is a flex column).
+The packet board now applies, not just tracks:
+
+- Readiness column: all known / N missing, from each packet's fill sheet.
+- Checkboxes + select-all + live count → POST /applications/apply.
+- webapp/apply.py launcher, two modes per packet:
+  automated (posting URL matches a JobPilot filler — greenhouse, lever,
+  ashby, linkedin): one headed sidecar run, pauseOnUncertainty=true —
+  the filler completes the form and pauses where it would have to guess,
+  leaving its window open; assisted (no filler): a browser window opens
+  tiled at the apply URL (`open -na` Chrome with window-position/size,
+  default-browser fallback). Both tile across the screen via tile_grid
+  (Finder bounds, ≤3 columns). Automated submission flips the posting
+  to applied. NOTE: this consciously relaxes the old "no auto-submission"
+  line — automated fillers submit on their own, headed and watchable;
+  assisted and paused runs stay with the human.
+- apply_runs table (schema v4) + HTMX run log polled every 3s while a
+  run is in flight (sidecar apply:update events carry record.job.id =
+  packet id; SidecarClient.drain_events pops them).
+- JobPilot side rebuilt (branch agent/add-linkedin-plugin, commit
+  67fdcc0): UserSettings.windows → dedicated tiled browser per apply
+  worker; paused applications keep page + worker open.
+
 ### P8 extension III — Framework migration (2026-09-28)
 
 The hand-rolled CSS kept producing layout bugs (three rounds of spacing
