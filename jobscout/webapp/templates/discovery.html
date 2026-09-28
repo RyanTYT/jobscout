@@ -87,6 +87,52 @@
   </div>
 </div>
 
+{# ── hunting profile: what every layer is being pointed at ──────────────
+     rules gate on seniorities/locations; the LLM rubric and the agent
+     brief read the same file (config/profile.yaml, target: block). #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Hunting profile</h2>
+    <span class="text-secondary small">
+      config/profile.yaml · rules + LLM rubric + agent brief all read this
+    </span>
+  </div>
+  <div class="card-body">
+    <dl class="row mb-0 small">
+      <dt class="col-6 col-md-2 text-secondary fw-normal">levels</dt>
+      <dd class="col-6 col-md-10">
+        {% for s in target.seniorities %}{{ m.badge(s, "primary") }}{% endfor %}
+        {% if not target.seniorities %}{{ m.badge("any level", "light") }}{% endif %}
+        <span class="text-secondary">
+          exclusion list — titles explicitly senior/lead/principal fail the
+          rule gate; unlabeled titles (most mid postings) pass to LLM scoring
+        </span>
+      </dd>
+      <dt class="col-6 col-md-2 text-secondary fw-normal">locations</dt>
+      <dd class="col-6 col-md-10">
+        {% for loc in target.primary_locations %}
+        {{ m.badge(loc ~ " · preferred", "success") }}
+        {% endfor %}
+        {% for loc in target.locations if loc not in target.primary_locations %}
+        {{ m.badge(loc, "light") }}
+        {% endfor %}
+        {% if not target.locations %}{{ m.badge("anywhere", "light") }}{% endif %}
+        <span class="text-secondary">remote allowed ({{ target.remote.preference }})</span>
+      </dd>
+      <dt class="col-6 col-md-2 text-secondary fw-normal">roles</dt>
+      <dd class="col-6 col-md-10">
+        {% for r in target.roles %}{{ m.badge(r, "light") }}{% endfor %}
+        {% if not target.roles %}<span class="text-secondary">any engineering role</span>{% endif %}
+      </dd>
+      <dt class="col-6 col-md-2 text-secondary fw-normal">stack</dt>
+      <dd class="col-6 col-md-10">
+        {% if target.stack %}<span class="font-monospace text-secondary small">{{ target.stack | join(" · ") }}</span>
+        {% else %}<span class="text-secondary">—</span>{% endif %}
+      </dd>
+    </dl>
+  </div>
+</div>
+
 {# ── agent spend ──────────────────────────────────────────────────────── #}
 <div class="row g-3">
   <div class="col-4">{{ m.stat("agent calls (30d)", agent_spend["calls"] | string) }}</div>

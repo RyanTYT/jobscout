@@ -512,3 +512,10 @@ def test_applications_runs_partial(client, db_file, tmp_path):
     assert "Apply runs" in r.text
     assert "launched" in r.text
     assert "every 3s" in r.text                        # polls while live
+
+
+def test_discovery_page_shows_hunting_profile(client):
+    r = client.get("/discovery")
+    assert r.status_code == 200
+    assert "Hunting profile" in r.text
+    assert "levels" in r.text and "locations" in r.text

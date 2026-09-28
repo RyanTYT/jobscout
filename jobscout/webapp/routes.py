@@ -230,6 +230,14 @@ def create_app() -> FastAPI:
             ctx = _ctx("discovery", conn)
         finally:
             conn.close()
+        from jobscout.core.config import load_profile
+
+        try:
+            target = load_profile().target
+        except Exception:                 # noqa: BLE001 — profile optional here
+            from jobscout.core.models import TargetCfg
+
+            target = TargetCfg()
         reports = sorted(BASE_DIR.parents[1].joinpath("morning_reports").glob("*.md"))
         latest_report = None
         if reports:
@@ -241,6 +249,7 @@ def create_app() -> FastAPI:
             {
                 **ctx,
                 "settings": settings,
+                "target": target,
                 "agent_spend": agent_spend,
                 "last_agent_run": last_agent_run,
                 "reports": [r.name for r in reports[-10:]],

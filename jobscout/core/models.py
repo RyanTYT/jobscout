@@ -285,6 +285,10 @@ class TargetCfg(BaseModel):
     weighting: dict[str, float] = Field(default_factory=dict)
     seniorities: list[str] = Field(default_factory=list)
     locations: list[str] = Field(default_factory=list)
+    # priority overlay on locations: rules treat both lists the same
+    # (union), but the agent brief, LLM rubric, and digest emphasise
+    # primary first. Empty = all locations equal.
+    primary_locations: list[str] = Field(default_factory=list)
     remote: RemoteCfg = Field(default_factory=RemoteCfg)
     domains: list[str] = Field(default_factory=list)
     stack: list[str] = Field(default_factory=list)

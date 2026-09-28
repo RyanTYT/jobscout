@@ -149,3 +149,39 @@ def test_set_discovery_mode_roundtrip(tmp_path, monkeypatch):
     assert 'mode: "off"' in settings_file.read_text()
     with pytest.raises(core_config.ConfigError):
         core_config.set_discovery_mode("bogus")
+
+
+# ── brief targeting (hunting focus for the morning agent) ───────────────
+
+
+def test_brief_carries_targeting():
+    import sqlite3
+
+    from jobscout.agent.brief import build_brief
+    from jobscout.core.config import load_settings
+    from jobscout.core.models import ProfileCfg, TargetCfg
+
+    profile = ProfileCfg(target=TargetCfg(
+        roles=["backend engineer"], seniorities=["junior"],
+        locations=["Singapore", "Amsterdam"], primary_locations=["Singapore"],
+        stack=["rust"], domains=["execution"],
+    ))
+    brief = build_brief(sqlite3.connect(":memory:"), profile, load_settings())
+    assert "junior" in brief                      # level derived, not hardcoded
+    assert "senior engineer" not in brief
+    assert "Singapore (preferred)" in brief       # priority flows into the brief
+    assert "Amsterdam" in brief
+    assert "backend engineer" in brief
+
+
+def test_brief_targeting_defaults():
+    import sqlite3
+
+    from jobscout.agent.brief import build_brief
+    from jobscout.core.config import load_settings
+    from jobscout.core.models import ProfileCfg
+
+    brief = build_brief(sqlite3.connect(":memory:"), ProfileCfg(),
+                        load_settings())
+    assert "any level" in brief
+    assert "locations=any" in brief

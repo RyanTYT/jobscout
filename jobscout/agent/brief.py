@@ -10,15 +10,29 @@ import sqlite3
 def build_brief(conn: sqlite3.Connection, profile, settings) -> str:
     agent_cfg = settings.discovery.agent
     target = profile.target
+    levels = "/".join(target.seniorities) if target.seniorities else "any level"
+    primary = ", ".join(target.primary_locations)
+    others = [loc for loc in target.locations if loc not in target.primary_locations]
+    loc_line = (
+        f"locations={primary} (preferred)"
+        + (f"; also acceptable: {', '.join(others)}" if others else "")
+        if target.locations
+        else "locations=any"
+    )
     return f"""MORNING BRIEF — {__date_hint__()}
 
-You are the discovery layer for a senior engineer hunting for quant/backend
-roles, with a focus on firms WITHOUT strong job-board presence (the "dark
-pool" — fewer applicants, better odds).
+You are the discovery layer for a {levels} engineer hunting for
+{", ".join(target.roles) or "engineering"} roles, with a focus on firms
+WITHOUT strong job-board presence (the "dark pool" — fewer applicants,
+better odds).
 
 Candidate target (distilled): roles={", ".join(target.roles)};
 stack={", ".join(target.stack)}; domains={", ".join(target.domains)};
-seniorities={", ".join(target.seniorities)}.
+seniorities={", ".join(target.seniorities)}; {loc_line}.
+Prefer {primary or "no specific location"}-based roles when weighing
+promising companies; treat the other acceptable locations as solid
+runners-up, not equal-priority. Remote roles are acceptable (preference:
+{target.remote.preference}).
 
 The deterministic collectors (ATS APIs, careers crawls, HN thread, RSS) have
 ALREADY run today. Your value-add is judgment and open-ended search.
