@@ -42,7 +42,15 @@
 <div class="actions-page">
   <button class="yes" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"interested"}' hx-target="#row-{{ p.id }}">mark interested</button>
   <button class="no" hx-post="/posting/{{ p.id }}/status" hx-vals='{"status":"dismissed"}'>dismiss</button>
-  <span class="dim">application packets land in P6 (prepare --posting {{ p.id }})</span>
+  <form method="post" action="/posting/{{ p.id }}/prepare" style="display:inline">
+    <input type="hidden" name="dry_run" value="false">
+    <button class="yes" type="submit">prepare application</button>
+  </form>
+  <form method="post" action="/posting/{{ p.id }}/prepare" style="display:inline">
+    <input type="hidden" name="dry_run" value="true">
+    <button type="submit">prepare (dry-run)</button>
+  </form>
+  <span class="dim">dry-run uses scripted fake models — full tailoring needs the LLM key</span>
 </div>
 
 {% if p.description %}

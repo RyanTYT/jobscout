@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/applications">← packet board</a></p>
+
+<h1>{{ manifest.posting_title or "packet" }}</h1>
+<p class="sub">
+  {{ manifest.company }} ·
+  <a href="{{ manifest.posting_url }}" rel="noopener" target="_blank">posting</a> ·
+  <a href="/posting/{{ pk.posting_id }}">posting detail</a>
+</p>
+
+{% if pk.status == "ready" %}<span class="chip int">ready</span>
+{% elif pk.status == "applied" %}<span class="chip dis">applied</span>
+{% else %}<span class="chip">{{ pk.status }}</span>{% endif %}
+{% if manifest.dry_run %}<span class="chip">dry-run</span>{% endif %}
+<span class="dim">model: {{ manifest.model or "—" }} · cost ${{ "%.4f" | format(pk.cost_usd or 0) }}</span>
+
+{% if manifest.reasons %}
+<h2>needs input</h2>
+<ul>
+{% for r in manifest.reasons %}
+<li class="red">{{ r }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+
+<div class="actions-page">
+  <form method="post" action="/packet/{{ pk.id }}/status" style="display:inline">
+    <input type="hidden" name="status" value="applied">
+    <button class="yes">mark applied</button>
+  </form>
+  <form method="post" action="/packet/{{ pk.id }}/status" style="display:inline">
+    <input type="hidden" name="status" value="withdrawn">
+    <button class="no">withdraw</button>
+  </form>
+  <span class="dim">files in {{ pk.dir }}</span>
+</div>
+
+{% if claims %}
+<h2>claim check ({{ claims | length }} claims, {{ (claims | selectattr("status", "equalto", "unsupported") | list) | length }} unsupported)</h2>
+<table>
+  <thead><tr><th>section</th><th>kind</th><th>claim</th><th>status</th></tr></thead>
+  <tbody>
+  {% for c in claims %}
+  <tr>
+    <td class="dim">{{ c.section }}</td>
+    <td><span class="chip">{{ c.kind }}</span></td>
+    <td>{{ c.claim }}</td>
+    <td>{% if c.status == "verified" %}<span class="chip int">verified</span>
+      {% else %}<span class="chip dis">unsupported</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if fill_sheet %}
+<h2>fill sheet ({{ (fill_sheet | selectattr("confidence", "equalto", "missing") | selectattr("required") | list) | length }} required missing)</h2>
+<table>
+  <thead><tr><th>field</th><th>value</th><th>source</th><th>confidence</th></tr></thead>
+  <tbody>
+  {% for f in fill_sheet %}
+  <tr>
+    <td>{{ f.label }}{% if f.required %} *{% endif %}</td>
+    <td>{{ f.value if f.value is not none else "—" }}</td>
+    <td class="dim">{{ f.value_source | truncate(40) }}</td>
+    <td>
+      {% if f.confidence == "missing" %}<span class="chip dis">missing</span>
+      {% elif f.confidence == "policy" %}<span class="chip">policy</span>
+      {% else %}<span class="chip int">{{ f.confidence }}</span>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if resume_md %}
+<h2>resume</h2>
+<pre class="desc">{{ resume_md }}</pre>
+{% endif %}
+
+{% if cover_letter %}
+<h2>cover letter</h2>
+<pre class="desc">{{ cover_letter }}</pre>
+{% endif %}
+
+{% if tailor and (tailor.keyword_alignment or tailor.summary) %}
+<h2>tailor plan</h2>
+<p class="dim">
+  emphasis: {{ (tailor.skills_emphasis or []) | join(", ") or "—" }} ·
+  gaps: {{ (tailor.keyword_alignment.gaps or []) | join(", ") or "—" }} (not papered over)
+</p>
+{% endif %}
+{% endblock %}

@@ -189,6 +189,97 @@ def create_app() -> FastAPI:
             _run_output_holder["out"] = "run timed out after 900s (caps should prevent this)"
         return RedirectResponse("/discovery?ran=1", status_code=303)
 
+    @app.get("/applications", response_class=HTMLResponse)
+    def applications(request: Request):
+        conn = db.connect()
+        try:
+            packets = db.list_packets(conn)
+        finally:
+            conn.close()
+        manifests = []
+        for pk in packets:
+            manifest = {}
+            if pk["dir"]:
+                mp = Path(pk["dir"]) / "packet.yaml"
+                if mp.is_file():
+                    try:
+                        import yaml as _yaml
+
+                        manifest = _yaml.safe_load(mp.read_text(encoding="utf-8")) or {}
+                    except ValueError:
+                        manifest = {}
+            manifests.append({"row": pk, "manifest": manifest})
+        return TEMPLATES.TemplateResponse(
+            request, "applications.html",
+            {**ctx_common, "packets": manifests},
+        )
+
+    @app.get("/packet/{pid}", response_class=HTMLResponse)
+    def packet_detail(request: Request, pid: str):
+        conn = db.connect()
+        try:
+            pk = db.get_packet(conn, pid)
+            posting = db.get_posting(conn, pk["posting_id"]) if pk else None
+        finally:
+            conn.close()
+        if pk is None:
+            return RedirectResponse("/applications", status_code=303)
+        import yaml as _yaml
+
+        def _load(name):
+            fp = Path(pk["dir"] or "") / name
+            if not fp.is_file():
+                return None
+            try:
+                text = fp.read_text(encoding="utf-8")
+                return _yaml.safe_load(text) if name.endswith(".yaml") else text
+            except (ValueError, OSError):
+                return None
+
+        return TEMPLATES.TemplateResponse(
+            request, "packet_detail.html",
+            {
+                **ctx_common,
+                "pk": pk,
+                "posting": posting,
+                "manifest": _load("packet.yaml") or {},
+                "fill_sheet": (_load("fill_sheet.yaml") or {}).get("fields", []),
+                "claims": _load("claim_check.yaml") or [],
+                "resume_md": _load("resume.md"),
+                "cover_letter": _load("cover_letter.md"),
+                "tailor": _load("tailor.yaml") or {},
+            },
+        )
+
+    @app.post("/posting/{pid}/prepare")
+    def prepare_now(pid: str, dry_run: bool = Form(False)):
+        from jobscout.packets.orchestrator import PacketError, prepare_packet
+
+        db.init_db()
+        conn = db.connect()
+        try:
+            result = prepare_packet(conn, pid, dry_run=dry_run, force=True)
+        except PacketError as e:
+            conn.close()
+            return HTMLResponse(f"failed: {e}", status_code=400)
+        conn.close()
+        return RedirectResponse(f"/packet/{result['packet_id']}", status_code=303)
+
+    @app.post("/packet/{pid}/status")
+    def set_packet_status(pid: str, status: str = Form(...)):
+        conn = db.connect()
+        try:
+            ok = db.set_packet_status(conn, pid, status)
+            if ok and status in ("applied", "withdrawn"):
+                pk = db.get_packet(conn, pid)
+                if pk is not None:
+                    db.set_posting_status(
+                        conn, pk["posting_id"],
+                        "applied" if status == "applied" else "withdrawn")
+        finally:
+            conn.close()
+        return RedirectResponse(f"/packet/{pid}", status_code=303)
+
     @app.get("/ops", response_class=HTMLResponse)
     def ops(request: Request):
         conn = db.connect()

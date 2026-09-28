@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>applications — packet board</h1>
+<p class="dim">packets live in applications/ · status flow: drafting → needs_input → ready → filled → applied</p>
+{% if packets %}
+<table>
+  <thead><tr><th>packet</th><th>posting</th><th>company</th><th>status</th><th>cost</th><th>reasons</th><th>updated</th></tr></thead>
+  <tbody>
+  {% for item in packets %}
+  {% set pk = item.row %}
+  {% set m = item.manifest %}
+  <tr>
+    <td class="title"><a href="/packet/{{ pk.id }}">{{ pk.id }}</a></td>
+    <td class="dim">{{ (pk.posting_title or "") | truncate(40) }}</td>
+    <td>{{ pk.company_name or pk.company_id or "—" }}
+      {% if pk.tier %}<span class="chip tier-{{ pk.tier | lower }}">{{ pk.tier }}</span>{% endif %}
+    </td>
+    <td>
+      {% if pk.status == "ready" %}<span class="chip int">{{ pk.status }}</span>
+      {% elif pk.status == "applied" %}<span class="chip dis">{{ pk.status }}</span>
+      {% else %}<span class="chip">{{ pk.status }}</span>{% endif %}
+      {% if m.dry_run %}<span class="chip">dry-run</span>{% endif %}
+    </td>
+    <td class="num">${{ "%.4f" | format(pk.cost_usd or 0) }}</td>
+    <td class="dim">{{ ((m.reasons or []) | join("; ")) | truncate(70) }}</td>
+    <td class="dim">{{ (pk.updated_at or "")[:16] }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="dim">no packets yet — mark a posting interested, then press [prepare application] on its detail page, or run `jobscout prepare --posting &lt;id&gt; --dry-run`</p>
+{% endif %}
+{% endblock %}

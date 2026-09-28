@@ -350,7 +350,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
 
 # ── P2: rule verdicts, scores, statuses ──────────────────────────────────────
 
-ALLOWED_STATUSES = ("new", "interested", "dismissed", "withdrawn")
+ALLOWED_STATUSES = (
+    "new", "interested", "dismissed", "withdrawn",
+    "packet:drafting", "packet:needs_input", "packet:ready",
+    "filled", "applied",
+)
 
 
 def set_rule_pass(conn: sqlite3.Connection, posting_id: str, passed: bool) -> None:
@@ -534,3 +538,76 @@ def set_state(conn: sqlite3.Connection, key: str, value: str) -> None:
         (key, value),
     )
     conn.commit()
+
+
+# ── P6: packets ───────────────────────────────────────────────────────────────
+
+PACKET_STATUSES = (
+    "drafting", "needs_input", "ready", "filled", "applied", "withdrawn",
+)
+
+
+def upsert_packet(
+    conn: sqlite3.Connection,
+    *,
+    packet_id: str,
+    posting_id: str,
+    status: str,
+    dir_path: str | None = None,
+    model: str | None = None,
+    cost_usd: float = 0.0,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO packets (id, posting_id, status, dir, model, cost_usd,
+                             created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        ON CONFLICT(id) DO UPDATE SET
+            status = excluded.status,
+            dir = COALESCE(excluded.dir, dir),
+            model = COALESCE(excluded.model, model),
+            cost_usd = cost_usd + excluded.cost_usd,
+            updated_at = excluded.updated_at
+        """,
+        (packet_id, posting_id, status, dir_path, model, cost_usd),
+    )
+    conn.commit()
+
+
+def get_packet(conn: sqlite3.Connection, packet_id: str) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM packets WHERE id = ?", (packet_id,)
+    ).fetchone()
+
+
+def get_packet_for_posting(
+    conn: sqlite3.Connection, posting_id: str
+) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM packets WHERE posting_id = ? ORDER BY updated_at DESC LIMIT 1",
+        (posting_id,),
+    ).fetchone()
+
+
+def set_packet_status(conn: sqlite3.Connection, packet_id: str, status: str) -> bool:
+    if status not in PACKET_STATUSES:
+        return False
+    cur = conn.execute(
+        "UPDATE packets SET status = ?, updated_at = datetime('now') WHERE id = ?",
+        (status, packet_id),
+    )
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def list_packets(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT pk.*, p.title AS posting_title, p.company_id, p.url AS posting_url,
+               c.name AS company_name, c.tier
+        FROM packets pk
+        LEFT JOIN postings p ON pk.posting_id = p.id
+        LEFT JOIN companies c ON p.company_id = c.id
+        ORDER BY pk.updated_at DESC
+        """
+    ).fetchall()

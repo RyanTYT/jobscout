@@ -403,15 +403,111 @@ def stats() -> None:
 
 
 @app.command()
-def prepare(posting: str = typer.Option(..., "--posting", help="posting id")):
+def prepare(
+    posting: str = typer.Option(..., "--posting", help="posting id"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Use scripted fake models (no key needed)"),
+    force: bool = typer.Option(False, "--force", help="Regenerate even if a packet exists"),
+) -> None:
     """Generate an application packet for a selected posting (P6)."""
-    _stub(f"prepare --posting {posting}", "P6", "fill sheet + tailor + claim-check + typst render")
+    from jobscout.packets.orchestrator import PacketError, prepare_packet
+
+    db.init_db()
+    conn = db.connect()
+    try:
+        if not force and not dry_run:
+            existing = db.get_packet_for_posting(conn, posting)
+            if existing is not None:
+                console.print(
+                    f"[yellow]packet already exists[/] ({existing['id']}, status "
+                    f"{existing['status']}) — use --force to regenerate, or see "
+                    f"{existing['dir']}"
+                )
+                raise typer.Exit(0)
+        result = prepare_packet(conn, posting, dry_run=dry_run, force=force)
+    except PacketError as e:
+        console.print(f"[red]{e}[/]")
+        raise typer.Exit(1) from e
+    finally:
+        conn.close()
+    color = "green" if result["status"] == "ready" else "yellow"
+    console.print(f"[{color}]packet {result['status']}[/] · {result['packet_id']}")
+    console.print(f"  dir: {result['dir']}")
+    console.print(f"  cost: ${result['cost']:.4f}"
+                  + (f" · unsupported claims: {result['unsupported']}" if result["unsupported"] else ""))
+    for r in result["reasons"]:
+        console.print(f"  [yellow]![/] {r}")
 
 
 @app.command()
 def mark(vid: str, status: str = typer.Argument(...)) -> None:
     """Record an outcome: applied | dismissed | withdrawn (P6)."""
-    _stub(f"mark {vid} {status}", "P6", "status machine persistence")
+    db.init_db()
+    conn = db.connect()
+    try:
+        if not db.set_posting_status(conn, vid, status):
+            console.print(
+                f"[red]could not mark {vid} as {status!r}[/] "
+                "(unknown posting or status must be applied|dismissed|withdrawn)"
+            )
+            raise typer.Exit(1)
+        if status == "applied":
+            packet = db.get_packet_for_posting(conn, vid)
+            if packet is not None:
+                db.set_packet_status(conn, packet["id"], "applied")
+        console.print(f"[green]✓[/] {vid} → {status}")
+    finally:
+        conn.close()
+
+
+@app.command()
+def retro() -> None:
+    """Weekly retro (P6): labels vs scores → a proposed profile tweak (read-only)."""
+    conn = db.connect()
+    try:
+        rows = conn.execute(
+            "SELECT p.status, p.company_id, p.final_score, c.tier FROM postings p "
+            "LEFT JOIN companies c ON p.company_id = c.id "
+            "WHERE p.status IN ('interested', 'packet:drafting', 'packet:needs_input', "
+            "'packet:ready', 'applied', 'dismissed')"
+        ).fetchall()
+    finally:
+        conn.close()
+    by_status: dict[str, int] = {}
+    by_company: dict[str, list] = {}
+    for r in rows:
+        by_status[r["status"]] = by_status.get(r["status"], 0) + 1
+        key = r["company_id"] or "?"
+        by_company.setdefault(key, []).append(r)
+
+    t = Table(title=f"outcomes ({len(rows)} labelled postings)")
+    t.add_column("status")
+    t.add_column("count", justify="right")
+    for k in sorted(by_status):
+        t.add_row(k, str(by_status[k]))
+    console.print(t)
+
+    top = sorted(
+        by_company.items(),
+        key=lambda kv: sum(1 for r in kv[1] if r["status"] not in ("dismissed",)),
+        reverse=True,
+    )[:8]
+    console.print("most-engaged companies (interested+applied, not dismissed):")
+    for company, rs in top:
+        tiers = {r["tier"] for r in rs if r["tier"]}
+        avg = None
+        scores = [r["final_score"] for r in rs if r["final_score"] is not None]
+        if scores:
+            avg = sum(scores) / len(scores)
+        console.print(
+            f"  {company}: {len(rs)} postings"
+            + (f" · tier {', '.join(sorted(str(x) for x in tiers))}" if tiers else "")
+            + (f" · avg score {avg:.0f}" if avg else "")
+        )
+    console.print(
+        "[dim]proposal: promote companies with sustained engagement and check "
+        "whether their tier in profile.yaml matches reality. No file is changed "
+        "by retro — edit profile.yaml yourself.[/]"
+    )
 
 
 # ── db ───────────────────────────────────────────────────────────────────────

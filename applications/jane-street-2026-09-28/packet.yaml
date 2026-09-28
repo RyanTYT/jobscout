@@ -1,0 +1,20 @@
+packet_id: pk-dcc79e91a0b3
+posting_id: p_2026-09-28_b9b1f64f
+posting_title: ASIC Engineer
+company: Jane Street
+posting_url: https://www.janestreet.com/join-jane-street/apply/8213653002?gh_jid=8213653002
+status: needs_input
+reasons:
+- 'master resume missing 10 required field(s): Full Name, Email, Phone, Country, LinkedIn,
+  Current Company, Current Title, Years of Experience, Highest Degree, School'
+- typst not installed — resume.md only (brew install typst for PDF)
+model: fake-tailor
+cost_usd: 0.0
+generated: 2026-09-28T08:02Z
+dry_run: true
+files:
+- claim_check.yaml
+- cover_letter.md
+- fill_sheet.yaml
+- resume.md
+- tailor.yaml

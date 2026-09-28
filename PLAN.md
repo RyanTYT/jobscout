@@ -7,7 +7,7 @@
 | | |
 |---|---|
 | **Version** | 2.0 (pinned 2026-09-28) |
-| **Status** | P5 complete — agent harness live (tool loop, caps, morning reports, dashboard Discovery switch, --dry-run verified end-to-end); harness activates fully when an LLM key lands in .env · **Next: P6 — master-resume consumers: packets** |
+| **Status** | P6 complete — packet pipeline live end-to-end against the skeleton resume: fill sheet + tailored resume + cover letter + claim-check gate + rendering + Applications dashboard, verified with a real Jane Street posting (honest needs_input) · **Next: P7 — JobPilot sidecar integration** |
 | **Repo** | `/Users/user/Downloads/Personal Project/jobscout` (local only, no remote yet) |
 | **Sibling repos** | `../JobPilot` (the "hands", see §6) · `../rusty_trader` (unrelated) |
 | **Dev Mac rule** | This Mac develops only. **Never run `bootstrap.sh` here** — it installs launchd and belongs on the target/deployment Mac. |
@@ -527,18 +527,25 @@ the live-model path engages the moment an API key lands in .env.**
 - [x] SKILL.md full contract: morning routine, acting-as-the-agent section (resolve unresolved mentions, dark-pool deep-dives, propose-not-promote)
 - [x] Morning report: steps/cost header, final summary, DB-change diff, full tool log
 
-### P6 — Master-resume consumers: packets
-Done when: one selected posting → complete packet, claim-checked, PDF.
+### P6 — Master-resume consumers: packets ✅ (2026-09-28, skeleton-first)
+Done when: one selected posting → complete packet, claim-checked, PDF —
+**verified live with a real Jane Street ASIC Engineer posting via --dry-run
+(fake models): full packet written to applications/jane-street-2026-09-28/,
+honest `needs_input` listing the 10 required fields the skeleton resume is
+missing; status/packet rows in DB; Applications + packet dashboard pages
+verified (fill sheet, claim check, cover letter, mark-applied). PDF rendering
+activates when typst is installed (brew install typst); real tailoring and
+cover letters activate with the LLM key + filled resume.**
 
-- [ ] `packets/field_map.py`: canonical field map (§5.3) → fill sheet (§5.4) with confidence levels
-- [ ] `packets/tailor.py`: quality-tier selection plan (§5.5), master-resume fragments as context
-- [ ] `packets/claim_check.py` (§5.7): claim extraction + source matching; packet cannot go `ready` with unresolved `unsupported`
-- [ ] `templates/resume.typ` + typst render → PDF; resume.md
-- [ ] Cover letter generation (§5.6) grounded in `research/` notes + narrative refs
-- [ ] `applications/` packet layout + manifest; status machine in DB
-- [ ] Dashboard Applications page: packet board, previews, claim-check warnings, missing-values checklist
-- [ ] `jobscout prepare --posting ID` verb + `jobscout mark ID applied|dismissed`
-- [ ] Weekly retro: labels vs scores → proposed `profile.yaml` diff (human-approved)
+- [x] `packets/field_map.py`: canonical field map (§5.3) → fill sheet (§5.4) with confidence (exact/derived/policy/missing) + required-field detection
+- [x] `packets/tailor.py`: quality-tier selection plan (§5.5) with ID validation — unknown bullet/experience/project IDs are stripped and flagged, never trusted; FakeTailorModel for --dry-run
+- [x] `packets/claim_check.py` (§5.7): deterministic extraction (percents/money/durations/year-ranges/degrees/entities); corpus = master resume + posting; gate blocks `ready` on unsupported; fixed false positives (case-sensitive degree pattern, salutation entities)
+- [x] `templates/resume.typ` + typst render → PDF (activates when typst binary present); resume.md always; selection-plan applied to rendering with rephrase overrides
+- [x] Cover letter generation (§5.6) grounded in research/ notes + master resume; FakeCoverModel fact-free for --dry-run; output claim-checked
+- [x] `applications/{company}-{date}/` layout: packet.yaml manifest (status, reasons, cost, files), fill_sheet.yaml, tailor.yaml, claim_check.yaml, resume.md, cover_letter.md; DB packet rows + extended posting statuses (packet:needs_input/ready, filled, applied)
+- [x] Dashboard Applications page: packet board (status/cost/reasons) + packet detail (fill-sheet table, claim-check table, resume + cover letter inline, mark-applied/withdraw) + [prepare application]/[prepare (dry-run)] buttons on posting detail
+- [x] `jobscout prepare --posting ID [--dry-run|--force]` + `jobscout mark ID applied|dismissed|withdrawn` (mark-applied cascades to the packet row)
+- [x] Weekly retro: `jobscout retro` — outcome counts by status + most-engaged companies with avg scores; read-only proposal, no file changes
 
 ### P7 — JobPilot sidecar integration
 Done when: [Fill for me] fills a real form headfully and returns an auditable fill report.
@@ -590,6 +597,7 @@ Done when: [Fill for me] fills a real form headfully and returns an auditable fi
 | 2026-09-28 | Careers ladder (P3): board-link scan beats page scraping — discovered tokens are live-verified, then the standard ATS connector owns future pulls (watchlist self-heals); JS-rendered careers pages are honest dark-pool, not failures (sidecar render is P7) |
 | 2026-09-28 | Discovery (P4): HN comments rarely hyperlink — domains come from emails + bare mentions; discovered companies enter `candidates` with live ATS probing and domain-level dedup (name variants don't duplicate); unresolved RSS mentions stay company-NULL signals for the P5 agent |
 | 2026-09-28 | Agent (P5): no CodeMax inference key exists to borrow — key-agnostic build with `--dry-run` scripted model; harness tools are safe by construction (SELECT-only db_query, path-sanitized notes, domain-validated adds); tool calling added to LlmClient (response_format suppressed when tools present) |
+| 2026-09-28 | Packets (P6): skeleton-first — the pipeline runs end-to-end on the skeleton resume and reports honest `needs_input` (missing fields + missing key + missing typst are reasons, not failures); tailor plans are ID-validated (unknown refs stripped+flagged, never trusted); claim-check is deterministic (no-LLM) and runs even in dry-run; FakeTailorModel/FakeCoverModel are deliberately fact-free so the gate provably passes only honest content |
 | OPEN | Private remote vs local-only |
 | OPEN | Final name |
 
@@ -607,6 +615,6 @@ Done when: [Fill for me] fills a real form headfully and returns an auditable fi
 
 ## Appendix B — CLI surface
 
-Implemented (P0–P2): `jobscout doctor` (incl. source health) · `jobscout db init|status` · `jobscout config check|show` · `jobscout resume validate|fields` · `jobscout run [--daily|--force]` · `jobscout add-company` · `jobscout probe` · `jobscout digest` · `jobscout serve` · `jobscout score` · `jobscout stats` · `jobscout agent [--dry-run]` · `jobscout version`
+Implemented (P0–P2): `jobscout doctor` (incl. source health) · `jobscout db init|status` · `jobscout config check|show` · `jobscout resume validate|fields` · `jobscout run [--daily|--force]` · `jobscout add-company` · `jobscout probe` · `jobscout digest` · `jobscout serve` · `jobscout score` · `jobscout stats` · `jobscout agent [--dry-run]` · `jobscout prepare --posting ID [--dry-run|--force]` · `jobscout mark ID applied|dismissed|withdrawn` · `jobscout retro` · `jobscout version`
 
-Planned: `jobscout prepare --posting ID` (P6) · `jobscout mark ID applied|dismissed|withdrawn` (P6) · `jobscout fill --packet ID` (P7)
+Planned: `jobscout fill --packet ID` (P7)
