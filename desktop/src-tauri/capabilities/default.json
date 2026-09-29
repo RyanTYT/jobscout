@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "The desktop shell loads the local jobscout backend; no frontend capabilities are needed.",
   "windows": ["main", "error"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "opener:default"]
 }

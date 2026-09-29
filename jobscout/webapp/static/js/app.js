@@ -216,6 +216,35 @@
     sync();
   }
 
+  /* ── external links open in the DEFAULT BROWSER, not the webview ──────
+     In the Tauri app, the opener plugin hands the URL to the OS; in a
+     normal browser this is just a new tab. Internal app URLs never route
+     through here. */
+  function openExternal(url) {
+    var tauri = window.__TAURI__;
+    if (tauri && tauri.invoke) {
+      tauri.invoke("plugin:opener|open_url", { url: url })
+        .catch(function () { window.open(url, "_blank", "noopener"); });
+    } else {
+      window.open(url, "_blank", "noopener");
+    }
+  }
+
+  function isExternal(url) {
+    return /^(https?:)?\/\//i.test(url);
+  }
+
+  // target=_blank anchors (careers buttons, domain links, signal URLs,
+  // employer forms): the webview can't open real tabs — route them out
+  document.addEventListener("click", function (e) {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest("a[target=\"_blank\"]");
+    if (a && a.href && isExternal(a.href)) {
+      e.preventDefault();
+      openExternal(a.href);
+    }
+  });
+
   /* ── whole-row navigation: tr[data-row-link] ────────────────────────── */
   // plain left-clicks anywhere in the row navigate to its link; clicks on
   // real links/buttons/controls keep their own behaviour, and modifier
@@ -227,7 +256,12 @@
     if (!tr || !tr.getAttribute("data-row-link")) return;
     if (e.target.closest(
         "a, button, input, select, textarea, label, .form-check")) return;
-    window.location.assign(tr.getAttribute("data-row-link"));
+    var url = tr.getAttribute("data-row-link");
+    if (isExternal(url)) {
+      openExternal(url);              // careers page / company site
+    } else {
+      window.location.assign(url);    // internal detail pages
+    }
   });
 
   /* ── table sorting: a property of every .table component ────────────── */

@@ -28,7 +28,16 @@ def cfg_dir(tmp_path, monkeypatch):
     for name in CONFIG_FILES:
         src = REPO / "config" / name
         (d / name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    # config_dir is imported BY NAME into several modules — patch each
+    # (the profile-store lesson): core.config, watchlist, and the source
+    from jobscout import watchlist as _wl
+    from jobscout.core import config as _cc
+    from jobscout.core import paths as core_paths
+
     monkeypatch.setattr(core_config, "config_dir", lambda: d)
+    monkeypatch.setattr(_cc, "config_dir", lambda: d)
+    monkeypatch.setattr(_wl, "config_dir", lambda: d)
+    monkeypatch.setattr(core_paths, "config_dir", lambda: d)
     return d
 
 
@@ -129,7 +138,6 @@ def test_price_refresh_writes_matched_prices(cfg_dir, monkeypatch):
                  "pricing": {"prompt": "0.00000055", "completion": "0.00000219"}},
             ]}
 
-    import jobscout.webapp.models_store as ms_mod
 
     monkeypatch.setattr("httpx.get", lambda *a, **kw: FakeResp())
     monkeypatch.setenv("JOBSCOUT_LLM_BASE_URL", "https://api.example.com/v1")
@@ -148,7 +156,6 @@ def test_price_refresh_no_pricing_reports_clearly(cfg_dir, monkeypatch):
         def json(self):
             return {"data": [{"id": "deepseek/deepseek-chat"}]}
 
-    import jobscout.webapp.models_store as ms_mod
 
     monkeypatch.setattr("httpx.get", lambda *a, **kw: FakeResp())
     monkeypatch.setenv("JOBSCOUT_LLM_BASE_URL", "https://api.example.com/v1")
@@ -322,3 +329,65 @@ def test_companies_rows_link_and_provenance(client, cfg_dir):
            'data-row-link="' in r.text
     assert 'title="open ' in r.text
     assert 'href="https://janestreet.com"' in r.text      # domain cell link
+
+
+# ── seed-by-URL + profile-driven brief ─────────────────────────────────
+
+
+def test_brief_has_profile_driven_search_step():
+    import sqlite3
+
+    from jobscout.agent.brief import build_brief
+    from jobscout.core.config import load_settings
+    from jobscout.core.models import ProfileCfg, TargetCfg
+
+    profile = ProfileCfg(target=TargetCfg(
+        roles=["backend engineer"], stack=["rust"], domains=["execution"],
+        locations=["Singapore"], primary_locations=["Singapore"]))
+    brief = build_brief(sqlite3.connect(":memory:"), profile, load_settings())
+    assert "PROFILE-DRIVEN" in brief
+    assert "SIGNAL-DRIVEN" in brief
+    assert "<primary location>" in brief
+
+
+def test_seed_url_adds_company_candidate(client, cfg_dir):
+    r = client.post("/companies/add-url",
+                    data={"url": "https://quantacme.io/careers"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    from jobscout import watchlist as wlmod
+
+    # registrable domain of quantacme.io → company "Quantacme"
+    entry = [e for e in wlmod.load().candidates if e.domain == "quantacme.io"]
+    assert entry and entry[0].name == "Quantacme"
+    assert entry[0].found_via == "seed-url"
+    assert "quantacme.io/careers" in (entry[0].note or "")
+
+
+def test_seed_url_recognises_ats_board(client, cfg_dir):
+    r = client.post("/companies/add-url",
+                    data={"url": "https://boards.greenhouse.io/newco"},
+                    follow_redirects=False)
+    print("STATUS:", r.status_code, "| location:", r.headers.get("location"), "| body:", r.text[:200])
+    assert r.status_code == 303
+    from jobscout import watchlist as wlmod
+    tp = wlmod.path()
+    print("TMP path:", tp)
+    print("TMP tail:", tp.read_text()[-200:] if tp.is_file() else "MISSING")
+    print("REAL tail:", Path("config/watchlist.yaml").read_text()[-200:])
+    wl = wlmod.load()
+    entry = [e for e in wl.candidates if e.name == "Newco"]
+    assert entry and entry[0].ats == {"greenhouse": "newco"}
+
+
+def test_seed_url_rejects_duplicates(client, cfg_dir):
+    r = client.post("/companies/add-url", data={"url": "https://janestreet.com"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    assert "already" in r.headers["location"]
+
+
+def test_companies_page_has_seed_form(client):
+    r = client.get("/companies")
+    assert 'action="/companies/add-url"' in r.text
+    assert 'name="url"' in r.text

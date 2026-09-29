@@ -26,6 +26,24 @@
   </div>
 </div>
 
+{# ── seed a company from any URL: company site, careers page, or an ATS
+     board (boards.greenhouse.io/<token> pins the board token) ────────── #}
+<div class="card">
+  <div class="card-body py-2">
+    <form method="post" action="/companies/add-url" class="d-flex flex-wrap gap-2 align-items-end" data-busy-submit>
+      <div class="flex-grow-1" style="min-width: var(--field-min-w);">
+        <label class="form-label" for="f-seed-url">Add a company by URL</label>
+        <input class="form-control" type="text" id="f-seed-url" name="url"
+               placeholder="https://acme.com/careers — or boards.greenhouse.io/acme">
+        <div class="form-text">lands as a candidate; ATS board URLs are auto-recognised</div>
+      </div>
+      <button class="btn btn-primary btn-sm" type="submit">
+        {{ m.icon("spark", 12) }} seed company
+      </button>
+    </form>
+  </div>
+</div>
+
 <div class="row g-3">
 
   <div class="col-lg-8">

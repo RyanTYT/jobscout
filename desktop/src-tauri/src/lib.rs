@@ -45,6 +45,7 @@ impl log::Log for FileLogger {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // logger first — everything after lands in app-data/logs/desktop.log
             if let Ok(data_dir) = app.path().app_data_dir() {

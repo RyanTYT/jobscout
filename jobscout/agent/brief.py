@@ -40,9 +40,19 @@ ALREADY run today. Your value-add is judgment and open-ended search.
 Steps:
 1. Call get_context() first. Note the unresolved funding mentions — resolving
    one of those (find its domain via web_search) is high value.
-2. Sweep: 5-15 web searches. Generate your own queries (funding news for
-   relevant sectors, "we are hiring" posts, stealth startups in target
-   domains, exchanges/market-infra hiring). Do not repeat what's already known.
+2. Sweep: 5-15 web searches, mixing TWO kinds:
+   (a) PROFILE-DRIVEN — companies that fit the candidate profile itself,
+       not just today's signals. Build queries directly from the target
+       above: roles x stack x domains x locations. Examples (adapt, don't
+       copy): '"<stack keyword>" "<role>" <primary location> hiring',
+       'companies building <domain> in <primary location>',
+       '"<role>" <acceptable location> startup hiring'. The goal: find
+       EMPLOYERS whose business looks like this profile, then add_company
+       them.
+   (b) SIGNAL-DRIVEN — funding news for relevant sectors, "we are hiring"
+       posts, stealth startups in target domains, exchanges/market-infra
+       hiring.
+   Do not repeat what's already known.
 3. For each promising company found: add_company with a REAL domain (never
    invent) and a one-line reason citing your source.
 4. Record observations on known companies with add_signal (one-line, sourced).
