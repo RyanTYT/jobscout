@@ -23,6 +23,8 @@
   <div class="d-flex flex-wrap gap-2">
     {{ m.stat("companies", rows | length) }}
     {{ m.stat("signals", signals | length) }}
+    {{ m.stat("apply route", route_counts.apply, hint="postings match your profile") }}
+    {{ m.stat("email route", route_counts.email, hint="no match — email interest instead") }}
   </div>
 </div>
 
@@ -53,6 +55,7 @@
           <thead class="table-light">
             <tr>
               <th data-sort-key="company" scope="col">company</th>
+              <th scope="col">route</th>
               <th scope="col">tier</th>
               <th scope="col">domain</th>
               <th scope="col">boards</th>
@@ -71,6 +74,24 @@
                 {% if found_via.get(r.id) %}
                 {{ m.badge("via " + (found_via.get(r.id) | truncate(18)), "light",
                            "discovered by: " + found_via.get(r.id)) }}
+                {% endif %}
+              </td>
+              <td class="text-nowrap">
+                {% set route = routes.get(r.id) %}
+                {% if route.kind == "apply" %}
+                <a class="badge text-bg-success" title="{{ route.detail }}"
+                   href="{{ r.career_url or ('https://' + r.domain) if (r.career_url or r.domain) else '#' }}"
+                   {% if r.career_url or r.domain %}target="_blank" rel="noopener"{% endif %}>
+                  {{ m.icon("arrow-right", 10) }} apply</a>
+                {% elif route.kind == "email" %}
+                {%- set subject = "Interest in opportunities at " ~ r.name -%}
+                {%- set body = "Hello,~I'm a " ~ (target_roles | join(", ") if target_roles is defined else "engineer") ~
+                   " and your company is on my watchlist. I'd love to hear about any current or upcoming roles.~Best regards" -%}
+                <a class="badge text-bg-primary" title="{{ route.detail }}"
+                   href="mailto:{{ r.contact_email }}?subject={{ subject | urlencode }}&body={{ body | urlencode }}">
+                  {{ m.icon("news", 10) }} {{ route.label }}</a>
+                {% else %}
+                {{ m.badge(route.label, "light", route.detail) }}
                 {% endif %}
               </td>
               <td>{% if r.tier %}{{ m.badge(r.tier, "light") }}{% endif %}</td>

@@ -22,27 +22,30 @@ def upsert_company(
     tier: str | None = None,
     ats_tokens: dict[str, str] | None = None,
     career_url: str | None = None,
+    contact_email: str | None = None,
     notes: str | None = None,
 ) -> str:
     slug = slugify(name)
     now = _utcnow()
     conn.execute(
         """
-        INSERT INTO companies (id, name, domain, tier, ats_tokens, career_url, non_ats, notes,
+        INSERT INTO companies (id, name, domain, tier, ats_tokens, career_url,
+                               contact_email, non_ats, notes,
                                created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             domain = COALESCE(excluded.domain, domain),
             tier = COALESCE(excluded.tier, tier),
             ats_tokens = COALESCE(excluded.ats_tokens, ats_tokens),
             career_url = COALESCE(excluded.career_url, career_url),
+            contact_email = COALESCE(excluded.contact_email, contact_email),
             notes = COALESCE(excluded.notes, notes),
             updated_at = excluded.updated_at
         """,
         (
             slug, name, domain, tier, json.dumps(ats_tokens or {}), career_url,
-            0 if (ats_tokens) else 1, notes, now, now,
+            contact_email, 0 if (ats_tokens) else 1, notes, now, now,
         ),
     )
     conn.commit()
@@ -400,6 +403,8 @@ def company_summary(conn: sqlite3.Connection) -> list[sqlite3.Row]:
                (SELECT COUNT(*) FROM postings p WHERE p.company_id = c.id) AS postings_total,
                (SELECT COUNT(*) FROM postings p WHERE p.company_id = c.id AND p.status = 'new'
                   AND p.rule_pass = 1) AS rule_pass_new,
+               (SELECT COUNT(*) FROM postings p WHERE p.company_id = c.id
+                  AND p.rule_pass = 1) AS rule_pass_total,
                (SELECT COUNT(*) FROM signals s WHERE s.company_id = c.id) AS signal_count
         FROM companies c
         ORDER BY CASE c.tier WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 ELSE 3 END, c.name

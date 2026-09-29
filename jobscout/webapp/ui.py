@@ -199,6 +199,35 @@ class Pagination:
         return "&".join(parts)
 
 
+def company_route(row) -> dict:
+    """The application route per company (the Companies page's key column).
+
+    apply    — some posting on this company matches the hunting profile
+               (rule_pass): the direct application path is live.
+    email    — nothing matches, but a careers/contact inbox is known:
+               emailing interest is the way in.
+    monitor  — neither yet: keep watching (signals/crawls may change it).
+
+    row: a company_summary row (rule_pass_total, contact_email, ...).
+    """
+    if (row["rule_pass_total"] or 0) > 0:
+        return {"kind": "apply", "label": "apply",
+                "detail": "postings matching your profile — apply directly"}
+    if (row["contact_email"] or "").strip():
+        return {"kind": "email", "label": "email interest",
+                "detail": f"no matching postings — email {(row['contact_email'] or '').strip()}"}
+    return {"kind": "monitor", "label": "monitor",
+            "detail": "no matching postings and no contact inbox yet — watch signals"}
+
+
+def route_counts(rows) -> dict:
+    """Totals per route kind (for the page header)."""
+    out = {"apply": 0, "email": 0, "monitor": 0}
+    for r in rows:
+        out[company_route(r)["kind"]] += 1
+    return out
+
+
 def nav_counts(conn) -> dict:
     """Badge counts for the sidebar (per-status totals)."""
     rows = conn.execute(

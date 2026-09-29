@@ -21,7 +21,7 @@ def db_path() -> Path:
     return core_paths.db_path()
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS companies (
     tier        TEXT CHECK (tier IN ('A','B','C','candidate','dark')),
     ats_tokens  TEXT,                      -- JSON: {greenhouse: token, lever: token, ...}
     career_url  TEXT,
+    contact_email TEXT,                   -- careers/contact inbox (crawl or agent)
     non_ats     INTEGER NOT NULL DEFAULT 0,
     notes       TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
@@ -228,6 +229,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(postings)")}
     if "rule_pass" not in cols:
         conn.execute("ALTER TABLE postings ADD COLUMN rule_pass INTEGER")
+    ccols = {r[1] for r in conn.execute("PRAGMA table_info(companies)")}
+    if "contact_email" not in ccols:
+        conn.execute("ALTER TABLE companies ADD COLUMN contact_email TEXT")
 
 
 # ── P2: rule verdicts, scores, statuses ──────────────────────────────────────

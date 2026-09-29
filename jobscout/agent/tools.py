@@ -94,6 +94,7 @@ TOOLS_SPEC = [
                     "name": {"type": "string"},
                     "domain": {"type": "string", "description": "e.g. acme.com — must come from evidence, never invented"},
                     "note": {"type": "string", "description": "One-line reason + source"},
+                    "contact_email": {"type": "string", "description": "careers/contact inbox found on their careers page (a mailto: or jobs@/careers@/hiring@ address) — the interest-email route when no board exists"},
                 },
                 "required": ["name", "domain", "note"],
             },

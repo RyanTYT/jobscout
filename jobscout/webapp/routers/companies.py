@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from jobscout.core import db
 from jobscout.core.schema import WatchlistEntry
+from jobscout.webapp import ui
 from jobscout.webapp.common import (
     TEMPLATES,
 )
@@ -157,6 +158,8 @@ def register(app):
         finally:
             conn.close()
         row_boards = {r["id"]: extract_boards(r) for r in rows}
+        routes = {r["id"]: ui.company_route(r) for r in rows}
+        route_counts = ui.route_counts(rows)
         try:
             from jobscout.core.config import load_watchlist
 
@@ -172,7 +175,8 @@ def register(app):
         return TEMPLATES.TemplateResponse(
             request,
             "companies.html",
-            {**ctx, "rows": rows, "boards": row_boards, "signals": signals,
+            {**ctx, "rows": rows, "boards": row_boards, "routes": routes,
+             "route_counts": route_counts, "signals": signals,
              "kinds": kinds, "company_saved": company_saved == "1",
              "error": error, "found_via": found_via},
         )

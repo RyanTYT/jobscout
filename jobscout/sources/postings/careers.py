@@ -306,14 +306,69 @@ def _crawl_sitemap(
 # ── orchestrator ─────────────────────────────────────────────────────────────
 
 
+# careers/contact inboxes worth emailing; generic/no-reply addresses are noise
+_EMAIL_JUNK = (
+    "example.com", "sentry.io", "wixpress.com", "sentry-next.wixpress.com",
+    "domain.com", "yourcompany", "email.com", "acme.com", "test.com",
+    "googlemail.com", "wix.com", "squarespace.com", "cloudflare",
+)
+_EMAIL_PREFIX_JUNK = ("noreply", "no-reply", "donotreply", "postmaster",
+                      "webmaster", "abuse@", "privacy@", "unsubscribe")
+_EMAIL_RE = re.compile(
+    r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+
+
+def extract_contact_email(html: str) -> str | None:
+    """The best contact/careers inbox on a page, if any.
+
+    Preference: mailto: links (they're intentional contact points), then
+    any address whose local part mentions careers/jobs/hiring/apply —
+    then any non-generic address. Junk (noreply, example.com, tracker
+    domains, image namesakes) is filtered out.
+    """
+    if not html:
+        return None
+    mailtos = [m.group(1).lower() for m in re.finditer(
+        r"mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", html)]
+    plain = [m.group(0).lower() for m in _EMAIL_RE.finditer(html)]
+
+    def ok(addr: str) -> bool:
+        local, _, domain = addr.partition("@")
+        if any(j in addr for j in _EMAIL_PREFIX_JUNK):
+            return False
+        if any(domain.endswith(j) for j in _EMAIL_JUNK):
+            return False
+        # image/file namesakes: the regex swallowed the extension into the
+        # domain (logo@x.co.png) — reject whole-match file extensions
+        if any(addr.endswith(ext) for ext in
+               (".png", ".jpg", ".gif", ".webp", ".svg", ".jpeg", ".pdf")):
+            return False
+        return True
+
+    mailtos = [a for a in mailtos if ok(a)]
+    plain = [a for a in plain if ok(a)]
+    hiring_words = ("career", "job", "hiring", "apply", "recruit", "talent",
+                    "work", "cv", "resume")
+    for addr in mailtos:                      # 1. mailto with hiring intent
+        if any(w in addr for w in hiring_words):
+            return addr
+    for addr in plain:                        # 2. plain with hiring intent
+        if any(w in addr for w in hiring_words):
+            return addr
+    return mailtos[0] if mailtos else (plain[0] if plain else None)
+
+
 def crawl_company(domain: str | None, name: str, client: httpx.Client) -> dict:
     """Crawl one company's static careers presence.
 
-    Returns {"career_url", "board_tokens" (verified), "postings", "notes"}.
-    Board tokens beat page scraping: once discovered, the standard ATS
-    connector owns future pulls and the watchlist self-heals (§5.9).
+    Returns {"career_url", "contact_email", "board_tokens" (verified),
+    "postings", "notes"}. Board tokens beat page scraping: once
+    discovered, the standard ATS connector owns future pulls and the
+    watchlist self-heals (§5.9). The contact email is the fallback route:
+    companies with no board AND no matching postings are emailed interest.
     """
-    out: dict = {"career_url": None, "board_tokens": {}, "postings": [], "notes": []}
+    out: dict = {"career_url": None, "contact_email": None, "board_tokens": {},
+                 "postings": [], "notes": []}
     if not domain:
         out["notes"].append("no domain — careers crawl skipped")
         return out
@@ -323,6 +378,7 @@ def crawl_company(domain: str | None, name: str, client: httpx.Client) -> dict:
         out["notes"].append("no static careers page found (JS site? P7 sidecar)")
         return out
     out["career_url"] = fetched_url
+    out["contact_email"] = extract_contact_email(html)
 
     # 1. board links (careers page first, homepage as backup)
     tokens = scan_board_links(html)

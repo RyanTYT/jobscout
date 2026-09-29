@@ -115,7 +115,9 @@ def run_daily(force: bool = False) -> int:
                         postings_seen += len(res["postings"])
                     db.upsert_company(
                         conn, name=e.name, domain=e.domain, tier=tier,
-                        ats_tokens=(e.ats or None), career_url=res["career_url"],
+                        ats_tokens=(e.ats or None),
+                        career_url=res["career_url"],
+                        contact_email=res.get("contact_email"),
                         notes=e.note,
                     )
 
