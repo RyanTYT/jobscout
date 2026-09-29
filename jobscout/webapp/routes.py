@@ -255,12 +255,24 @@ def create_app() -> FastAPI:
         finally:
             conn.close()
         boards = {r["id"]: _boards(r) for r in rows}
+        try:
+            from jobscout.core.config import load_watchlist
+
+            wl = load_watchlist()
+            found_via = {
+                db.slugify(e.name): e.found_via
+                for tier in ("A", "B", "C", "candidates")
+                for e in getattr(wl, tier)
+                if e.found_via
+            }
+        except Exception:               # noqa: BLE001 — provenance optional
+            found_via = {}
         return TEMPLATES.TemplateResponse(
             request,
             "companies.html",
             {**ctx, "rows": rows, "boards": boards, "signals": signals,
              "kinds": kinds, "company_saved": company_saved == "1",
-             "error": error},
+             "error": error, "found_via": found_via},
         )
 
     # ── discovery ────────────────────────────────────────────────────────

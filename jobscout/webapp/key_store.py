@@ -86,7 +86,7 @@ def save_key(raw_key: str) -> dict:
 
 # ── CSE (search) keys — the agent's web-search tier ──────────────────────
 
-CSE_KEY_ENV = "JOBSCOUT_CSE_KEY"
+CSE_KEY_ENV = "JOBSCOUT_CSE_API_KEY"   # canonical name (tools + .env.example)
 CSE_CX_ENV = "JOBSCOUT_CSE_CX"
 
 

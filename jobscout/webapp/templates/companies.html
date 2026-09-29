@@ -46,10 +46,21 @@
           </thead>
           <tbody>
             {% for r in rows %}
-            <tr {% if r.career_url %}data-row-link="{{ r.career_url }}"{% endif %}>
-              <td class="fw-medium">{{ r.name }}</td>
+            <tr {% if r.career_url or r.domain %}data-row-link="{{ r.career_url or ('https://' + r.domain) }}"{% endif %}
+                title="{{ 'open ' + (r.career_url or ('https://' + r.domain)) }}">
+              <td class="fw-medium">
+                {{ r.name }}
+                {% if found_via.get(r.id) %}
+                {{ m.badge("via " + (found_via.get(r.id) | truncate(18)), "light",
+                           "discovered by: " + found_via.get(r.id)) }}
+                {% endif %}
+              </td>
               <td>{% if r.tier %}{{ m.badge(r.tier, "light") }}{% endif %}</td>
-              <td class="small text-secondary text-truncate" style="max-width: 12rem;">{{ r.domain or "—" }}</td>
+              <td class="small text-secondary text-truncate" style="max-width: 12rem;">
+                {% if r.domain %}<a class="text-secondary" href="https://{{ r.domain }}"
+                   target="_blank" rel="noopener">{{ r.domain }}</a>
+                {% else %}—{% endif %}
+              </td>
               <td>
                 {% if boards.get(r.id) %}
                   {% for prov, tok in boards.get(r.id) %}

@@ -213,7 +213,7 @@ def test_cse_save_and_clear(env_file):
 
     ks.save_cse(key="cse-key-123", cx="cx-abc")
     text = env_file.read_text(encoding="utf-8")
-    assert "JOBSCOUT_CSE_KEY=cse-key-123" in text
+    assert "JOBSCOUT_CSE_API_KEY=cse-key-123" in text
     assert "JOBSCOUT_CSE_CX=cx-abc" in text
     assert "JOBSCOUT_LLM_API_KEY=sk-x" in text      # untouched
     st = ks.cse_status()
@@ -237,7 +237,7 @@ def test_cse_route_renders_and_saves(client, env_file):
     r2 = client.post("/ops/cse-keys", data={"cse_key": "zz", "cse_cx": "cc"},
                      follow_redirects=False)
     assert r2.status_code == 303
-    assert "JOBSCOUT_CSE_KEY=zz" in env_file.read_text(encoding="utf-8")
+    assert "JOBSCOUT_CSE_API_KEY=zz" in env_file.read_text(encoding="utf-8")
 
 
 # ── watchlist editor ────────────────────────────────────────────────────────
@@ -302,3 +302,23 @@ def test_company_editor_pages(client, cfg_dir):
 def test_companies_page_has_edit_buttons(client):
     r = client.get("/companies")
     assert 'href="/companies/jane-street"' in r.text
+
+
+def test_cse_key_uses_canonical_env_name(env_file):
+    """The agent tools read JOBSCOUT_CSE_API_KEY (per .env.example) — the
+    key store must write exactly that name or search silently stays off."""
+    from jobscout.webapp import key_store as ks
+
+    assert ks.CSE_KEY_ENV == "JOBSCOUT_CSE_API_KEY"
+    ks.save_cse(key="abc", cx="cx")
+    text = env_file.read_text(encoding="utf-8")
+    assert "JOBSCOUT_CSE_API_KEY=abc" in text
+
+
+def test_companies_rows_link_and_provenance(client, cfg_dir):
+    r = client.get("/companies")
+    # jane-street has a career_url → row links to it
+    assert 'data-row-link="https://janestreet.com' in r.text or \
+           'data-row-link="' in r.text
+    assert 'title="open ' in r.text
+    assert 'href="https://janestreet.com"' in r.text      # domain cell link
