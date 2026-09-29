@@ -161,3 +161,22 @@ def test_mark_applied_updates_packet(conn, tmp_path, monkeypatch):
     core_db.get_packet_for_posting(conn, "p1")
     assert core_db.set_packet_status(conn, result["packet_id"], "applied")
     assert core_db.get_packet(conn, result["packet_id"])["status"] == "applied"
+
+
+def test_render_typst_pdf_end_to_end(tmp_path, monkeypatch):
+    """The PDF pipeline: template compiles with typst, data beside it."""
+    import shutil
+
+    from jobscout.core.resume import load_master_resume
+    from jobscout.packets import render
+
+    if shutil.which("typst") is None:
+        import pytest
+
+        pytest.skip("typst not installed")
+    resume = load_master_resume()
+    pdf = render.render_typst_pdf(tmp_path, None, resume)
+    assert pdf is not None and pdf.is_file() and pdf.stat().st_size > 1000
+    # the template is copied beside the data (typst path resolution)
+    assert (tmp_path / "resume.typ").is_file()
+    assert (tmp_path / "packet-data.json").is_file()

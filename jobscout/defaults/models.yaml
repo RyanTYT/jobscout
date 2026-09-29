@@ -20,11 +20,11 @@ tiers:
     price_out_per_mtok: 0.40
 
   quality:
-    model: deepseek/deepseek-reasoner
+    model: deepseek/deepseek-v4-pro
     max_daily_usd: 2.00
     purpose: resume tailoring, cover letters, profile distillation
-    price_in_per_mtok: 0.55
-    price_out_per_mtok: 2.19
+    price_in_per_mtok: 0.96
+    price_out_per_mtok: 1.91
 
 caps:
   monthly_usd: 15.0

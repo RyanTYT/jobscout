@@ -21,6 +21,7 @@ echo "── 1/2 freezing jobscout backend (PyInstaller onedir) ──"
   --add-data "$REPO/jobscout/webapp/templates:jobscout/webapp/templates" \
   --add-data "$REPO/jobscout/webapp/static:jobscout/webapp/static" \
   --add-data "$REPO/jobscout/defaults:jobscout/defaults" \
+  --add-data "$REPO/jobscout/packets/templates:jobscout/packets/templates" \
   freeze/entry.py
 
 echo "── 2/2 building the Tauri bundles ──"

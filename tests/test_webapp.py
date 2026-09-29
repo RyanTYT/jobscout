@@ -928,7 +928,8 @@ def test_run_cancel_kills_and_labels(client, monkeypatch):
             return self.returncode
 
     monkeypatch.setattr(subprocess, "Popen", FakePopen)
-    r = client.post("/discovery/run", follow_redirects=False)
+    r = client.post("/discovery/run", data={"focus": "profile"},
+                    follow_redirects=False)
     assert r.status_code == 303
     assert started.wait(5)
 
@@ -939,3 +940,17 @@ def test_run_cancel_kills_and_labels(client, monkeypatch):
             break
         time.sleep(0.1)
     assert _run_state["error"] == "run cancelled by you"
+
+
+def test_discovery_reports_read_from_runtime_root(client, monkeypatch, tmp_path):
+    """Reports live under the runtime root (JOBSCOUT_HOME in the packaged
+    app) — the route must not look inside the frozen bundle's templates
+    dir, which showed an empty table."""
+    from jobscout.core import paths as core_paths
+
+    (tmp_path / "morning_reports").mkdir()
+    (tmp_path / "morning_reports" / "2026-09-29.md").write_text(
+        "# report", encoding="utf-8")
+    monkeypatch.setattr(core_paths, "morning_reports_dir", lambda: tmp_path / "morning_reports")
+    r = client.get("/discovery")
+    assert "2026-09-29" in r.text

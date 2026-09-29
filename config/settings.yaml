@@ -45,4 +45,4 @@ run:
 
 search:
   provider: auto
-  llm_model: ""
+  llm_model: perplexity/sonar

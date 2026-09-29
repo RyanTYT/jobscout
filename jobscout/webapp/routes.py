@@ -401,7 +401,12 @@ def create_app() -> FastAPI:
             from jobscout.core.models import TargetCfg
 
             target = TargetCfg()
-        reports = sorted(BASE_DIR.parents[1].joinpath("morning_reports").glob("*.md"))
+        from jobscout.core import paths as core_paths
+
+        # morning_reports live under the runtime root (JOBSCOUT_HOME in the
+        # packaged app) — NOT relative to the webapp templates dir, which
+        # pointed inside the frozen bundle and showed an empty report list
+        reports = sorted(core_paths.morning_reports_dir().glob("*.md"))
         latest_report = None
         if reports:
             latest_report = {"name": reports[-1].name,
@@ -498,21 +503,33 @@ def create_app() -> FastAPI:
                 env = {**os.environ}
                 if focus:
                     env["JOBSCOUT_AGENT_FOCUS"] = focus
-                # Popen (not subprocess.run) so a cancel can kill mid-run
-                proc = subprocess.Popen(
-                    [cli, "agent"], stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE, text=True, env=env,
-                )
-                _run_state["proc"] = proc
-                try:
-                    out, err = proc.communicate(timeout=900)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    out, err = proc.communicate()
-                    _run_state["error"] = "run timed out after 900s"
-                    _run_state["out"] = _strip_ansi(
-                        (out or "") + (err or ""))[-8000:]
-                    return
+                # Full hunt = the daily sweep (ATS polling + careers crawl +
+                # scoring — what fills the inbox) THEN the morning agent.
+                # Profile hunt = the agent alone with a focused brief.
+                commands = ([cli, "agent"] if focus
+                            else [[cli, "run", "--daily"], [cli, "agent"]])
+                out, err, returncode = "", "", 0
+                for cmd in (commands if isinstance(commands[0], list)
+                            else [commands]):
+                    # Popen (not subprocess.run) so a cancel can kill mid-run
+                    proc = subprocess.Popen(
+                        cmd, stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE, text=True, env=env,
+                    )
+                    _run_state["proc"] = proc
+                    try:
+                        o, e = proc.communicate(timeout=900)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        o, e = proc.communicate()
+                        _run_state["error"] = "run timed out after 900s"
+                        _run_state["out"] = _strip_ansi(
+                            (out or "") + (err or "") + (o or "") + (e or "")
+                        )[-8000:]
+                        return
+                    out += (o or "")
+                    err += (e or "")
+                    returncode = returncode or proc.returncode
                 _run_state["out"] = _strip_ansi(
                     (out or "") + (err or ""))[-8000:]
                 if _run_state["cancel"]:

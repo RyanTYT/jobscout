@@ -121,7 +121,11 @@ def render_typst_pdf(out_dir: Path, plan: dict | None, resume: MasterResume) -> 
     typst = shutil.which("typst")
     if typst is None:
         return None
+    # repo checkout first; the frozen app falls back to the template
+    # bundled inside the jobscout package (packets/templates/resume.typ)
     template = core_paths.repo_root() / "templates" / "resume.typ"
+    if not template.is_file():
+        template = Path(__file__).resolve().parent / "templates" / "resume.typ"
     if not template.is_file():
         return None
 
@@ -129,23 +133,33 @@ def render_typst_pdf(out_dir: Path, plan: dict | None, resume: MasterResume) -> 
     links = [lk for lk in (ident.links.personal_website, ident.links.linkedin,
                             ident.links.github) if lk]
     sections = _selected_sections(plan, resume)
+    summary = sections["summary"]
+    if isinstance(summary, list):
+        summary = " ".join(str(x) for x in summary)
     data = {
         "name": ident.full_name or "",
         "contact": " · ".join(filter(None, [ident.email, ident.phone,
                                             ident.location.city])),
         "links": links,
-        "summary": sections["summary"],
+        "summary": summary,
         "experience": sections["experience"],
         "projects": sections["projects"],
         "skills": [
             {"area": a.area, "items": a.items} for a in resume.skills.core if a.items
         ],
     }
-    (out_dir / "packet-data.json").write_text(json.dumps(data, indent=1), encoding="utf-8")
+    # typst resolves --input paths (and json() paths) RELATIVE TO THE
+    # TEMPLATE FILE — so the template is copied next to the packet data
+    # and compiled from there: `json("packet-data.json")` just works.
+    local_template = out_dir / "resume.typ"
+    local_template.write_text(template.read_text(encoding="utf-8"),
+                              encoding="utf-8")
+    (out_dir / "packet-data.json").write_text(json.dumps(data, indent=1),
+                                              encoding="utf-8")
     try:
         proc = subprocess.run(
-            [typst, "compile", str(template), str(out_dir / "resume.pdf"),
-             "--input", f"data={out_dir / 'packet-data.json'}"],
+            [typst, "compile", str(local_template), str(out_dir / "resume.pdf"),
+             "--input", "data=packet-data.json"],
             capture_output=True, text=True, timeout=60,
         )
     except subprocess.TimeoutExpired:
