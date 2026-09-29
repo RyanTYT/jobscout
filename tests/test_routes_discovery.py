@@ -53,7 +53,7 @@ def test_run_agent_now_returns_immediately(client, monkeypatch):
 
 
 def test_run_panel_error_callout(client):
-    from jobscout.webapp import agent_runner as _ar
+    from jobscout.webapp.runners import agent_runner as _ar
 
     _ar._state.update(running=False, out="some output",
                       error="ConfigError: missing config file: models.yaml")
@@ -76,7 +76,7 @@ def test_run_panel_has_button_and_spend(client):
 
 
 def test_run_panel_running_state_polls(client):
-    from jobscout.webapp import agent_runner as _ar
+    from jobscout.webapp.runners import agent_runner as _ar
 
     _ar._state.update(running=True, out="", error="")
     try:
@@ -130,7 +130,7 @@ def test_run_cancel_kills_and_labels(client, monkeypatch):
     import threading
     import time
 
-    from jobscout.webapp import agent_runner as _ar
+    from jobscout.webapp.runners import agent_runner as _ar
 
     started = threading.Event()
 

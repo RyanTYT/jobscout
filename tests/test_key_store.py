@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jobscout.core import paths as core_paths
-from jobscout.webapp import key_store as ks
+from jobscout.webapp.stores import key_store as ks
 
 ENV_HEADER = "# test env\nOTHER=value\n"
 

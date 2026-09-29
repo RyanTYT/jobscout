@@ -8,13 +8,13 @@ from fastapi import Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from jobscout.core import db
-from jobscout.webapp import agent_runner
 from jobscout.webapp.common import (
     TEMPLATES,
 )
 from jobscout.webapp.common import (
     ctx as page_ctx,
 )
+from jobscout.webapp.runners import agent_runner
 
 
 def register(app):
@@ -61,7 +61,7 @@ def register(app):
     async def ops_search_provider(request: Request):
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import settings_store
+        from jobscout.webapp.stores import settings_store
 
         form = await request.form()
         try:
@@ -79,7 +79,7 @@ def register(app):
         """models.yaml editor: tier models + prices + caps, with rollback."""
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import models_store
+        from jobscout.webapp.stores import models_store
 
         form = await request.form()
         tiers = {
@@ -106,7 +106,7 @@ def register(app):
         (OpenRouter-style) and update models.yaml prices only."""
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import models_store
+        from jobscout.webapp.stores import models_store
 
         try:
             result = models_store.refresh_prices()
@@ -127,7 +127,7 @@ def register(app):
         """Search keys (JOBSCOUT_CSE_KEY / JOBSCOUT_CSE_CX) into .env."""
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import key_store
+        from jobscout.webapp.stores import key_store
 
         form = await request.form()
         try:
@@ -140,7 +140,7 @@ def register(app):
 
     @app.post("/ops/cse-keys/clear")
     def ops_cse_clear():
-        from jobscout.webapp import key_store
+        from jobscout.webapp.stores import key_store
 
         key_store.clear_cse()
         return RedirectResponse("/ops?key_saved=1", status_code=303)
@@ -149,7 +149,7 @@ def register(app):
     async def ops_brave_save(request: Request):
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import key_store
+        from jobscout.webapp.stores import key_store
 
         form = await request.form()
         try:
@@ -161,7 +161,7 @@ def register(app):
 
     @app.post("/ops/brave-key/clear")
     def ops_brave_clear():
-        from jobscout.webapp import key_store
+        from jobscout.webapp.stores import key_store
 
         key_store.clear_brave()
         return RedirectResponse("/ops?key_saved=1", status_code=303)
@@ -172,7 +172,7 @@ def register(app):
         The key itself is never rendered back — only a masked tail."""
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import key_store
+        from jobscout.webapp.stores import key_store
 
         form = await request.form()
         try:
@@ -184,7 +184,7 @@ def register(app):
 
     @app.post("/ops/llm-key/clear")
     async def ops_llm_key_clear(request: Request):
-        from jobscout.webapp import key_store
+        from jobscout.webapp.stores import key_store
 
         key_store.clear_key()
         return RedirectResponse("/ops?key_saved=1", status_code=303)
@@ -196,7 +196,7 @@ def register(app):
             models_refreshed: str = Query(""),
             search_saved: str = Query("")):
         from jobscout.core import config as core_config
-        from jobscout.webapp import key_store, models_store
+        from jobscout.webapp.stores import key_store, models_store
 
         try:
             cse_status = key_store.cse_status()

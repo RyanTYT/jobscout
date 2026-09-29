@@ -12,9 +12,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jobscout.core import config as core_config
-from jobscout.webapp import models_store as ms
-from jobscout.webapp import settings_store as ss
-from jobscout.webapp import watchlist_store as ws
+from jobscout.webapp.stores import models_store as ms
+from jobscout.webapp.stores import settings_store as ss
+from jobscout.webapp.stores import watchlist_store as ws
 
 REPO = Path(__file__).resolve().parents[1]
 CONFIG_FILES = ("models.yaml", "settings.yaml", "watchlist.yaml",
@@ -210,7 +210,7 @@ def env_file(tmp_path, monkeypatch):
 
 
 def test_cse_save_and_clear(env_file):
-    from jobscout.webapp import key_store as ks
+    from jobscout.webapp.stores import key_store as ks
 
     ks.save_cse(key="cse-key-123", cx="cx-abc")
     text = env_file.read_text(encoding="utf-8")
@@ -224,7 +224,7 @@ def test_cse_save_and_clear(env_file):
 
 
 def test_cse_empty_fields_keep_existing(env_file):
-    from jobscout.webapp import key_store as ks
+    from jobscout.webapp.stores import key_store as ks
 
     ks.save_cse(key="keep-me", cx="keep-cx")
     ks.save_cse(key="", cx="")
@@ -308,7 +308,7 @@ def test_companies_page_has_edit_buttons(client):
 def test_cse_key_uses_canonical_env_name(env_file):
     """The agent tools read JOBSCOUT_CSE_API_KEY (per .env.example) — the
     key store must write exactly that name or search silently stays off."""
-    from jobscout.webapp import key_store as ks
+    from jobscout.webapp.stores import key_store as ks
 
     assert ks.CSE_KEY_ENV == "JOBSCOUT_CSE_API_KEY"
     ks.save_cse(key="abc", cx="cx")
@@ -349,7 +349,7 @@ def test_seed_url_adds_company_candidate(client, cfg_dir):
                     data={"url": "https://quantacme.io/careers"},
                     follow_redirects=False)
     assert r.status_code == 303
-    from jobscout import watchlist as wlmod
+    from jobscout.core import watchlist as wlmod
 
     # registrable domain of quantacme.io → company "Quantacme"
     entry = [e for e in wlmod.load().candidates if e.domain == "quantacme.io"]
@@ -364,7 +364,7 @@ def test_seed_url_recognises_ats_board(client, cfg_dir):
                     follow_redirects=False)
     print("STATUS:", r.status_code, "| location:", r.headers.get("location"), "| body:", r.text[:200])
     assert r.status_code == 303
-    from jobscout import watchlist as wlmod
+    from jobscout.core import watchlist as wlmod
     tp = wlmod.path()
     print("TMP path:", tp)
     print("TMP tail:", tp.read_text()[-200:] if tp.is_file() else "MISSING")
@@ -391,7 +391,7 @@ def test_companies_page_has_seed_form(client):
 
 
 def test_brave_save_status_clear(env_file):
-    from jobscout.webapp import key_store as ks
+    from jobscout.webapp.stores import key_store as ks
 
     st = ks.brave_status()
     assert not st["key_set"]
@@ -436,7 +436,7 @@ def test_search_provider_dispatch_contract():
 
 
 def test_search_settings_roundtrip_and_append(cfg_dir):
-    from jobscout.webapp import settings_store as ss
+    from jobscout.webapp.stores import settings_store as ss
 
     # the repo settings.yaml ships a search: block (sonar default); save
     # must rewrite it in place either way
@@ -451,7 +451,7 @@ def test_search_settings_roundtrip_and_append(cfg_dir):
 
 
 def test_search_settings_llm_needs_model(cfg_dir):
-    from jobscout.webapp import settings_store as ss
+    from jobscout.webapp.stores import settings_store as ss
 
     before = (cfg_dir / "settings.yaml").read_bytes()
     with pytest.raises(ss.SettingsStoreError):

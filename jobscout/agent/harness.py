@@ -17,7 +17,7 @@ from pathlib import Path
 
 from jobscout.agent import tools as agent_tools
 from jobscout.agent.brief import build_brief
-from jobscout.llm import CapExceeded, LlmError, LlmResponse, ToolCall
+from jobscout.clients.llm import CapExceeded, LlmError, LlmResponse, ToolCall
 
 MAX_TOOL_RESULT_CHARS = 4000
 

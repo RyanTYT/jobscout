@@ -16,7 +16,7 @@ from pathlib import Path
 
 from jobscout.core import config as core_config
 from jobscout.core import paths as core_paths
-from jobscout.webapp import config_store as cs
+from jobscout.webapp.stores import config_store as cs
 
 # tokens the rule gate can actually produce (rules._SENIORITY_PATTERNS)
 LEVEL_TOKENS = ("junior", "senior", "staff", "lead",

@@ -154,7 +154,7 @@ def _refresh(conn) -> None:
         return
     packets = {r[0] for r in active}
     # the sidecar singleton is imported lazily: apply.py owns it
-    from jobscout.webapp.apply import get_sidecar
+    from jobscout.webapp.runners.apply import get_sidecar
 
     client = get_sidecar()
     if client is None:

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import json
 
+from jobscout.clients.llm import LlmError, LlmResponse
 from jobscout.core.schema import MasterResume
-from jobscout.llm import LlmError, LlmResponse
 
 SYSTEM = (
     "You tailor resumes strictly by SELECTION. You are given master-resume "

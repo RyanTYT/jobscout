@@ -8,13 +8,13 @@ from fastapi import Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from jobscout.core import db
-from jobscout.webapp import agent_runner
 from jobscout.webapp.common import (
     TEMPLATES,
 )
 from jobscout.webapp.common import (
     ctx as page_ctx,
 )
+from jobscout.webapp.runners import agent_runner
 
 
 def register(app):
@@ -24,7 +24,7 @@ def register(app):
                        saved: str = Query(""), error: str = Query(""),
                        caps_saved: str = Query("")):
         from jobscout.core.config import load_settings
-        from jobscout.webapp import targeting_store
+        from jobscout.webapp.stores import targeting_store
 
         settings = load_settings()
         conn = db.connect()
@@ -149,7 +149,7 @@ def register(app):
         """Agent caps editor: schedule, step cap, cost cap, run-on-signal."""
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import settings_store
+        from jobscout.webapp.stores import settings_store
 
         form = await request.form()
         try:
@@ -171,7 +171,7 @@ def register(app):
         with validation + rollback; version bump re-scores the LLM cache."""
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import targeting_store
+        from jobscout.webapp.stores import targeting_store
 
         form = await request.form()
         try:

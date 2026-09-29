@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import json
 
+from jobscout.clients.llm import CapExceeded, LlmClient, LlmError
 from jobscout.core import db
 from jobscout.core.schema import ProfileCfg
-from jobscout.llm import CapExceeded, LlmClient, LlmError
 
 TIER_SCORES = {"A": 90, "B": 70, "C": 50, "candidate": 30}
 

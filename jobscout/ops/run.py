@@ -11,12 +11,12 @@ import time
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
-from jobscout import digest, watchlist
-from jobscout.core import db
+from jobscout.core import db, watchlist
 from jobscout.core.config import load_profile, load_settings
+from jobscout.ops import digest
 from jobscout.scoring.rules import guess_seniority, rule_filter
-from jobscout.sources import careers_page
 from jobscout.sources.postings import FETCHERS
+from jobscout.sources.postings import careers as careers_page
 from jobscout.sources.postings.base import make_client
 
 
@@ -181,7 +181,7 @@ def run_daily(force: bool = False) -> int:
     # ── tier-1 bulk scoring (P2): cheap LLM on rule-pass, cap-respecting ─────
     scored_stats: dict | None = None
     try:
-        from jobscout.llm import LlmClient
+        from jobscout.clients.llm import LlmClient
         from jobscout.scoring import llm_bulk
 
         llm = LlmClient(conn=conn)

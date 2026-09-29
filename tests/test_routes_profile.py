@@ -34,12 +34,12 @@ def test_profile_save_roundtrip(client, monkeypatch):
     import shutil
     import tempfile
 
-    from jobscout.webapp import profile_store
+    from jobscout.webapp.stores import profile_store
     tmp = Path(tempfile.mkdtemp()) / "master_resume"
     tmp.mkdir()
     shutil.copytree(core_resume_dir(), tmp, dirs_exist_ok=True)
     monkeypatch.setattr(
-        "jobscout.webapp.profile_store.master_resume_dir", lambda: tmp)
+        "jobscout.webapp.stores.profile_store.master_resume_dir", lambda: tmp)
     monkeypatch.setattr(
         "jobscout.core.resume.master_resume_dir", lambda: tmp)
 
@@ -81,7 +81,7 @@ def test_profile_save_invalid_rolls_back(client, monkeypatch):
     tmp.mkdir()
     shutil.copytree(core_resume_dir(), tmp, dirs_exist_ok=True)
     monkeypatch.setattr(
-        "jobscout.webapp.profile_store.master_resume_dir", lambda: tmp)
+        "jobscout.webapp.stores.profile_store.master_resume_dir", lambda: tmp)
     monkeypatch.setattr(
         "jobscout.core.resume.master_resume_dir", lambda: tmp)
 
@@ -94,7 +94,7 @@ def test_profile_save_invalid_rolls_back(client, monkeypatch):
         raise cr.ResumeError("boom")
     monkeypatch.setattr(cr, "load_master_resume", broken)
     monkeypatch.setattr(
-        "jobscout.webapp.profile_store.core_resume.load_master_resume", broken)
+        "jobscout.webapp.stores.profile_store.core_resume.load_master_resume", broken)
 
     r = client.post("/profile/save", data={"f_full_name": "X"},
                     follow_redirects=False)
@@ -116,7 +116,7 @@ def test_resume_upload_replaces_with_backup(client, monkeypatch, tmp_path):
     _sh.copytree(real, tmp_path, dirs_exist_ok=True)
     monkeypatch.setattr(core_paths, "master_resume_dir", lambda: tmp_path)
     monkeypatch.setattr(cr, "master_resume_dir", lambda: tmp_path)
-    monkeypatch.setattr("jobscout.webapp.profile_store.master_resume_dir",
+    monkeypatch.setattr("jobscout.webapp.stores.profile_store.master_resume_dir",
                         lambda: tmp_path)
     before = (tmp_path / "resume.yaml").read_text(encoding="utf-8")
 
@@ -145,7 +145,7 @@ def test_resume_upload_invalid_rejected_untouched(client, monkeypatch, tmp_path)
     _sh.copytree(real, tmp_path, dirs_exist_ok=True)
     monkeypatch.setattr(core_paths, "master_resume_dir", lambda: tmp_path)
     monkeypatch.setattr(cr, "master_resume_dir", lambda: tmp_path)
-    monkeypatch.setattr("jobscout.webapp.profile_store.master_resume_dir",
+    monkeypatch.setattr("jobscout.webapp.stores.profile_store.master_resume_dir",
                         lambda: tmp_path)
     before = (tmp_path / "resume.yaml").read_text(encoding="utf-8")
 

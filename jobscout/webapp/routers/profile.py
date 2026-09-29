@@ -36,7 +36,7 @@ def register(app):
         Validated against the schema first; the old file is kept as .bak."""
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import profile_store
+        from jobscout.webapp.stores import profile_store
 
         form = await request.form()
         upload = form.get("resume_file")
@@ -68,7 +68,7 @@ def register(app):
     def profile_page(request: Request, saved: str = Query(""),
                      uploaded: str = Query(""), upload_error: str = Query(""),
                      fields: str = Query("")):
-        from jobscout.webapp import profile_store
+        from jobscout.webapp.stores import profile_store
 
         conn = db.connect()
         try:
@@ -97,7 +97,7 @@ def register(app):
 
     @app.post("/profile/save")
     async def profile_save(request: Request):
-        from jobscout.webapp import profile_store
+        from jobscout.webapp.stores import profile_store
 
         form = dict(await request.form())
         try:

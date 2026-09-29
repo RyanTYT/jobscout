@@ -14,7 +14,8 @@ from urllib.parse import quote
 from fastapi.templating import Jinja2Templates
 
 from jobscout import __version__
-from jobscout.webapp import agent_runner, ui
+from jobscout.webapp import ui
+from jobscout.webapp.runners import agent_runner
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -27,7 +28,7 @@ def ctx(active: str, conn) -> dict:
     """Nav context: counts + the profile-missing badge."""
     counts = ui.nav_counts(conn)
     try:
-        from jobscout.webapp import profile_store
+        from jobscout.webapp.stores import profile_store
         counts["profile_missing"] = len(profile_store.missing_required())
     except Exception:  # noqa: BLE001 — resume unreadable must not kill nav
         counts["profile_missing"] = 0

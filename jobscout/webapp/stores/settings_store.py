@@ -14,7 +14,7 @@ from pathlib import Path
 
 from jobscout.core import config as core_config
 from jobscout.core import paths as core_paths
-from jobscout.webapp import config_store as cs
+from jobscout.webapp.stores import config_store as cs
 
 SCHEDULES = ("daily", "weekdays", "mon-wed-fri", "manual")
 SEARCH_PROVIDERS = ("auto", "cse", "brave", "llm", "ddg")

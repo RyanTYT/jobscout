@@ -49,7 +49,7 @@ def test_applications_apply_launches_and_redirects(client, db_file, monkeypatch)
                             status="opened", detail="test")
         return {"automated": [], "assisted": ids, "note": []}
 
-    from jobscout.webapp import apply as apply_mod
+    from jobscout.webapp.runners import apply as apply_mod
     monkeypatch.setattr(apply_mod, "launch_apply", fake_launch)
     r = client.post("/applications/apply", data={"pk": "pk_w1"},
                     follow_redirects=False)
@@ -64,7 +64,7 @@ def test_applications_apply_launches_and_redirects(client, db_file, monkeypatch)
 def test_applications_apply_error_redirects(client, db_file, monkeypatch):
     _seed_packet(db_file, db_file.parent)
 
-    from jobscout.webapp import apply as apply_mod
+    from jobscout.webapp.runners import apply as apply_mod
     def boom(conn, ids):
         raise apply_mod.ApplyError("nope")
 

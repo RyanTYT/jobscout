@@ -66,7 +66,7 @@ def prepare_packet(conn, posting_id: str, *, dry_run: bool = False,
         llm = FakeTailorModel()
         model = "fake-tailor"
     else:
-        from jobscout.llm import LlmClient
+        from jobscout.clients.llm import LlmClient
 
         client = LlmClient(conn=conn)
         if client.available:

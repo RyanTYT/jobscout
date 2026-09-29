@@ -4,9 +4,9 @@ in research notes + master resume. The claim-check gate screens the output.
 
 from __future__ import annotations
 
+from jobscout.clients.llm import LlmError, LlmResponse
 from jobscout.core.paths import research_dir
 from jobscout.core.schema import MasterResume
-from jobscout.llm import LlmError, LlmResponse
 
 SYSTEM = (
     "You write concise, honest cover letters (250-350 words, first person). "

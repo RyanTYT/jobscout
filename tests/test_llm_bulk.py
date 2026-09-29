@@ -7,9 +7,9 @@ import sqlite3
 
 import pytest
 
+from jobscout.clients.llm import LlmResponse
 from jobscout.core import db as core_db
 from jobscout.core.schema import ProfileCfg
-from jobscout.llm import LlmResponse
 from jobscout.scoring import llm_bulk
 
 

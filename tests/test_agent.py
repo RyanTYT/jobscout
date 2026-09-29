@@ -30,7 +30,7 @@ def conn():
 
 @pytest.fixture()
 def wl():
-    from jobscout import watchlist as wlmod
+    from jobscout.core import watchlist as wlmod
 
     w = wlmod.Watchlist()
     w.B.append(

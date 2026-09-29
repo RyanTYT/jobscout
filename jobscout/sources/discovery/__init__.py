@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import httpx
 
-from jobscout import watchlist as wlmod
 from jobscout.core import db
+from jobscout.core import watchlist as wlmod
 from jobscout.core.schema import ProfileCfg, Settings, WatchlistEntry
 from jobscout.sources.discovery import cse, github, hn, news, rss
 from jobscout.sources.discovery.blocklist import BLOCKED_DOMAINS, is_blocked  # noqa: F401

@@ -10,7 +10,7 @@ import textwrap
 import pytest
 
 from jobscout.core import db
-from jobscout.webapp import apply as apply_mod
+from jobscout.webapp.runners import apply as apply_mod
 
 # ── test data ───────────────────────────────────────────────────────────────
 
@@ -281,7 +281,7 @@ def test_jobscout_home_unset_uses_repo(monkeypatch):
 
 
 def test_sidecar_env_override(monkeypatch, tmp_path):
-    from jobscout.sidecar import SidecarClient
+    from jobscout.clients.sidecar import SidecarClient
 
     fake = tmp_path / "bundled-sidecar.js"
     fake.write_text("// sidecar")

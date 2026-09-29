@@ -1,13 +1,13 @@
 """webapp/watchlist_store.py — form adapter for the company editor.
 
 The entry-mutation logic (find/render/tier-move/rollback) lives in ONE
-place: jobscout.watchlist.update_entry. This module only translates
+place: jobscout.core.watchlist.update_entry. This module only translates
 form fields (comma text, per-line ats pairs) into that call.
 """
 
 from __future__ import annotations
 
-from jobscout import watchlist as wlmod
+from jobscout.core import watchlist as wlmod
 
 TIERS = wlmod.TIER_KEYS
 

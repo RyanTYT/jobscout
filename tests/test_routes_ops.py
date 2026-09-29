@@ -5,7 +5,7 @@ from __future__ import annotations
 
 
 def test_ops_spend_partial_polls_while_running(client):
-    from jobscout.webapp import agent_runner as _ar
+    from jobscout.webapp.runners import agent_runner as _ar
 
     _ar._state.update(running=True, out="", error="")
     try:
@@ -26,7 +26,7 @@ def test_credentials_card_replace_and_remove_semantics(client, db_file):
     assert "remove key" not in r.text
     import pathlib
 
-    from jobscout.webapp import key_store as _ks
+    from jobscout.webapp.stores import key_store as _ks
 
     fake = pathlib.Path("/tmp/_fake.env")
     fake.write_text("JOBSCOUT_LLM_API_KEY=sk-zzz\n", encoding="utf-8")

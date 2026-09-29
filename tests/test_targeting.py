@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jobscout.core import config as core_config
-from jobscout.webapp import targeting_store as ts
+from jobscout.webapp.stores import targeting_store as ts
 
 PROFILE = (Path(__file__).resolve().parents[1]
            / "config" / "profile.yaml").read_text(encoding="utf-8")

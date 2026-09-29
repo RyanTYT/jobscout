@@ -28,9 +28,9 @@ import threading
 from pathlib import Path
 from urllib.parse import urlparse
 
+from jobscout.clients.sidecar import SidecarClient
 from jobscout.core import db
 from jobscout.core import paths as core_paths
-from jobscout.sidecar import SidecarClient
 
 _SIDE_LOCK = threading.Lock()
 _SIDE: SidecarClient | None = None

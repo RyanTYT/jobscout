@@ -231,7 +231,7 @@ def _llm_search(query: str, n: int, ctx: AgentCtx) -> str | None:
         return None
     import json as _json
 
-    from jobscout.llm import LlmClient, LlmError
+    from jobscout.clients.llm import LlmClient, LlmError
 
     prompt = (
         f"Search the web for: {query}\n"
@@ -367,7 +367,7 @@ def _add_company(name: str, domain: str, note: str, ctx: AgentCtx) -> str:
 
 
 def _add_signal(company_name: str, kind: str, note: str, ctx: AgentCtx) -> str:
-    from jobscout import watchlist as wlmod
+    from jobscout.core import watchlist as wlmod
 
     found = wlmod.find(ctx.wl, company_name or "")
     company_id = found[1] and db.slugify(found[1].name) if found else None

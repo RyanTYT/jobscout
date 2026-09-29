@@ -94,7 +94,7 @@ def init_home() -> None:
 @app.command()
 def doctor() -> None:
     """Health-check the whole stack. Exit 1 on any failure."""
-    from jobscout.doctor import run_checks
+    from jobscout.ops.doctor import run_checks
 
     checks = run_checks()
     table = Table(title="jobscout doctor", show_lines=False)
@@ -137,7 +137,7 @@ def run(
     force: bool = typer.Option(False, "--force", help="Ignore the freshness idempotency check"),
 ) -> None:
     """Pull watchlist ATS boards → dedup → rule filter → markdown digest (P1)."""
-    from jobscout.run import run_daily
+    from jobscout.ops.run import run_daily
 
     raise typer.Exit(run_daily(force=force or not daily))
 
@@ -153,7 +153,7 @@ def add_company(
     no_probe: bool = typer.Option(False, "--no-probe", help="Skip ATS board probing"),
 ) -> None:
     """Add a company to the watchlist (ATS boards probed automatically, P1)."""
-    from jobscout import watchlist as wlmod
+    from jobscout.core import watchlist as wlmod
     from jobscout.core.schema import WatchlistEntry
     from jobscout.sources.postings.base import make_client
     from jobscout.sources.postings.probe import probe_company
@@ -222,7 +222,7 @@ def probe(
     no_careers: bool = typer.Option(False, "--no-careers", help="Skip careers-page discovery"),
 ) -> None:
     """Probe ATS boards + careers page for a company (the full ATS-absence probe, P3)."""
-    from jobscout.sources import careers_page
+    from jobscout.sources.postings import careers as careers_page
     from jobscout.sources.postings.base import make_client
     from jobscout.sources.postings.probe import probe_company
 
@@ -281,8 +281,8 @@ def agent(
     """
     import os
 
-    from jobscout import watchlist as wlmod
     from jobscout.core import db as dbmod
+    from jobscout.core import watchlist as wlmod
     from jobscout.core.config import load_env, load_profile, load_settings
     from jobscout.sources import discovery
     from jobscout.sources.postings.base import make_client
@@ -315,7 +315,7 @@ def agent(
 
         # 2. agent harness (P5)
         from jobscout.agent.harness import FakeAgentModel, run_morning
-        from jobscout.llm import LlmClient
+        from jobscout.clients.llm import LlmClient
 
         if dry_run:
             console.print("[bold]agent harness (dry run — scripted fake model)[/]")
@@ -377,8 +377,8 @@ def serve(
 @app.command()
 def score(limit: int = typer.Option(500, "--limit", help="Max postings to score this invocation")) -> None:
     """Bulk-score rule-pass postings (tier A first, cap-respecting, cached)."""
+    from jobscout.clients.llm import LlmClient
     from jobscout.core.config import load_profile as _lp
-    from jobscout.llm import LlmClient
     from jobscout.scoring import llm_bulk
 
     profile = _lp()
@@ -519,7 +519,7 @@ def scan_form(
     """
     import yaml
 
-    from jobscout.sidecar import SidecarClient, SidecarError
+    from jobscout.clients.sidecar import SidecarClient, SidecarError
 
     db.init_db()
     conn = db.connect()
@@ -577,8 +577,8 @@ def fill(
     """
     import json
 
+    from jobscout.clients.sidecar import SidecarClient, SidecarError
     from jobscout.core.resume import ResumeError, field_map, load_master_resume
-    from jobscout.sidecar import SidecarClient, SidecarError
 
     db.init_db()
     conn = db.connect()

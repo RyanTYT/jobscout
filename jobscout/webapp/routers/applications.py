@@ -22,7 +22,7 @@ def register(app):
     def applications(request: Request, applied: str = Query(""),
                      auto: int = Query(0), assist: int = Query(0),
                      note: str = Query(""), error: str = Query("")):
-        from jobscout.webapp import apply as apply_mod
+        from jobscout.webapp.runners import apply as apply_mod
 
         conn = db.connect()
         try:
@@ -58,7 +58,7 @@ def register(app):
     @app.get("/applications/runs", response_class=HTMLResponse)
     def applications_runs(request: Request):
         """HTMX partial: live apply-run statuses (drains sidecar events)."""
-        from jobscout.webapp import apply as apply_mod
+        from jobscout.webapp.runners import apply as apply_mod
 
         conn = db.connect()
         try:
@@ -76,7 +76,7 @@ def register(app):
     @app.post("/applications/apply")
     async def applications_apply(request: Request):
         """Launch the selected packets (checkboxes on the packet board)."""
-        from jobscout.webapp import apply as apply_mod
+        from jobscout.webapp.runners import apply as apply_mod
 
         form = await request.form()
         selected = form.getlist("pk")

@@ -28,7 +28,7 @@ def register(app):
         from urllib.parse import quote as _q
         from urllib.parse import urlparse
 
-        from jobscout import watchlist as wlmod
+        from jobscout.core import watchlist as wlmod
 
         form = await request.form()
         raw = (form.get("url") or "").strip()
@@ -103,7 +103,7 @@ def register(app):
     def company_edit(request: Request, cid: str, error: str = Query("")):
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import watchlist_store
+        from jobscout.webapp.stores import watchlist_store
 
         conn = db.connect()
         try:
@@ -125,7 +125,7 @@ def register(app):
     async def company_save(request: Request, cid: str):
         from urllib.parse import quote as _q
 
-        from jobscout.webapp import watchlist_store
+        from jobscout.webapp.stores import watchlist_store
 
         form = await request.form()
         try:
