@@ -15,6 +15,9 @@ from jobscout.webapp.common import (
 from jobscout.webapp.common import (
     ctx as page_ctx,
 )
+from jobscout.webapp.common import (
+    toast as _toast,
+)
 
 
 def register(app):
@@ -138,7 +141,11 @@ def register(app):
         )
 
     @app.post("/packet/{pid}/status")
-    def set_packet_status(pid: str, status: str = Form(...)):
+    def set_packet_status(pid: str, status: str = Form(...),
+                          request: Request = None):
+        """Manual follow-through: update the application state (applied →
+        interviewing → offer/rejected...). HTMX swaps the row in place; a
+        plain post redirects back to the packet page."""
         conn = db.connect()
         try:
             ok = db.set_packet_status(conn, pid, status)
@@ -148,8 +155,31 @@ def register(app):
                     db.set_posting_status(
                         conn, pk["posting_id"],
                         "applied" if status == "applied" else "withdrawn")
+            row = db.get_packet(conn, pid) if ok else None
         finally:
             conn.close()
+        is_htmx = request is not None and any(
+            k.lower().startswith("hx-") for k in request.headers)
+        if is_htmx and row is not None:
+            manifest = {}
+            if row["dir"]:
+                mp = Path(row["dir"]) / "packet.yaml"
+                if mp.is_file():
+                    try:
+                        import yaml as _yaml
+
+                        manifest = _yaml.safe_load(
+                            mp.read_text(encoding="utf-8")) or {}
+                    except ValueError:
+                        manifest = {}
+            from jobscout.webapp.runners.apply import sheet_missing_count
+
+            missing = sheet_missing_count(row)
+            resp = TEMPLATES.TemplateResponse(
+                request, "_packet_row.html",
+                {"request": request, "pk": row, "man": manifest,
+                 "missing": missing})
+            return _toast(resp, f"State updated: {status}", "success")
         return RedirectResponse(f"/packet/{pid}", status_code=303)
 
     # ── ops ──────────────────────────────────────────────────────────────

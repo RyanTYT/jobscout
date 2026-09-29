@@ -98,3 +98,57 @@ def test_applications_rows_carry_row_links(client, db_file, tmp_path):
     assert 'data-row-link="/packet/pk_w1"' in r.text
 
 
+
+
+# ── follow-through: manual application-state tracking ────────────────────
+
+
+def test_packet_status_updates_through_lifecycle(client, db_file, tmp_path):
+    """applied → interviewing → offer → rejected via the row select."""
+    _seed_packet(db_file, tmp_path)
+    import sqlite3
+
+    for status in ("applied", "interviewing", "offer", "rejected"):
+        r = client.post("/packet/pk_w1/status", data={"status": status},
+                        headers={"HX-Request": "true"},
+                        follow_redirects=False)
+        assert r.status_code == 200, f"{status}: {r.status_code}"
+        assert "id=\"pk-row-pk_w1\"" in r.text          # the swapped row
+        c = sqlite3.connect(db_file)
+        cur = c.execute("SELECT status FROM packets WHERE id = 'pk_w1'").fetchone()
+        c.close()
+        assert cur[0] == status
+
+
+def test_packet_status_select_renders(client, db_file, tmp_path):
+    _seed_packet(db_file, tmp_path)
+    r = client.get("/applications")
+    assert 'hx-post="/packet/pk_w1/status"' in r.text
+    assert "interview in progress" in r.text
+    assert 'value="offer"' in r.text and 'value="rejected"' in r.text
+
+
+def test_packet_bad_status_rejected(client, db_file, tmp_path):
+    _seed_packet(db_file, tmp_path)
+    r = client.post("/packet/pk_w1/status", data={"status": "nonsense"},
+                    follow_redirects=False)
+    assert r.status_code == 303                        # not written; redirects
+    import sqlite3
+
+    c = sqlite3.connect(db_file)
+    cur = c.execute("SELECT status FROM packets WHERE id = 'pk_w1'").fetchone()
+    c.close()
+    assert cur[0] == "packet:ready"
+
+
+def test_new_stages_render_groups(client, db_file, tmp_path):
+    _seed_packet(db_file, tmp_path)
+    import sqlite3
+
+    c = sqlite3.connect(db_file)
+    c.execute("UPDATE packets SET status = 'interviewing' WHERE id = 'pk_w1'")
+    c.commit()
+    c.close()
+    r = client.get("/applications")
+    assert "Interview in progress" in r.text
+    assert "pk_w1" in r.text

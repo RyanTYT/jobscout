@@ -1,0 +1,53 @@
+{% import "components/macros.html" as m %}
+{# _packet_row.html — one row of the Applications board. Swapped in place
+   by the per-row status select (hx-post → closest tr). #}
+<tr data-row-link="/packet/{{ pk.id }}" id="pk-row-{{ pk.id }}">
+  <td class="ps-4">
+    <input class="form-check-input" type="checkbox" name="pk"
+           value="{{ pk.id }}" data-apply-row
+           {% if pk.status in ("applied", "interviewing", "offer", "rejected") %}disabled{% endif %}
+           aria-label="select {{ pk.posting_title or pk.id }}">
+  </td>
+  <td class="text-truncate" style="max-width: 24rem;">
+    <a href="/packet/{{ pk.id }}" class="fw-medium text-decoration-none">
+      {{ pk.posting_title or pk.id }}
+    </a>
+    {% if man.dry_run %}{{ m.badge("dry-run", "light") }}{% endif %}
+  </td>
+  <td class="text-nowrap">
+    <span class="text-secondary">{{ pk.company_name or pk.company_id or "—" }}</span>
+    {% if pk.tier %}{{ m.badge(pk.tier, "light") }}{% endif %}
+  </td>
+  <td>
+    {% if missing is none %}
+      {{ m.badge("—", "light", "no fill sheet yet — packet still drafting") }}
+    {% elif missing == 0 %}
+      {{ m.badge("all known", "success", "every required field is filled from the master resume") }}
+    {% else %}
+      {{ m.badge(missing ~ " missing", "warning", "required fields missing from the master resume") }}
+    {% endif %}
+  </td>
+  <td class="text-nowrap">
+    <select class="form-select form-select-sm" name="status" style="min-width: 9rem;"
+            title="update the application state — saved instantly"
+            hx-post="/packet/{{ pk.id }}/status" hx-trigger="change"
+            hx-target="#pk-row-{{ pk.id }}" hx-swap="outerHTML">
+      {% for value, label in [
+        ("packet:drafting", "drafting"), ("packet:needs_input", "needs input"),
+        ("packet:ready", "ready"), ("filled", "filled"),
+        ("applied", "applied"), ("interviewing", "interview in progress"),
+        ("offer", "offer"), ("rejected", "rejected"),
+        ("withdrawn", "withdrawn"),
+      ] %}
+      <option value="{{ value }}" {% if value == pk.status %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </td>
+  <td class="font-monospace text-secondary">${{ "%.4f" | format(pk.cost_usd or 0) }}</td>
+  <td class="small text-secondary font-monospace text-nowrap">{{ (pk.updated_at or "")[:16] | replace("T", " ") }}</td>
+  <td class="text-end">
+    <a class="btn btn-outline-primary btn-sm" href="/packet/{{ pk.id }}">
+      open {{ m.icon("arrow-right", 11) }}
+    </a>
+  </td>
+</tr>

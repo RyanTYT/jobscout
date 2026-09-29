@@ -10,8 +10,9 @@
   <div>
     <h1 class="h4 mb-1">Packet board</h1>
     <div class="text-secondary small">
-      packets live in applications/ · status flow:
-      drafting → needs_input → ready → filled → applied
+      packets live in var/applications/ · the follow-through flow:
+      drafting → needs_input → ready → filled → applied →
+      interview in progress → offer | rejected
     </div>
   </div>
 </div>
@@ -65,6 +66,9 @@
   ("packet:ready", "Ready to fill"),
   ("filled", "Filled"),
   ("applied", "Applied"),
+  ("interviewing", "Interview in progress"),
+  ("offer", "Offer"),
+  ("rejected", "Rejected"),
 ] %}
 
 {% for stage, label in stages %}
@@ -87,46 +91,15 @@
       <thead class="table-light">
         <tr><th scope="col" class="ps-4"></th><th scope="col">posting</th>
             <th scope="col">company</th><th scope="col">details</th>
-            <th scope="col">cost</th><th scope="col">updated</th><th scope="col"></th></tr>
+            <th scope="col">state</th><th scope="col">cost</th>
+            <th scope="col">updated</th><th scope="col"></th></tr>
       </thead>
       <tbody>
         {% for item in stage_rows %}
         {% set pk = item.row %}
         {% set man = item.manifest %}
-        <tr data-row-link="/packet/{{ pk.id }}">
-          <td class="ps-4">
-            <input class="form-check-input" type="checkbox" name="pk"
-                   value="{{ pk.id }}" data-apply-row
-                   {% if stage == "applied" %}disabled{% endif %}
-                   aria-label="select {{ pk.posting_title or pk.id }}">
-          </td>
-          <td class="text-truncate" style="max-width: 24rem;">
-            <a href="/packet/{{ pk.id }}" class="fw-medium text-decoration-none">
-              {{ pk.posting_title or pk.id }}
-            </a>
-            {% if man.dry_run %}{{ m.badge("dry-run", "light") }}{% endif %}
-          </td>
-          <td class="text-nowrap">
-            <span class="text-secondary">{{ pk.company_name or pk.company_id or "—" }}</span>
-            {% if pk.tier %}{{ m.badge(pk.tier, "light") }}{% endif %}
-          </td>
-          <td>
-            {% if item.missing is none %}
-              {{ m.badge("—", "light", "no fill sheet yet — packet still drafting") }}
-            {% elif item.missing == 0 %}
-              {{ m.badge("all known", "success", "every required field is filled from the master resume") }}
-            {% else %}
-              {{ m.badge(item.missing ~ " missing", "warning", "required fields missing from the master resume") }}
-            {% endif %}
-          </td>
-          <td class="font-monospace text-secondary">${{ "%.4f" | format(pk.cost_usd or 0) }}</td>
-          <td class="small text-secondary font-monospace text-nowrap">{{ (pk.updated_at or "")[:16] | replace("T", " ") }}</td>
-          <td class="text-end">
-            <a class="btn btn-outline-primary btn-sm" href="/packet/{{ pk.id }}">
-              open {{ m.icon("arrow-right", 11) }}
-            </a>
-          </td>
-        </tr>
+        {% set missing = item.missing %}
+        {% include "_packet_row.html" with context %}
         {% endfor %}
       </tbody>
     </table>

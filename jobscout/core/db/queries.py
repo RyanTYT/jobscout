@@ -522,7 +522,8 @@ def set_state(conn: sqlite3.Connection, key: str, value: str) -> None:
 # ── P6: packets ───────────────────────────────────────────────────────────────
 
 PACKET_STATUSES = (
-    "drafting", "needs_input", "ready", "filled", "applied", "withdrawn",
+    "drafting", "needs_input", "ready", "filled", "applied",
+    "interviewing", "offer", "rejected", "withdrawn",
 )
 
 
