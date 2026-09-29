@@ -14,12 +14,25 @@
         {% if running %}
         <button class="btn btn-primary btn-sm" type="button" disabled>
           <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-          agent running…
+          {% if focus == "profile" %}profile hunt running…{% else %}full hunt running…{% endif %}
         </button>
         <span class="small text-secondary">
-          the sweep + agent are running in the background — this panel
-          refreshes itself every 3s until the output lands
+          {% if focus == "profile" %}
+          profile-driven employer discovery only — the whole budget is on
+          companies matching your hunting profile
+          {% else %}
+          the deterministic sweep + agent (profile-driven AND signal-driven
+          searches) are running
+          {% endif %}
+          — this panel refreshes every 3s until the output lands
         </span>
+        <form method="post" action="/discovery/run/cancel" data-busy-submit
+              style="display: contents">
+          <button class="btn btn-outline-danger btn-sm" type="submit"
+                  title="Kill the in-flight agent run — partial output is kept">
+            {{ m.icon("x", 12) }} cancel run
+          </button>
+        </form>
         {% else %}
         <form method="post" action="/discovery/run" data-busy-submit
               style="display: contents">
@@ -73,7 +86,12 @@
     <div class="card-body">
       <div class="d-flex align-items-center gap-2 text-secondary small">
         <span class="spinner-grow spinner-grow-sm" role="status"></span>
-        collecting + judging — the output appears here when the run finishes
+        {% if focus == "profile" %}
+        hunting employers that match your profile —
+        {% else %}
+        collecting + judging —
+        {% endif %}
+        the output appears here when the run finishes (or is cancelled)
       </div>
     </div>
   </div>

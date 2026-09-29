@@ -597,17 +597,24 @@ def test_run_agent_now_returns_immediately(client, monkeypatch):
 
     done = threading.Event()
 
-    class FakeProc:
-        stdout, stderr, returncode = "agent done", "", 0
+    class FakePopen:
+        returncode = 0
 
-    def fake_run(*a, **kw):
-        done.set()
-        time.sleep(0.2)
-        return FakeProc()
+        def __init__(self, args, **kw):
+            self.args = args
 
-    # the handler imports subprocess INSIDE the function — the module
-    # object is shared, so patching subprocess.run covers it
-    monkeypatch.setattr(subprocess, "run", fake_run)
+        def communicate(self, timeout=None):
+            done.set()
+            time.sleep(0.2)
+            return "agent done", ""
+
+        def kill(self):
+            self.returncode = -9
+
+        def poll(self):
+            return self.returncode
+
+    monkeypatch.setattr(subprocess, "Popen", FakePopen)
 
     r = client.post("/discovery/run", follow_redirects=False)
     assert r.status_code == 303
@@ -616,8 +623,7 @@ def test_run_agent_now_returns_immediately(client, monkeypatch):
 
     status = client.get("/discovery/run-status")
     assert status.status_code == 200
-    # while the fake run sleeps, running=True polls
-    assert "running" in status.text or "run-status" in status.text
+    assert "every 3s" in status.text
 
 
 # ── live run panel + error surfacing + credentials UX ──────────────────────
@@ -651,7 +657,7 @@ def test_run_panel_running_state_polls(client):
     try:
         r = client.get("/discovery/run-status")
         assert "every 3s" in r.text
-        assert "agent running" in r.text
+        assert "full hunt running" in r.text
         assert "Run agent now" not in r.text         # button swapped for state
     finally:
         _run_state.update(running=False, out="", error="")
@@ -676,9 +682,9 @@ def test_credentials_card_replace_and_remove_semantics(client, db_file):
     assert "replaces" in r.text
     # remove button appears only when a key is saved
     assert "remove key" not in r.text
-    from jobscout.webapp import key_store as _ks
-
     import pathlib
+
+    from jobscout.webapp import key_store as _ks
 
     fake = pathlib.Path("/tmp/_fake.env")
     fake.write_text("JOBSCOUT_LLM_API_KEY=sk-zzz\n", encoding="utf-8")
@@ -873,16 +879,63 @@ def test_run_agent_focus_flag_reaches_subprocess(client, monkeypatch):
 
     seen = {}
 
-    class FakeProc:
-        stdout, stderr, returncode = "done", "", 0
+    class FakePopen:
+        returncode = 0
 
-    def fake_run(args, **kw):
-        seen["args"] = args
-        seen["env"] = kw.get("env")
-        return FakeProc()
+        def __init__(self, args, **kw):
+            seen["args"] = args
+            seen["env"] = kw.get("env")
 
-    monkeypatch.setattr(sp, "run", fake_run)
+        def communicate(self, timeout=None):
+            return "done", ""
+
+        def kill(self):
+            self.returncode = -9
+
+    monkeypatch.setattr(sp, "Popen", FakePopen)
     r = client.post("/discovery/run", data={"focus": "profile"},
                     follow_redirects=False)
     assert r.status_code == 303
     assert seen["env"]["JOBSCOUT_AGENT_FOCUS"] == "profile"
+
+
+def test_run_cancel_kills_and_labels(client, monkeypatch):
+    """Cancel mid-run: the process is killed, output labelled cancelled."""
+    import subprocess
+    import threading
+    import time
+
+    from jobscout.webapp.routes import _run_state
+
+    started = threading.Event()
+
+    class FakePopen:
+        returncode = None
+
+        def __init__(self, args, **kw):
+            self.killed = threading.Event()
+
+        def communicate(self, timeout=None):
+            started.set()
+            self.killed.wait(5)                 # blocks until kill() interrupts
+            return "partial output", ""
+
+        def kill(self):
+            self.returncode = -9
+            self.killed.set()
+
+        def poll(self):
+            return self.returncode
+
+    monkeypatch.setattr(subprocess, "Popen", FakePopen)
+    r = client.post("/discovery/run", follow_redirects=False)
+    assert r.status_code == 303
+    assert started.wait(5)
+
+    c = client.post("/discovery/run/cancel", follow_redirects=False)
+    assert c.status_code == 303
+    for _ in range(30):                        # wait for the thread to land
+        if not _run_state["running"]:
+            break
+        time.sleep(0.1)
+    assert _run_state["error"] == "run cancelled by you"

@@ -28,7 +28,8 @@ TEMPLATES.env.globals["linkify"] = ui.linkify
 TEMPLATES.env.globals["kind_meta"] = ui.signal_kind_meta
 TEMPLATES.env.globals["kind_desc"] = lambda k: ui.signal_kind_meta(k)["desc"]
 
-_run_state: dict = {"running": False, "out": "", "error": ""}
+_run_state: dict = {"running": False, "out": "", "error": "",
+                    "focus": "", "proc": None, "cancel": False}
 
 
 def _strip_ansi(text: str) -> str:
@@ -426,6 +427,7 @@ def create_app() -> FastAPI:
                 "running": _run_state["running"],
                 "run_out": _run_state["out"],
                 "run_error": _run_state["error"],
+                "focus": _run_state["focus"],
             },
         )
 
@@ -482,9 +484,12 @@ def create_app() -> FastAPI:
         _run_state["running"] = True
         _run_state["out"] = ""
         _run_state["error"] = ""
+        _run_state["cancel"] = False
         focus = "profile" if focus == "profile" else ""
+        _run_state["focus"] = focus
 
         def _launch():
+            proc = None
             try:
                 if getattr(sys, "frozen", False):
                     cli = sys.executable            # the frozen binary itself
@@ -493,28 +498,50 @@ def create_app() -> FastAPI:
                 env = {**os.environ}
                 if focus:
                     env["JOBSCOUT_AGENT_FOCUS"] = focus
-                proc = subprocess.run(
-                    [cli, "agent"], capture_output=True, text=True,
-                    timeout=900, env=env
+                # Popen (not subprocess.run) so a cancel can kill mid-run
+                proc = subprocess.Popen(
+                    [cli, "agent"], stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, text=True, env=env,
                 )
+                _run_state["proc"] = proc
+                try:
+                    out, err = proc.communicate(timeout=900)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    out, err = proc.communicate()
+                    _run_state["error"] = "run timed out after 900s"
+                    _run_state["out"] = _strip_ansi(
+                        (out or "") + (err or ""))[-8000:]
+                    return
                 _run_state["out"] = _strip_ansi(
-                    (proc.stdout or "") + (proc.stderr or ""))[-8000:]
-                if proc.returncode != 0:
+                    (out or "") + (err or ""))[-8000:]
+                if _run_state["cancel"]:
+                    _run_state["error"] = "run cancelled by you"
+                elif proc.returncode != 0:
                     _run_state["error"] = _last_error(_run_state["out"]) or (
                         f"the agent exited with code {proc.returncode}")
                 else:
                     _run_state["error"] = ""
-            except subprocess.TimeoutExpired:
-                _run_state["out"] = ("run timed out after 900s "
-                                     "(caps should prevent this)")
-                _run_state["error"] = "run timed out after 900s"
             except OSError as e:
                 _run_state["out"] = f"failed to launch the jobscout agent: {e}"
                 _run_state["error"] = _run_state["out"]
             finally:
+                _run_state["proc"] = None
                 _run_state["running"] = False
+                _run_state["cancel"] = False
 
         threading.Thread(target=_launch, daemon=True).start()
+        return RedirectResponse("/discovery?started=1", status_code=303)
+
+    @app.post("/discovery/run/cancel")
+    def run_agent_cancel():
+        """Kill the in-flight agent run (the button on the run panel)."""
+        if not _run_state["running"]:
+            return RedirectResponse("/discovery", status_code=303)
+        _run_state["cancel"] = True
+        proc = _run_state.get("proc")
+        if proc is not None and proc.poll() is None:
+            proc.kill()
         return RedirectResponse("/discovery?started=1", status_code=303)
 
     @app.get("/discovery/run-status", response_class=HTMLResponse)
@@ -534,7 +561,8 @@ def create_app() -> FastAPI:
         return TEMPLATES.TemplateResponse(
             request, "_run_status.html",
             {"running": _run_state["running"], "run_out": _run_state["out"],
-             "run_error": _run_state["error"], "agent_spend": agent_spend},
+             "run_error": _run_state["error"], "agent_spend": agent_spend,
+             "focus": _run_state["focus"]},
         )
 
     @app.get("/ops/spend", response_class=HTMLResponse)
