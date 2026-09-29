@@ -68,6 +68,59 @@
   </div>
 </div>
 
+{# ── LLM credentials: the API key lives in .env (gitignored) — the only
+     place secrets go. Saved keys take effect on the next scoring run:
+     the client re-reads .env every time. The key is never echoed back. #}
+{% if key_saved %}
+{{ m.callout("API key saved to .env — effective on the next LLM run (no restart needed).", "success") }}
+{% endif %}
+{% if key_error %}
+{{ m.callout(key_error, "danger") }}
+{% endif %}
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">LLM credentials</h2>
+    <span class="text-secondary small">
+      stored in .env (gitignored) · never rendered back
+    </span>
+  </div>
+  <div class="card-body">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+      {% if llm_status.key_set %}
+      {{ m.badge("key set ····" ~ llm_status.key_tail, "success") }}
+      {% else %}
+      {{ m.badge("no key set", "warning", "LLM scoring and the agent stay off until a key exists") }}
+      {% endif %}
+      {% if llm_status.base_url %}
+      {{ m.badge(llm_status.base_url, "light", llm_status.base_url_env) }}
+      {% else %}
+      {{ m.badge("default provider endpoint", "light") }}
+      {% endif %}
+    </div>
+    <form method="post" action="/ops/llm-key" class="row g-3 align-items-end" data-busy-submit>
+      <div class="col-12 col-md-8 col-lg-6">
+        <label class="form-label" for="f-api-key">API key</label>
+        <input class="form-control" type="password" id="f-api-key" name="api_key"
+               autocomplete="off" spellcheck="false"
+               placeholder="paste {{ llm_status.key_env }} — saves to .env">
+        <div class="form-text">
+          pasted once, stored in .env; the field is always empty on reload
+        </div>
+      </div>
+      <div class="col-12 col-md-4 col-lg-3 d-flex gap-2">
+        <button class="btn btn-primary btn-sm" type="submit">
+          {{ m.icon("check", 12) }} save key
+        </button>
+        {% if llm_status.key_set %}
+        <button class="btn btn-outline-secondary btn-sm" type="submit"
+                formaction="/ops/llm-key/clear" formnovalidate>clear</button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="card">
   <div class="card-header"><h2 class="card-title mb-0 h6">LLM spend (7 days)</h2></div>
   {% if spend %}

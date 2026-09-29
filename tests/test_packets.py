@@ -130,12 +130,15 @@ def test_orchestrator_end_to_end_skeleton(conn, tmp_path, monkeypatch):
     monkeypatch.setattr(core_paths, "applications_dir", lambda: tmp_path)
     result = prepare_packet(conn, "p1", dry_run=True)
 
+    from datetime import UTC, datetime
+
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     assert result["packet_id"].startswith("pk-")
     assert result["status"] == "needs_input"
     # skeleton resume → missing fields reported
     assert any("required field" in r for r in result["reasons"])
     # files written
-    out = tmp_path / "jane-street-2026-09-28"
+    out = tmp_path / f"jane-street-{today}"
     for name in ("packet.yaml", "fill_sheet.yaml", "claim_check.yaml",
                  "tailor.yaml", "resume.md", "cover_letter.md"):
         assert (out / name).is_file(), name

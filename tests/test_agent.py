@@ -112,7 +112,9 @@ def test_run_morning_full_loop(conn, wl, tmp_path, monkeypatch):
     assert result["cost"] == 0.0
     assert "Dry run complete" in result["final"]
     assert result["cap_note"] == ""
-    report = tmp_path / "2026-09-28.md"
+    from datetime import UTC, datetime
+
+    report = tmp_path / f"{datetime.now(UTC).strftime('%Y-%m-%d')}.md"
     assert report.is_file()
     content = report.read_text()
     assert "## Tool log" in content and "get_context" in content

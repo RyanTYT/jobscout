@@ -398,6 +398,29 @@ def create_app() -> FastAPI:
             return RedirectResponse(
                 f"/discovery?error={_q(str(e))}", status_code=303)
 
+    @app.post("/ops/llm-key")
+    async def ops_llm_key(request: Request):
+        """Save the LLM API key into .env (gitignored; live without restart).
+        The key itself is never rendered back — only a masked tail."""
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import key_store
+
+        form = await request.form()
+        try:
+            key_store.save_key(form.get("api_key", ""))
+            return RedirectResponse("/ops?key_saved=1", status_code=303)
+        except key_store.KeyStoreError as e:
+            return RedirectResponse(
+                f"/ops?key_error={_q(str(e))}", status_code=303)
+
+    @app.post("/ops/llm-key/clear")
+    async def ops_llm_key_clear(request: Request):
+        from jobscout.webapp import key_store
+
+        key_store.clear_key()
+        return RedirectResponse("/ops?key_saved=1", status_code=303)
+
     @app.get("/packet/{pid}", response_class=HTMLResponse)
     def packet_detail(request: Request, pid: str, prepared: str = Query("")):
         conn = db.connect()
@@ -471,7 +494,16 @@ def create_app() -> FastAPI:
     # ── ops ──────────────────────────────────────────────────────────────
 
     @app.get("/ops", response_class=HTMLResponse)
-    def ops(request: Request):
+    def ops(request: Request, key_saved: str = Query(""),
+            key_error: str = Query("")):
+        from jobscout.webapp import key_store
+
+        try:
+            llm_status = key_store.status()
+        except Exception:               # noqa: BLE001 — status is informational
+            llm_status = {"key_set": False, "key_tail": "", "base_url": "",
+                          "key_env": "JOBSCOUT_LLM_API_KEY",
+                          "base_url_env": "JOBSCOUT_LLM_BASE_URL"}
         conn = db.connect()
         try:
             status = db.db_status()
@@ -503,7 +535,10 @@ def create_app() -> FastAPI:
                 "runs": runs_meta,
                 "spend": spend,
                 "last_stats": last_stats,
-            },
+            
+                "llm_status": llm_status,
+                "key_saved": key_saved == "1",
+                "key_error": key_error,},
         )
 
     # ── profile (master resume editor) ───────────────────────────────────
