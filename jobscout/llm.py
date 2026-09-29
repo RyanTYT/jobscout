@@ -171,6 +171,52 @@ class LlmClient:
                                tool_calls=tool_calls or None)
         raise LlmError(f"{cfg.model}: request failed after retries: {last_err}")
 
+    def complete(self, model: str, messages: list[dict], *,
+                 tier: str = "agent", temperature: float = 0) -> LlmResponse:
+        """One raw completion against an ARBITRARY model slug — no tier
+        lookup, no cap gate, no cache, no JSON mode. The plumbing (auth,
+        base URL, retries, response parsing, metering) is shared with
+        chat(). Used by the agent's LLM-search engine: the search model
+        is not a tier, but its spend still lands in llm_calls under the
+        given tier. Cost is metered only when the slug matches the
+        tier's model (prices are per-tier config)."""
+        if not self.available:
+            raise LlmError("no API key set (JOBSCOUT_LLM_API_KEY in .env)")
+        cfg = self.tier_cfg(tier)
+        payload = {"model": model, "messages": messages,
+                   "temperature": temperature}
+        headers = {"Authorization": f"Bearer {self.api_key}",
+                   "Content-Type": "application/json"}
+        url = f"{self.base_url}/chat/completions"
+        last_err: Exception | None = None
+        for attempt in range(3):
+            try:
+                with httpx.Client(timeout=httpx.Timeout(90.0, connect=15.0)) as client:
+                    r = client.post(url, json=payload, headers=headers)
+            except httpx.HTTPError as e:
+                last_err = e
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            if r.status_code in (429, 500, 502, 503) and attempt < 2:
+                time.sleep(2.5 * (attempt + 1))
+                continue
+            if r.status_code != 200:
+                raise LlmError(f"{model}: HTTP {r.status_code}: {r.text[:300]}")
+            try:
+                data = r.json()
+                message = data["choices"][0]["message"]
+            except (ValueError, KeyError, IndexError, TypeError) as e:
+                raise LlmError(f"{model}: unexpected response shape: {e}") from e
+            usage = data.get("usage") or {}
+            pt = int(usage.get("prompt_tokens") or 0)
+            ct = int(usage.get("completion_tokens") or 0)
+            cost = _cost(cfg, pt, ct) if model == cfg.model else 0.0
+            self._record_call(tier, model, None, pt, ct, cost)
+            return LlmResponse(text=message.get("content") or "",
+                               model=model, prompt_tokens=pt,
+                               completion_tokens=ct, cost_usd=cost)
+        raise LlmError(f"{model}: request failed after retries: {last_err}")
+
     # ── internals ───────────────────────────────────────────────────────────
 
     def _record_call(self, tier: str, model: str, cache_key, pt: int, ct: int,

@@ -1,212 +1,15 @@
-"""SQLite state — the single persistence layer (PLAN §3).
+"""core/db/queries.py — every CRUD function over the schema.
 
-All DB access goes through this module (AGENTS.md rule). WAL mode. Schema is
-versioned via PRAGMA user_version so later phases can migrate.
+Imported and re-exported by core/db (the package root), so callers see
+one `db` module exactly as before the split.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
-import re
 import sqlite3
-from datetime import UTC, datetime
-from pathlib import Path
 
-from jobscout.core.paths import db_path, ensure_runtime_dirs
-
-SCHEMA_VERSION = 4
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS companies (
-    id          TEXT PRIMARY KEY,          -- slug, e.g. 'janestreet'
-    name        TEXT NOT NULL,
-    domain      TEXT,
-    tier        TEXT CHECK (tier IN ('A','B','C','candidate','dark')),
-    ats_tokens  TEXT,                      -- JSON: {greenhouse: token, lever: token, ...}
-    career_url  TEXT,
-    non_ats     INTEGER NOT NULL DEFAULT 0,
-    notes       TEXT,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS postings (
-    id            TEXT PRIMARY KEY,        -- 'p_<date>_<hash8>'
-    source        TEXT NOT NULL,           -- 'ats:greenhouse:drw'
-    company_id    TEXT,
-    url           TEXT NOT NULL,
-    url_hash      TEXT NOT NULL UNIQUE,    -- sha256(url)
-    title         TEXT,
-    location      TEXT,
-    remote        INTEGER,
-    seniority     TEXT,
-    job_type      TEXT,
-    rule_pass     INTEGER,                   -- 1 = passed deterministic rule filter (P2 scoring/dashboard gate)
-    posted_at     TEXT,
-    description   TEXT,                      -- plain text, first ~4000 chars (P2 LLM input)
-    first_seen    TEXT NOT NULL,
-    last_seen     TEXT NOT NULL,
-    content_hash  TEXT,                     -- sha256(title|location|description) — dedup across sources
-    status        TEXT NOT NULL DEFAULT 'new',
-        -- new | interested | dismissed | packet:drafting | packet:needs_input
-        -- | packet:ready | filled | applied | withdrawn
-    fit_score     REAL,
-    company_score REAL,
-    opportunity   REAL,
-    final_score   REAL,
-    llm_json      TEXT,                    -- tier-1 scoring JSON
-    llm_cache_key TEXT,
-    FOREIGN KEY (company_id) REFERENCES companies(id)
-);
-CREATE INDEX IF NOT EXISTS idx_postings_status ON postings(status);
-CREATE INDEX IF NOT EXISTS idx_postings_content ON postings(content_hash);
-CREATE INDEX IF NOT EXISTS idx_postings_first_seen ON postings(first_seen);
-
-CREATE TABLE IF NOT EXISTS signals (
-    id          TEXT PRIMARY KEY,
-    company_id  TEXT,
-    kind        TEXT,                      -- funding | hn | blog | search | careers_change
-    payload     TEXT,                      -- JSON
-    note        TEXT,
-    seen_at     TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS packets (
-    id          TEXT PRIMARY KEY,
-    posting_id  TEXT NOT NULL REFERENCES postings(id),
-    status      TEXT NOT NULL DEFAULT 'drafting',
-        -- drafting | needs_input | ready | filled | applied | withdrawn
-    dir         TEXT,                      -- applications/<company-slug>-<date>/
-    model       TEXT,
-    cost_usd    REAL,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS runs (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    kind        TEXT NOT NULL,             -- daily | agent | manual | fill
-    started     TEXT NOT NULL,
-    finished    TEXT,
-    stats       TEXT,                      -- JSON: per-source counts, errors
-    cost_usd    REAL NOT NULL DEFAULT 0,
-    ok          INTEGER NOT NULL DEFAULT 1
-);
-
-CREATE TABLE IF NOT EXISTS state (
-    key         TEXT PRIMARY KEY,            -- e.g. 'hn_last_story'
-    value       TEXT NOT NULL,
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS llm_calls (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    tier              TEXT NOT NULL,         -- bulk | agent | quality
-    model             TEXT NOT NULL,
-    cache_key         TEXT,
-    prompt_tokens     INTEGER NOT NULL DEFAULT 0,
-    completion_tokens INTEGER NOT NULL DEFAULT 0,
-    cost_usd          REAL NOT NULL DEFAULT 0,
-    created_at        TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_llm_calls_day ON llm_calls(tier, date(created_at));
-
-CREATE TABLE IF NOT EXISTS apply_runs (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    packet_id     TEXT NOT NULL,
-    mode          TEXT NOT NULL,             -- automated (sidecar filler) | assisted (opened for the human)
-    status        TEXT NOT NULL,             -- launched|running|submitted|paused|failed|opened
-    detail        TEXT,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_apply_runs_packet ON apply_runs(packet_id, id DESC);
-
-CREATE TABLE IF NOT EXISTS llm_cache (
-    cache_key   TEXT PRIMARY KEY,          -- sha256(model + prompt) or (content_hash, profile_version)
-    response    TEXT NOT NULL,
-    model       TEXT,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-"""
-
-_COUNTED_TABLES = ("companies", "postings", "signals", "packets", "runs", "apply_runs", "llm_cache", "llm_calls", "state")
-
-
-# ── helpers ──────────────────────────────────────────────────────────────────
-
-
-def _utcnow() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def slugify(s: str) -> str:
-    s = re.sub(r"[^a-z0-9]+", "-", (s or "").lower()).strip("-")
-    return s or "unknown"
-
-
-def sha256(s: str) -> str:
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()
-
-
-# ── lifecycle ────────────────────────────────────────────────────────────────
-
-
-def connect() -> sqlite3.Connection:
-    """Open the DB (read-write). Raises FileNotFoundError if not initialised."""
-    path = db_path()
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"database not initialised at {path} — run `jobscout db init`"
-        )
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
-
-
-def init_db() -> Path:
-    """Idempotently create the DB + schema. Returns the DB path."""
-    ensure_runtime_dirs()
-    path = db_path()
-    conn = sqlite3.connect(path)
-    try:
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.executescript(SCHEMA)
-        _migrate(conn)
-        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-        conn.commit()
-    finally:
-        conn.close()
-    return path
-
-
-def db_status() -> dict:
-    path = db_path()
-    if not path.is_file():
-        return {"exists": False, "path": str(path), "schema_version": None, "counts": {}}
-    conn = sqlite3.connect(path)
-    try:
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
-        counts: dict[str, int] = {}
-        for table in _COUNTED_TABLES:
-            try:
-                counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            except sqlite3.OperationalError:
-                counts[table] = -1  # table missing (schema drifted)
-        return {
-            "exists": True,
-            "path": str(path),
-            "schema_version": version,
-            "expected_version": SCHEMA_VERSION,
-            "counts": counts,
-            "size_bytes": path.stat().st_size,
-        }
-    finally:
-        conn.close()
-
+from jobscout.core.db.schema import _utcnow, sha256, slugify
 
 # ── companies ────────────────────────────────────────────────────────────────
 
@@ -320,6 +123,7 @@ def stale_postings(
 
 
 # ── runs ─────────────────────────────────────────────────────────────────────
+# ── runs ─────────────────────────────────────────────────────────────────────
 
 
 def record_run(conn: sqlite3.Connection, kind: str) -> int:
@@ -349,16 +153,6 @@ def last_ok_run(conn: sqlite3.Connection, kind: str) -> sqlite3.Row | None:
 
 
 # ── migration ────────────────────────────────────────────────────────────────
-
-
-def _migrate(conn: sqlite3.Connection) -> None:
-    """In-place column additions for pre-existing DBs (CREATE IF NOT EXISTS
-    can't upgrade them). Safe to run repeatedly."""
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(postings)")}
-    if "rule_pass" not in cols:
-        conn.execute("ALTER TABLE postings ADD COLUMN rule_pass INTEGER")
-
-
 # ── P2: rule verdicts, scores, statuses ──────────────────────────────────────
 
 ALLOWED_STATUSES = (

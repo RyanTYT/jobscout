@@ -222,22 +222,17 @@ def _brave_search(query: str, n: int, ctx: AgentCtx) -> str | None:
 def _llm_search(query: str, n: int, ctx: AgentCtx) -> str | None:
     """Search-grounded chat model as the engine (no extra key — reuses the
     LLM provider; e.g. OpenRouter :online plugins or sonar-style models).
-    Prompts for a JSON result list and parses it; a few cents per run."""
+    Prompts for a JSON result list and parses it; a few cents per run.
+    Delegates the HTTP/auth/retry/metering plumbing to LlmClient.complete
+    — search spend lands in llm_calls like every other call."""
     model = ((ctx.settings.search.llm_model or "").strip()
              if ctx.settings else "")
     if not model:
         return None
     import json as _json
 
-    settings = ctx.settings or None
-    base = (ctx.env.get((settings.llm.base_url_env if settings
-                         else "JOBSCOUT_LLM_BASE_URL") or "")
-            or "").strip().rstrip("/")
-    key = (ctx.env.get((settings.llm.api_key_env if settings
-                        else "JOBSCOUT_LLM_API_KEY") or "")
-           or "").strip()
-    if not (base and key):
-        return None
+    from jobscout.llm import LlmClient, LlmError
+
     prompt = (
         f"Search the web for: {query}\n"
         f"Return ONLY a JSON array of the top {n} results, each exactly "
@@ -245,24 +240,16 @@ def _llm_search(query: str, n: int, ctx: AgentCtx) -> str | None:
         "No prose, no markdown fences."
     )
     try:
-        r = ctx.client.post(
-            base + "/chat/completions",
-            headers={"Authorization": f"Bearer {key}"},
-            json={"model": model,
-                  "messages": [{"role": "user", "content": prompt}],
-                  "temperature": 0},
-            timeout=30.0,
-        )
-        r.raise_for_status()
-        text = (r.json().get("choices") or [{}])[0].get("message", {}).get(
-            "content", "")
+        client = LlmClient(settings=ctx.settings, env=ctx.env)
+        resp = client.complete(model, [{"role": "user", "content": prompt}])
+        text = resp.text
         start, end = text.find("["), text.rfind("]")
         if start == -1 or end <= start:
             return None
         items = _json.loads(text[start:end + 1])
         return _fmt([(str(i.get("title", "")), str(i.get("url", "")),
                       str(i.get("snippet", ""))) for i in items[:n]])
-    except Exception:
+    except LlmError:
         return None
 
 
