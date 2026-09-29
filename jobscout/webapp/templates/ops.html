@@ -198,7 +198,8 @@
 
     <form method="post" action="/ops/cse-keys" data-busy-submit
           class="mb-3 pb-3 border-bottom">
-      <label class="form-label">Search keys (Google CSE — the agent's web-search tier)</label>
+      <label class="form-label">Google CSE — primary search
+        <span class="text-secondary fw-normal">(free 100 queries/day)</span></label>
       <div class="d-flex flex-wrap gap-2">
         <div class="flex-grow-1" style="min-width: var(--field-min-w);">
           <input class="form-control" type="password" name="cse_key"
@@ -217,6 +218,26 @@
         {% endif %}
       </div>
       <div class="form-text">both go to .env · empty fields keep the saved values</div>
+    </form>
+
+    <form method="post" action="/ops/brave-key" data-busy-submit>
+      <label class="form-label">Brave Search — fallback engine
+        <span class="text-secondary fw-normal">(free tier: 2,000 queries/month, 1/sec)</span></label>
+      <div class="d-flex flex-wrap gap-2">
+        <div class="flex-grow-1" style="min-width: var(--field-min-w);">
+          <input class="form-control" type="password" name="brave_key"
+                 autocomplete="off" spellcheck="false"
+                 placeholder="{% if brave_status.key_set %}saved ····{{ brave_status.key_tail }} — paste to replace{% else %}Brave API key — https://brave.com/search/api/{% endif %}">
+          <div class="form-text">
+            the agent uses CSE first, then Brave — saving ONLY Brave works too
+          </div>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" type="submit">save brave key</button>
+        {% if brave_status.key_set %}
+        <button class="btn btn-outline-danger btn-sm" type="submit"
+                formaction="/ops/brave-key/clear">remove</button>
+        {% endif %}
+      </div>
     </form>
 
     <form method="post" action="/ops/llm-key" data-busy-submit>

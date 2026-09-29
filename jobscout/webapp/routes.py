@@ -778,6 +778,27 @@ def create_app() -> FastAPI:
         key_store.clear_cse()
         return RedirectResponse("/ops?key_saved=1", status_code=303)
 
+    @app.post("/ops/brave-key")
+    async def ops_brave_save(request: Request):
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import key_store
+
+        form = await request.form()
+        try:
+            key_store.save_brave(form.get("brave_key", ""))
+            return RedirectResponse("/ops?key_saved=1", status_code=303)
+        except key_store.KeyStoreError as e:
+            return RedirectResponse(
+                f"/ops?key_error={_q(str(e))}", status_code=303)
+
+    @app.post("/ops/brave-key/clear")
+    def ops_brave_clear():
+        from jobscout.webapp import key_store
+
+        key_store.clear_brave()
+        return RedirectResponse("/ops?key_saved=1", status_code=303)
+
     @app.post("/ops/llm-key")
     async def ops_llm_key(request: Request):
         """Save the LLM API key into .env (gitignored; live without restart).
@@ -889,6 +910,10 @@ def create_app() -> FastAPI:
         except Exception:                       # noqa: BLE001
             cse_status = {"key_set": False, "key_tail": "", "cx": ""}
         try:
+            brave_status = key_store.brave_status()
+        except Exception:                       # noqa: BLE001
+            brave_status = {"key_set": False, "key_tail": ""}
+        try:
             models_cfg = models_store.current()
         except Exception:                       # noqa: BLE001
             models_cfg = None
@@ -932,6 +957,7 @@ def create_app() -> FastAPI:
             
                 "llm_status": llm_status,
                 "cse_status": cse_status,
+                "brave_status": brave_status,
                 "models_cfg": models_cfg,
                 "models_saved": models_saved == "1",
                 "models_error": models_error,

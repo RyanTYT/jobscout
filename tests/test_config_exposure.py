@@ -391,3 +391,44 @@ def test_companies_page_has_seed_form(client):
     r = client.get("/companies")
     assert 'action="/companies/add-url"' in r.text
     assert 'name="url"' in r.text
+
+
+# ── Brave fallback key ─────────────────────────────────────────────────
+
+
+def test_brave_save_status_clear(env_file):
+    from jobscout.webapp import key_store as ks
+
+    st = ks.brave_status()
+    assert not st["key_set"]
+    ks.save_brave("brave-key-9876")
+    text = env_file.read_text(encoding="utf-8")
+    assert "JOBSCOUT_BRAVE_API_KEY=brave-key-9876" in text
+    st2 = ks.brave_status()
+    assert st2["key_set"] and st2["key_tail"] == "9876"
+    with pytest.raises(ks.KeyStoreError):
+        ks.save_brave("has space")
+    ks.clear_brave()
+    assert "BRAVE" not in env_file.read_text(encoding="utf-8")
+
+
+def test_brave_route_and_card(client, env_file):
+    r = client.get("/ops")
+    assert 'name="brave_key"' in r.text
+    assert "Brave Search" in r.text
+    assert "2,000 queries/month" in r.text          # honest tier info
+    r2 = client.post("/ops/brave-key", data={"brave_key": "bb-1234"},
+                     follow_redirects=False)
+    assert r2.status_code == 303
+    assert "JOBSCOUT_BRAVE_API_KEY=bb-1234" in env_file.read_text(encoding="utf-8")
+
+
+def test_tools_prefer_brave_when_only_brave_set():
+    """The agent's web_search falls back to Brave — env contract check."""
+    import inspect
+
+    from jobscout.agent import tools
+
+    src = inspect.getsource(tools._web_search)
+    assert "JOBSCOUT_BRAVE_API_KEY" in src
+    assert "JOBSCOUT_CSE_API_KEY" in src

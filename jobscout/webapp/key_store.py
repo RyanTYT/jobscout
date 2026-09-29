@@ -87,6 +87,7 @@ def save_key(raw_key: str) -> dict:
 # ── CSE (search) keys — the agent's web-search tier ──────────────────────
 
 CSE_KEY_ENV = "JOBSCOUT_CSE_API_KEY"   # canonical name (tools + .env.example)
+BRAVE_KEY_ENV = "JOBSCOUT_BRAVE_API_KEY"
 CSE_CX_ENV = "JOBSCOUT_CSE_CX"
 
 
@@ -118,6 +119,26 @@ def clear_cse() -> dict:
     _drop(path, CSE_KEY_ENV)
     _drop(path, CSE_CX_ENV)
     return cse_status()
+
+
+def brave_status() -> dict:
+    key = (_current_env().get(BRAVE_KEY_ENV) or "").strip()
+    return {"key_set": bool(key), "key_tail": key[-4:] if key else ""}
+
+
+def save_brave(raw_key: str) -> dict:
+    key = (raw_key or "").strip().strip("'\"")
+    if not key:
+        raise KeyStoreError("empty key — nothing to save")
+    if any(ch.isspace() for ch in key):
+        raise KeyStoreError("the key contains whitespace — paste it verbatim")
+    _upsert(_env_path(), BRAVE_KEY_ENV, key)
+    return brave_status()
+
+
+def clear_brave() -> dict:
+    _drop(_env_path(), BRAVE_KEY_ENV)
+    return brave_status()
 
 
 def clear_key() -> dict:
