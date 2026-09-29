@@ -7,6 +7,16 @@ cd "$(dirname "$0")"
 REPO="$(cd .. && pwd)"
 VENV="$REPO/.venv/bin"
 
+echo "── snapshot config → bundle defaults (the dmg ships your current config) ──"
+rm -rf build/defaults-snapshot
+mkdir -p build/defaults-snapshot
+cp "$REPO/config/settings.yaml" \
+   "$REPO/config/profile.yaml" \
+   "$REPO/config/models.yaml" \
+   "$REPO/config/watchlist.yaml" \
+   "$REPO/master_resume/resume.yaml" \
+   build/defaults-snapshot/
+
 echo "── 1/2 freezing jobscout backend (PyInstaller onedir) ──"
 "$VENV/pyinstaller" \
   --name jobscout-server --onedir \
@@ -23,16 +33,6 @@ echo "── 1/2 freezing jobscout backend (PyInstaller onedir) ──"
   --add-data "$REPO/jobscout/packets/templates:jobscout/packets/templates" \
   --add-data "$REPO/desktop/build/defaults-snapshot:jobscout/defaults" \
   freeze/entry.py
-
-echo "── snapshot config → bundle defaults (the dmg ships your current config) ──"
-rm -rf build/defaults-snapshot
-mkdir -p build/defaults-snapshot
-cp "$REPO/config/settings.yaml" \
-   "$REPO/config/profile.yaml" \
-   "$REPO/config/models.yaml" \
-   "$REPO/config/watchlist.yaml" \
-   "$REPO/master_resume/resume.yaml" \
-   build/defaults-snapshot/
 
 echo "── 2/2 building the Tauri bundles ──"
 npx tauri build
