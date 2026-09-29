@@ -89,6 +89,42 @@ def _resume_path() -> Path:
     return master_resume_dir() / "resume.yaml"
 
 
+def upload_resume(text: str) -> dict:
+    """Replace master_resume/resume.yaml wholesale with a validated upload.
+
+    The incoming YAML must parse into the MasterResume schema — anything
+    else is rejected with the file untouched. The previous resume is kept
+    as resume.yaml.bak alongside (one rolling backup). Returns a summary
+    for the flash."""
+    import yaml
+
+    from jobscout.core.models import MasterResume
+    from jobscout.core.resume import load_master_resume
+
+    path = _resume_path()
+    try:
+        data = yaml.safe_load(text or "")
+    except yaml.YAMLError as e:
+        raise ProfileError(f"not valid YAML: {e}") from e
+    if not isinstance(data, dict):
+        raise ProfileError("expected a YAML mapping at the top level")
+    try:
+        MasterResume.model_validate(data)
+    except Exception as e:                       # noqa: BLE001 — pydantic detail
+        raise ProfileError(f"resume schema rejected it: {e}") from e
+
+    if path.is_file():
+        backup = path.with_suffix(".yaml.bak")
+        backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+    resume = load_master_resume()
+    return {"fields": sum(
+        1 for e in resume.experience or []) + len(resume.education or []),
+            "backup": str(path.with_suffix(".yaml.bak"))}
+
+
 def current_values() -> dict:
     """Form-friendly view of the current resume values."""
     try:

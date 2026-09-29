@@ -26,7 +26,24 @@ TEMPLATES.env.globals["linkify"] = ui.linkify
 TEMPLATES.env.globals["kind_meta"] = ui.signal_kind_meta
 TEMPLATES.env.globals["kind_desc"] = lambda k: ui.signal_kind_meta(k)["desc"]
 
-_run_state: dict = {"running": False, "out": ""}
+_run_state: dict = {"running": False, "out": "", "error": ""}
+
+
+def _strip_ansi(text: str) -> str:
+    """Console colour codes have no business in a web page."""
+    import re as _re
+
+    return _re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", text or "")
+
+
+def _last_error(text: str) -> str:
+    """The last `SomethingError: message` line from a CLI traceback."""
+    import re as _re
+
+    hits = _re.findall(
+        r"[A-Za-z_]*(?:Error|Exception|ConfigError)\b[^\n]*",
+        text or "")
+    return hits[-1].strip() if hits else ""
 
 
 def _llm_fields(row) -> dict:
@@ -263,6 +280,9 @@ def create_app() -> FastAPI:
                 "latest_report": latest_report,
                 "recent_runs": recent_runs,
                 "just_started": started == "1",
+                "running": _run_state["running"],
+                "run_out": _run_state["out"],
+                "run_error": _run_state["error"],
             },
         )
 
@@ -300,12 +320,20 @@ def create_app() -> FastAPI:
                 proc = subprocess.run(
                     [cli, "agent"], capture_output=True, text=True, timeout=900
                 )
-                _run_state["out"] = ((proc.stdout or "") + (proc.stderr or ""))[-8000:]
+                _run_state["out"] = _strip_ansi(
+                    (proc.stdout or "") + (proc.stderr or ""))[-8000:]
+                if proc.returncode != 0:
+                    _run_state["error"] = _last_error(_run_state["out"]) or (
+                        f"the agent exited with code {proc.returncode}")
+                else:
+                    _run_state["error"] = ""
             except subprocess.TimeoutExpired:
                 _run_state["out"] = ("run timed out after 900s "
                                      "(caps should prevent this)")
+                _run_state["error"] = "run timed out after 900s"
             except OSError as e:
                 _run_state["out"] = f"failed to launch the jobscout agent: {e}"
+                _run_state["error"] = _run_state["out"]
             finally:
                 _run_state["running"] = False
 
@@ -314,10 +342,35 @@ def create_app() -> FastAPI:
 
     @app.get("/discovery/run-status", response_class=HTMLResponse)
     def discovery_run_status(request: Request):
-        """HTMX partial: live state of the background agent run."""
+        """HTMX partial: the agent-run panel — button state, live badge,
+        agent spend (updated while the run is in flight), then output."""
+        conn = db.connect()
+        try:
+            agent_spend = conn.execute(
+                "SELECT COUNT(*) AS calls, COALESCE(SUM(cost_usd), 0) AS cost, "
+                "COALESCE(SUM(prompt_tokens + completion_tokens), 0) AS tokens "
+                "FROM llm_calls WHERE tier = 'agent' "
+                "AND date(created_at) >= date('now', '-30 days')"
+            ).fetchone()
+        finally:
+            conn.close()
         return TEMPLATES.TemplateResponse(
             request, "_run_status.html",
-            {"running": _run_state["running"], "run_out": _run_state["out"]},
+            {"running": _run_state["running"], "run_out": _run_state["out"],
+             "run_error": _run_state["error"], "agent_spend": agent_spend},
+        )
+
+    @app.get("/ops/spend", response_class=HTMLResponse)
+    def ops_spend(request: Request):
+        """HTMX partial: the ops spend table, polled while the agent runs."""
+        conn = db.connect()
+        try:
+            spend = db.llm_spend_by_tier(conn, days=7)
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(
+            request, "_ops_spend.html",
+            {"spend": spend, "running": _run_state["running"]},
         )
 
     # ── applications / packets ───────────────────────────────────────────
@@ -567,14 +620,66 @@ def create_app() -> FastAPI:
                 "last_stats": last_stats,
             
                 "llm_status": llm_status,
+                "running": _run_state["running"],
                 "key_saved": key_saved == "1",
                 "key_error": key_error,},
         )
 
     # ── profile (master resume editor) ───────────────────────────────────
 
+    @app.get("/profile/resume-download")
+    def profile_resume_download():
+        """Serve the current master resume as a download (fill it fully
+        offline, re-upload via the form above)."""
+        from starlette.responses import FileResponse
+
+        from jobscout.core.paths import master_resume_dir
+
+        path = master_resume_dir() / "resume.yaml"
+        if not path.is_file():
+            return RedirectResponse("/profile?upload_error=resume.yaml+not+found",
+                                    status_code=303)
+        return FileResponse(path, filename="resume.yaml",
+                            media_type="application/x-yaml")
+
+    @app.post("/profile/upload-resume")
+    async def profile_upload_resume(request: Request):
+        """Replace the master resume wholesale from an uploaded YAML file.
+        Validated against the schema first; the old file is kept as .bak."""
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import profile_store
+
+        form = await request.form()
+        upload = form.get("resume_file")
+        if upload is None or not getattr(upload, "filename", ""):
+            return RedirectResponse(
+                "/profile?upload_error=" + _q("no file selected"),
+                status_code=303)
+        name = upload.filename.lower()
+        if not name.endswith((".yaml", ".yml")):
+            return RedirectResponse(
+                "/profile?upload_error=" + _q("expected a .yaml file"),
+                status_code=303)
+        try:
+            text = (await upload.read()).decode("utf-8")
+        except UnicodeDecodeError:
+            return RedirectResponse(
+                "/profile?upload_error=" + _q("not a UTF-8 text file"),
+                status_code=303)
+        try:
+            result = profile_store.upload_resume(text)
+            return RedirectResponse(
+                "/profile?uploaded=1&fields=" + _q(str(result["fields"])),
+                status_code=303)
+        except profile_store.ProfileError as e:
+            return RedirectResponse(
+                "/profile?upload_error=" + _q(str(e)), status_code=303)
+
     @app.get("/profile", response_class=HTMLResponse)
-    def profile_page(request: Request, saved: str = Query("")):
+    def profile_page(request: Request, saved: str = Query(""),
+                     uploaded: str = Query(""), upload_error: str = Query(""),
+                     fields: str = Query("")):
         from jobscout.webapp import profile_store
 
         conn = db.connect()
@@ -595,6 +700,9 @@ def create_app() -> FastAPI:
                 "missing": profile_store.missing_required(),
                 "custom": profile_store.custom_fields(),
                 "just_saved": saved == "1",
+                "just_uploaded": uploaded == "1",
+                "upload_error": upload_error,
+                "uploaded_fields": fields,
                 "error": None,
             },
         )

@@ -597,10 +597,13 @@ def test_run_agent_now_returns_immediately(client, monkeypatch):
 
     done = threading.Event()
 
+    class FakeProc:
+        stdout, stderr, returncode = "agent done", "", 0
+
     def fake_run(*a, **kw):
         done.set()
         time.sleep(0.2)
-        return
+        return FakeProc()
 
     # the handler imports subprocess INSIDE the function — the module
     # object is shared, so patching subprocess.run covers it
@@ -615,3 +618,172 @@ def test_run_agent_now_returns_immediately(client, monkeypatch):
     assert status.status_code == 200
     # while the fake run sleeps, running=True polls
     assert "running" in status.text or "run-status" in status.text
+
+
+# ── live run panel + error surfacing + credentials UX ──────────────────────
+
+
+def test_run_panel_error_callout(client):
+    from jobscout.webapp.routes import _run_state
+
+    _run_state.update(running=False, out="some output",
+                      error="ConfigError: missing config file: models.yaml")
+    try:
+        r = client.get("/discovery/run-status")
+        assert r.status_code == 200
+        assert "run failed" in r.text
+        assert "ConfigError: missing config file" in r.text
+    finally:
+        _run_state.update(running=False, out="", error="")
+
+
+def test_run_panel_has_button_and_spend(client):
+
+    r = client.get("/discovery/run-status")
+    assert 'action="/discovery/run"' in r.text      # button lives in the panel
+    assert "agent spend" in r.text                   # spend refreshes with it
+
+
+def test_run_panel_running_state_polls(client):
+    from jobscout.webapp.routes import _run_state
+
+    _run_state.update(running=True, out="", error="")
+    try:
+        r = client.get("/discovery/run-status")
+        assert "every 3s" in r.text
+        assert "agent running" in r.text
+        assert "Run agent now" not in r.text         # button swapped for state
+    finally:
+        _run_state.update(running=False, out="", error="")
+
+
+def test_ops_spend_partial_polls_while_running(client):
+    from jobscout.webapp.routes import _run_state
+
+    _run_state.update(running=True, out="", error="")
+    try:
+        r = client.get("/ops/spend")
+        assert r.status_code == 200
+        assert "every 3s" in r.text
+        assert "live" in r.text
+    finally:
+        _run_state.update(running=False, out="", error="")
+
+
+def test_credentials_card_replace_and_remove_semantics(client, db_file):
+    r = client.get("/ops")
+    assert "Replace the saved key" in r.text
+    assert "replaces" in r.text
+    # remove button appears only when a key is saved
+    assert "remove key" not in r.text
+    from jobscout.webapp import key_store as _ks
+
+    import pathlib
+
+    fake = pathlib.Path("/tmp/_fake.env")
+    fake.write_text("JOBSCOUT_LLM_API_KEY=sk-zzz\n", encoding="utf-8")
+    from jobscout.core import config as core_config
+
+    orig_store, orig_cfg = _ks._env_path, core_config.env_path
+    _ks._env_path = lambda: fake
+    core_config.env_path = lambda: fake     # status() reads via load_env
+    try:
+        r = client.get("/ops")
+        assert "remove key" in r.text
+        assert "data-confirm-prompt" in r.text
+        assert "key saved" in r.text and "zzz" in r.text
+    finally:
+        _ks._env_path, core_config.env_path = orig_store, orig_cfg
+        fake.unlink(missing_ok=True)
+
+
+# ── resume upload / download round-trip ────────────────────────────────────
+
+
+VALID_RESUME_YAML = """identity:
+  full_name: Upload Tester
+  email: upload@example.com
+experience:
+  - id: EXPCUR
+    company: Uploaded Co
+    title: Engineer
+    dates: {start: "2024-01"}
+education:
+  - id: EDU1
+    school: Upload U
+    degree: BS
+    dates: {start: "2016-09", end: "2020-06"}
+"""
+
+
+def test_resume_upload_replaces_with_backup(client, monkeypatch, tmp_path):
+    import shutil as _sh
+
+    from jobscout.core import paths as core_paths
+    from jobscout.core import resume as cr
+
+    real = core_paths.master_resume_dir()
+    _sh.copytree(real, tmp_path, dirs_exist_ok=True)
+    monkeypatch.setattr(core_paths, "master_resume_dir", lambda: tmp_path)
+    monkeypatch.setattr(cr, "master_resume_dir", lambda: tmp_path)
+    monkeypatch.setattr("jobscout.webapp.profile_store.master_resume_dir",
+                        lambda: tmp_path)
+    before = (tmp_path / "resume.yaml").read_text(encoding="utf-8")
+
+    r = client.post("/profile/upload-resume",
+                    files={"resume_file": ("resume.yaml", VALID_RESUME_YAML,
+                                           "application/x-yaml")},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    assert "uploaded=1" in r.headers["location"]
+    after = (tmp_path / "resume.yaml").read_text(encoding="utf-8")
+    assert after == VALID_RESUME_YAML
+    assert (tmp_path / "resume.yaml.bak").read_text(encoding="utf-8") == before
+    # the form now reflects the uploaded values
+    page = client.get("/profile")
+    assert "Upload Tester" in page.text and "Uploaded Co" in page.text
+
+
+def test_resume_upload_invalid_rejected_untouched(client, monkeypatch, tmp_path):
+    import shutil as _sh
+
+    from jobscout.core import paths as core_paths
+    from jobscout.core import resume as cr
+
+    real = core_paths.master_resume_dir()
+    _sh.copytree(real, tmp_path, dirs_exist_ok=True)
+    monkeypatch.setattr(core_paths, "master_resume_dir", lambda: tmp_path)
+    monkeypatch.setattr(cr, "master_resume_dir", lambda: tmp_path)
+    monkeypatch.setattr("jobscout.webapp.profile_store.master_resume_dir",
+                        lambda: tmp_path)
+    before = (tmp_path / "resume.yaml").read_text(encoding="utf-8")
+
+    r = client.post("/profile/upload-resume",
+                    files={"resume_file": ("resume.yaml", "not: [valid",
+                                           "application/x-yaml")},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    assert "upload_error=" in r.headers["location"]
+    assert (tmp_path / "resume.yaml").read_text(encoding="utf-8") == before
+
+
+def test_resume_upload_rejects_non_yaml(client):
+    r = client.post("/profile/upload-resume",
+                    files={"resume_file": ("resume.pdf", b"%PDF-",
+                                           "application/pdf")},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    assert "upload_error=" in r.headers["location"]
+
+
+def test_resume_download_serves_file(client, monkeypatch, tmp_path):
+    import shutil as _sh
+
+    from jobscout.core import paths as core_paths
+
+    real = core_paths.master_resume_dir()
+    _sh.copytree(real, tmp_path, dirs_exist_ok=True)
+    monkeypatch.setattr(core_paths, "master_resume_dir", lambda: tmp_path)
+    r = client.get("/profile/resume-download")
+    assert r.status_code == 200
+    assert "full_name" in r.text

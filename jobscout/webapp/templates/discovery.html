@@ -14,12 +14,11 @@
       <em>pipeline</em>, <em>agent</em> and <em>hybrid</em> modes
     </div>
   </div>
-  <form method="post" action="/discovery/run" data-busy-submit>
-    <button class="btn btn-primary" type="submit">
-      {{ m.icon("bolt", 14) }} Run agent now
-    </button>
-  </form>
 </div>
+
+{# ── live agent-run panel: the button, running state, and spend refresh
+     together (polls every 3s while a run is in flight) ────────────────── #}
+{% include "_run_status.html" %}
 
 <p class="text-secondary small mb-0">
   runs the deterministic sweep + agent harness (if key present) as a subprocess,
@@ -188,20 +187,6 @@
   </div>
 </form>
 
-{# ── agent spend ──────────────────────────────────────────────────────── #}
-<div class="row g-3">
-  <div class="col-4">{{ m.stat("agent calls (30d)", agent_spend["calls"] | string) }}</div>
-  <div class="col-4">{{ m.stat("tokens", "{:,}".format(agent_spend["tokens"])) }}</div>
-  <div class="col-4">{{ m.stat("spend", "$%.4f" | format(agent_spend["cost"]),
-                              hint="metered in llm_calls · capped per tier") }}</div>
-</div>
-
-{% if run_output %}
-<div class="card">
-  <div class="card-header"><h2 class="card-title mb-0 h6">Last run output</h2></div>
-  <div class="card-body"><pre class="mb-0 small">{{ run_output }}</pre></div>
-</div>
-{% endif %}
 
 {# ── recent runs (the Ops view, scoped to the agent) ─────────────────── #}
 <div class="card">

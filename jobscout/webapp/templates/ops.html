@@ -17,8 +17,14 @@
     </a>
     <form method="post" action="/discovery/run" data-busy-submit
           style="display: contents">
-      <button class="btn btn-primary" type="submit">
+      <button class="btn btn-primary" type="submit"
+              {% if running %}disabled{% endif %}>
+        {% if running %}
+        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+        agent running…
+        {% else %}
         {{ m.icon("bolt", 14) }} Run agent now
+        {% endif %}
       </button>
     </form>
   </div>
@@ -88,67 +94,47 @@
   <div class="card-body">
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
       {% if llm_status.key_set %}
-      {{ m.badge("key set ····" ~ llm_status.key_tail, "success") }}
+      {{ m.badge("key saved ····" ~ llm_status.key_tail, "success", llm_status.key_env) }}
       {% else %}
-      {{ m.badge("no key set", "warning", "LLM scoring and the agent stay off until a key exists") }}
+      {{ m.badge("no key saved", "warning", "LLM scoring and the agent stay off until a key exists") }}
       {% endif %}
       {% if llm_status.base_url %}
       {{ m.badge(llm_status.base_url, "light", llm_status.base_url_env) }}
       {% else %}
       {{ m.badge("default provider endpoint", "light") }}
       {% endif %}
+      <div class="flex-grow-1"></div>
+      {% if llm_status.key_set %}
+      <form method="post" action="/ops/llm-key/clear" data-busy-submit
+            data-confirm-prompt="Remove the saved API key? LLM scoring and the agent turn off until a new key is saved.">
+        <button class="btn btn-outline-danger btn-sm" type="submit">
+          {{ m.icon("x", 12) }} remove key
+        </button>
+      </form>
+      {% endif %}
     </div>
-    <form method="post" action="/ops/llm-key" class="row g-3 align-items-end" data-busy-submit>
-      <div class="col-12 col-md-8 col-lg-6">
-        <label class="form-label" for="f-api-key">API key</label>
-        <input class="form-control" type="password" id="f-api-key" name="api_key"
-               autocomplete="off" spellcheck="false"
-               placeholder="paste {{ llm_status.key_env }} — saves to .env">
-        <div class="form-text">
-          pasted once, stored in .env; the field is always empty on reload
+
+    <form method="post" action="/ops/llm-key" data-busy-submit>
+      <label class="form-label" for="f-api-key">Replace the saved key</label>
+      <div class="d-flex flex-wrap gap-2">
+        <div class="flex-grow-1" style="min-width: var(--field-min-w);">
+          <input class="form-control" type="password" id="f-api-key" name="api_key"
+                 autocomplete="off" spellcheck="false"
+                 placeholder="{% if llm_status.key_set %}paste the new key — it replaces ····{{ llm_status.key_tail }}{% else %}paste {{ llm_status.key_env }}{% endif %}">
+          <div class="form-text">
+            the field always starts empty (the key is never shown back) —
+            pasting here <strong>replaces</strong> whatever is saved
+          </div>
         </div>
-      </div>
-      <div class="col-12 col-md-4 col-lg-3 d-flex gap-2">
         <button class="btn btn-primary btn-sm" type="submit">
           {{ m.icon("check", 12) }} save key
         </button>
-        {% if llm_status.key_set %}
-        <button class="btn btn-outline-secondary btn-sm" type="submit"
-                formaction="/ops/llm-key/clear" formnovalidate>clear</button>
-        {% endif %}
       </div>
     </form>
   </div>
 </div>
 
-<div class="card">
-  <div class="card-header"><h2 class="card-title mb-0 h6">LLM spend (7 days)</h2></div>
-  {% if spend %}
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead class="table-light">
-        <tr><th scope="col">tier</th><th scope="col">model</th><th scope="col">calls</th>
-            <th scope="col">in tok</th><th scope="col">out tok</th><th scope="col">cost</th></tr>
-      </thead>
-      <tbody>
-        {% for s in spend %}
-        <tr>
-          <td>{{ m.badge(s.tier, "primary") }}</td>
-          <td class="text-secondary">{{ s.model }}</td>
-          <td class="font-monospace">{{ s.calls }}</td>
-          <td class="font-monospace">{{ "{:,}".format(s.ptok or 0) }}</td>
-          <td class="font-monospace">{{ "{:,}".format(s.ctok or 0) }}</td>
-          <td class="font-monospace">${{ "%.4f" | format(s.cost or 0) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="card-body">
-    {{ m.empty("No LLM calls recorded", "The key isn't set in .env, or nothing has been scored yet.", "pulse") }}
-  </div>
-  {% endif %}
+{% include "_ops_spend.html" %}
 </div>
 
 {% if last_stats %}

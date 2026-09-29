@@ -1,29 +1,72 @@
-{# _run_status.html — live state of the background agent run. Polls
-   itself every 3s while running; renders the output when it lands. #}
+{# _run_status.html — the live agent-run panel. This is the ONE place the
+   run button lives, so the button, the running state, and the spend
+   updates stay in lockstep: plain click → full POST → page reloads with
+   the running badge; this partial then polls every 3s, refreshing spend
+   in real time, restoring the button when the run lands its output. #}
 {% import "components/macros.html" as m %}
 
-{% if running %}
-<div hx-get="/discovery/run-status" hx-trigger="every 3s" hx-swap="outerHTML"
-     id="run-status">
+<div id="run-status"
+     {% if running %}hx-get="/discovery/run-status" hx-trigger="every 3s"
+     hx-swap="outerHTML"{% endif %}>
   <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <h2 class="card-title mb-0 h6">Agent run</h2>
-      <span class="badge text-bg-primary">
-        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-        running
-      </span>
-    </div>
-    <div class="card-body text-secondary small">
-      the morning agent is running in the background — this panel refreshes
-      itself until the output lands
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        {% if running %}
+        <button class="btn btn-primary btn-sm" type="button" disabled>
+          <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+          agent running…
+        </button>
+        <span class="small text-secondary">
+          the sweep + agent are running in the background — this panel
+          refreshes itself every 3s until the output lands
+        </span>
+        {% else %}
+        <form method="post" action="/discovery/run" data-busy-submit
+              style="display: contents">
+          <button class="btn btn-primary btn-sm" type="submit">
+            {{ m.icon("bolt", 12) }} Run agent now
+          </button>
+        </form>
+        {% if run_out %}
+        <span class="small text-secondary">last run finished — output below</span>
+        {% else %}
+        <span class="small text-secondary">
+          runs the sweep + agent as a background subprocess (capped)
+        </span>
+        {% endif %}
+        {% endif %}
+        <div class="flex-grow-1"></div>
+        <div class="d-flex flex-wrap gap-3 mb-0">
+          {{ m.stat("agent calls (30d)", agent_spend["calls"] | string) }}
+          {{ m.stat("agent tokens", "{:,}".format(agent_spend["tokens"])) }}
+          {{ m.stat("agent spend", "$%.4f" | format(agent_spend["cost"]),
+                     hint="live while running — metered in llm_calls") }}
+        </div>
+      </div>
     </div>
   </div>
-</div>
-{% elif run_out %}
-<div id="run-status">
-  <div class="card">
+
+  {% if run_error %}
+  <div class="alert alert-danger mb-0 mt-3 d-flex align-items-start gap-2">
+    <span class="fw-semibold text-nowrap">run failed:</span>
+    <span class="small">{{ run_error }}</span>
+  </div>
+  {% endif %}
+
+  {% if run_out %}
+  <div class="card mt-3">
     <div class="card-header"><h2 class="card-title mb-0 h6">Last run output</h2></div>
-    <div class="card-body"><pre class="mb-0 small" style="white-space: pre-wrap;">{{ run_out }}</pre></div>
+    <div class="card-body scroll-y"><pre class="mb-0 small"
+        style="white-space: pre-wrap;">{{ run_out }}</pre></div>
   </div>
+  {% elif running %}
+  <div class="card mt-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-2 text-secondary small">
+        <span class="spinner-grow spinner-grow-sm" role="status"></span>
+        collecting + judging — the output appears here when the run finishes
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </div>
-{% endif %}

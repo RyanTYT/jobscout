@@ -124,6 +124,16 @@
     }
   });
 
+  // plain forms with a confirm prompt (e.g. remove the API key)
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (form.matches && form.matches("form[data-confirm-prompt]")) {
+      if (!window.confirm(form.getAttribute("data-confirm-prompt"))) {
+        e.preventDefault();
+      }
+    }
+  }, true);
+
   // plain forms: disable submit while pending
   document.addEventListener("submit", function (e) {
     var form = e.target;

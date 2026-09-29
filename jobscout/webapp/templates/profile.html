@@ -20,6 +20,48 @@
   </span>
 </div>
 
+{% if just_uploaded %}
+{{ m.callout("Master resume replaced — validated, old file kept as resume.yaml.bak. The form below now shows its values.", "success") }}
+{% endif %}
+{% if upload_error %}
+{{ m.callout("Upload rejected: " ~ upload_error ~ " — nothing was changed.", "danger") }}
+{% endif %}
+
+{# ── full-resume round-trip: download the current YAML, fill it
+     completely offline (every block: experience history, education,
+     links, extras — beyond what the form above edits), re-upload. #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Full resume (YAML)</h2>
+    <span class="text-secondary small">
+      the single source of truth — every field, not just the form above
+    </span>
+  </div>
+  <div class="card-body">
+    <form method="post" action="/profile/upload-resume"
+          enctype="multipart/form-data" data-busy-submit
+          data-confirm-prompt="Replace the entire master resume with the uploaded file? The current one is kept as resume.yaml.bak.">
+      <div class="d-flex flex-wrap gap-2 align-items-end">
+        <div class="flex-grow-1" style="min-width: var(--field-min-w);">
+          <label class="form-label" for="f-resume-file">resume.yaml file</label>
+          <input class="form-control" type="file" id="f-resume-file"
+                 name="resume_file" accept=".yaml,.yml">
+          <div class="form-text">
+            must parse + validate against the resume schema; invalid uploads
+            change nothing
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" type="submit">
+          {{ m.icon("arrow-right", 12) }} replace resume
+        </button>
+        <a class="btn btn-outline-secondary btn-sm" href="/profile/resume-download">
+          {{ m.icon("doc", 12) }} download current
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% if just_saved %}
 {{ m.callout("Profile saved — resume.yaml updated and re-validated. New packets pick these values up immediately.", "success") }}
 {% endif %}

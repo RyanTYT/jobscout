@@ -61,6 +61,8 @@ def init_home() -> None:
     seeds = [
         (defaults / "settings.yaml", config_dir() / "settings.yaml"),
         (defaults / "profile.yaml", config_dir() / "profile.yaml"),
+        (defaults / "models.yaml", config_dir() / "models.yaml"),
+        (defaults / "watchlist.yaml", config_dir() / "watchlist.yaml"),
         (defaults / "resume.yaml", master_resume_dir() / "resume.yaml"),
     ]
     for src, dst in seeds:
