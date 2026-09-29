@@ -18,12 +18,13 @@
     <form method="post" action="/discovery/run" data-busy-submit
           style="display: contents">
       <button class="btn btn-primary" type="submit"
+              title="Full morning hunt: deterministic sweep, then the agent with profile-driven + signal-driven web searches (CSE keys required for search)."
               {% if running %}disabled{% endif %}>
         {% if running %}
         <span class="spinner-border spinner-border-sm me-1" role="status"></span>
         agent running…
         {% else %}
-        {{ m.icon("bolt", 14) }} Run agent now
+        {{ m.icon("bolt", 14) }} full hunt
         {% endif %}
       </button>
     </form>

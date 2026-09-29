@@ -8,6 +8,7 @@ and styles come exclusively from static/css/tokens.css variables.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from urllib.parse import quote
 
@@ -442,8 +443,32 @@ def create_app() -> FastAPI:
                 status_code=303)
         return RedirectResponse("/discovery", status_code=303)
 
+    @app.post("/open-url")
+    async def open_url(request: Request):
+        """Open an external URL in the DEFAULT browser (OS `open`).
+
+        Called by the webview for company links, careers buttons, signal
+        URLs — browser-opening from a Tauri webview is unreliable (plugin
+        permissions, target=_blank is a no-op in WKWebView), so the
+        backend does it on the same machine it serves. http/https only."""
+        import subprocess
+        import sys
+        from urllib.parse import urlparse
+
+        form = await request.form()
+        url = (form.get("url") or "").strip()
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return {"error": "only http/https URLs can be opened"}
+        opener = "open" if sys.platform == "darwin" else "xdg-open"
+        try:
+            subprocess.Popen([opener, url], start_new_session=True)
+            return {"ok": True}
+        except OSError as e:
+            return {"error": f"failed to open: {e}"}
+
     @app.post("/discovery/run")
-    def run_agent_now():
+    def run_agent_now(focus: str = Form("")):
         """Run the morning agent in a background thread — the button
         returns immediately; the output panel below polls until it lands.
         The CLI resolution works both in dev (.venv/bin/jobscout) and in
@@ -456,6 +481,8 @@ def create_app() -> FastAPI:
             return RedirectResponse("/discovery?started=1", status_code=303)
         _run_state["running"] = True
         _run_state["out"] = ""
+        _run_state["error"] = ""
+        focus = "profile" if focus == "profile" else ""
 
         def _launch():
             try:
@@ -463,8 +490,12 @@ def create_app() -> FastAPI:
                     cli = sys.executable            # the frozen binary itself
                 else:
                     cli = str(Path(sys.executable).parent / "jobscout")
+                env = {**os.environ}
+                if focus:
+                    env["JOBSCOUT_AGENT_FOCUS"] = focus
                 proc = subprocess.run(
-                    [cli, "agent"], capture_output=True, text=True, timeout=900
+                    [cli, "agent"], capture_output=True, text=True,
+                    timeout=900, env=env
                 )
                 _run_state["out"] = _strip_ansi(
                     (proc.stdout or "") + (proc.stderr or ""))[-8000:]

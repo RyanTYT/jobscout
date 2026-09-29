@@ -831,3 +831,58 @@ def test_htmx_failure_toast_handler_present(client):
     assert "htmx:responseError" in r.text
     assert "htmx:sendError" in r.text
     assert "request failed" in r.text
+
+
+# ── external opens + focused hunts ─────────────────────────────────────────
+
+
+def test_open_url_endpoint_rejects_non_http(client):
+    r = client.post("/open-url", data={"url": "file:///etc/passwd"})
+    assert r.status_code == 200
+    assert r.json()["error"]
+    r2 = client.post("/open-url", data={"url": "javascript:alert(1)"})
+    assert r2.json()["error"]
+
+
+def test_open_url_endpoint_opens_default_browser(client, monkeypatch):
+    import subprocess
+
+    calls = []
+
+    class FakePopen:
+        def __init__(self, args, **kw):
+            calls.append(args)
+
+    monkeypatch.setattr(subprocess, "Popen", FakePopen)
+    r = client.post("/open-url", data={"url": "https://acme.com/careers"})
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+    assert calls == [["open", "https://acme.com/careers"]]
+
+
+def test_run_panel_renders_both_hunt_buttons(client):
+    r = client.get("/discovery/run-status")
+    assert "full hunt (sweep + agent)" in r.text
+    assert "profile hunt only" in r.text
+    assert 'name="focus" value="profile"' in r.text
+    assert "title=" in r.text                       # tooltips explain them
+
+
+def test_run_agent_focus_flag_reaches_subprocess(client, monkeypatch):
+    import subprocess as sp
+
+    seen = {}
+
+    class FakeProc:
+        stdout, stderr, returncode = "done", "", 0
+
+    def fake_run(args, **kw):
+        seen["args"] = args
+        seen["env"] = kw.get("env")
+        return FakeProc()
+
+    monkeypatch.setattr(sp, "run", fake_run)
+    r = client.post("/discovery/run", data={"focus": "profile"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    assert seen["env"]["JOBSCOUT_AGENT_FOCUS"] == "profile"

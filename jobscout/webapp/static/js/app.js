@@ -221,13 +221,31 @@
      normal browser this is just a new tab. Internal app URLs never route
      through here. */
   function openExternal(url) {
+    // The backend runs on the same machine as the browser that's showing
+    // this page, so it can ask the OS to open the default browser — the
+    // one path that works inside the Tauri webview AND in a normal
+    // browser. The plugin invoke stays as a first try; window.open is the
+    // last resort (no-op inside the webview, real tab elsewhere).
     var tauri = window.__TAURI__;
-    if (tauri && tauri.invoke) {
-      tauri.invoke("plugin:opener|open_url", { url: url })
-        .catch(function () { window.open(url, "_blank", "noopener"); });
-    } else {
-      window.open(url, "_blank", "noopener");
-    }
+    var body = "url=" + encodeURIComponent(url);
+    fetch("/open-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body,
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok, j: j }; });
+    }).then(function (res) {
+      if (!res.ok || res.j.error) {
+        toast("could not open link: " + (res.j.error || "unknown"), "danger");
+      }
+    }).catch(function () {
+      if (tauri && tauri.invoke) {
+        tauri.invoke("plugin:opener|open_url", { url: url })
+          .catch(function () { window.open(url, "_blank", "noopener"); });
+      } else {
+        window.open(url, "_blank", "noopener");
+      }
+    });
   }
 
   function isExternal(url) {

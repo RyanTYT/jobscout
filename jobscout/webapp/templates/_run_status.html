@@ -23,15 +23,24 @@
         {% else %}
         <form method="post" action="/discovery/run" data-busy-submit
               style="display: contents">
-          <button class="btn btn-primary btn-sm" type="submit">
-            {{ m.icon("bolt", 12) }} Run agent now
+          <button class="btn btn-primary btn-sm" type="submit"
+                  title="Full morning hunt: the deterministic sweep (ATS boards, careers pages, signals), then the agent — BOTH profile-driven searches (companies matching your hunting profile) AND signal-driven searches (funding news, hiring posts). Needs CSE search keys for web searches. Capped at the step and $ caps.">
+            {{ m.icon("bolt", 12) }} full hunt (sweep + agent)
+          </button>
+        </form>
+        <form method="post" action="/discovery/run" data-busy-submit
+              style="display: contents">
+          <input type="hidden" name="focus" value="profile">
+          <button class="btn btn-outline-primary btn-sm" type="submit"
+                  title="Profile-only hunt: the agent spends its whole budget searching for companies that match YOUR hunting profile (roles × stack × domains × locations, Singapore first) — no signal resolution, no funding chases. Needs CSE search keys.">
+            {{ m.icon("search", 12) }} profile hunt only
           </button>
         </form>
         {% if run_out %}
         <span class="small text-secondary">last run finished — output below</span>
         {% else %}
         <span class="small text-secondary">
-          runs the sweep + agent as a background subprocess (capped)
+          background subprocess, capped by your Agent caps
         </span>
         {% endif %}
         {% endif %}
