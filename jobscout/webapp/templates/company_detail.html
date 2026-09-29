@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% import "components/macros.html" as m %}
+
+{% block title %}{{ entry.name }} · jobscout{% endblock %}
+{% block topbar_title %}Company{% endblock %}
+
+{% block content %}
+
+<a class="backlink" href="/companies">{{ m.icon("arrow-left", 12) }} companies</a>
+
+{% if error %}
+{{ m.callout(error, "danger") }}
+{% endif %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+  <div>
+    <h1 class="h4 mb-1">{{ entry.name }}</h1>
+    <div class="text-secondary small">
+      watchlist.yaml entry · {{ "tier " + tier if tier in ("A", "B", "C") else "candidate (unpromoted)" }}
+    </div>
+  </div>
+</div>
+
+<form class="card" method="post" action="/companies/{{ cid }}/save" data-busy-submit>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Edit company</h2>
+    <span class="text-secondary small">the note is data — it survives regeneration</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+
+      <div class="col-12 col-md-6 col-lg-4">
+        <label class="form-label" for="f-name">name</label>
+        <input class="form-control" type="text" id="f-name" name="name"
+               value="{{ entry.name }}">
+        <div class="form-text">renaming would change the company id — disabled</div>
+      </div>
+
+      <div class="col-12 col-md-6 col-lg-4">
+        <label class="form-label" for="f-domain">domain</label>
+        <input class="form-control" type="text" id="f-domain" name="domain"
+               value="{{ entry.domain or "" }}" placeholder="example.com">
+        <div class="form-text">drives careers-page + signal discovery</div>
+      </div>
+
+      <div class="col-12 col-md-6 col-lg-4">
+        <label class="form-label" for="f-tier">tier</label>
+        <select class="form-select" id="f-tier" name="tier">
+          {% for t in tiers %}
+          <option value="{{ t }}" {% if t == tier %}selected{% endif %}>
+            {{ t if t in ("A", "B", "C") else "candidate" }}
+          </option>
+          {% endfor %}
+        </select>
+        <div class="form-text">A = dream companies; candidates = unpromoted</div>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label" for="f-ats">ATS boards</label>
+        <textarea class="form-control" id="f-ats" name="ats" rows="3"
+                  placeholder="provider: token — one per line, e.g.&#10;greenhouse: janestreet"
+                  style="font-family: var(--font-mono);">{% for prov, tok in (entry.ats or {}).items() %}{{ prov }}: {{ tok }}
+{% endfor %}</textarea>
+        <div class="form-text">empty = no public board → dark-pool monitoring via signals</div>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label" for="f-note">note</label>
+        <textarea class="form-control" id="f-note" name="note" rows="2"
+                  placeholder="why this company matters — one line">{{ entry.note or "" }}</textarea>
+      </div>
+
+    </div>
+  </div>
+  <div class="card-body py-2 d-flex justify-content-end">
+    <button class="btn btn-primary btn-sm" type="submit">
+      {{ m.icon("check", 12) }} save company
+    </button>
+  </div>
+</form>
+
+{% endblock %}

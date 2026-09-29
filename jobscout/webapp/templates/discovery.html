@@ -86,6 +86,49 @@
   </div>
 </div>
 
+{% if caps_saved %}
+{{ m.callout("Agent caps saved — the next run uses the new budget.", "success") }}
+{% endif %}
+
+{# ── agent caps: how much the morning agent may spend and how often ──── #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Agent caps</h2>
+    <span class="text-secondary small">settings.yaml · discovery.agent</span>
+  </div>
+  <div class="card-body">
+    <form method="post" action="/discovery/agent-caps" class="row g-3 align-items-end" data-busy-submit>
+      <div class="col-6 col-md-4 col-xl-2">
+        <label class="form-label" for="f-schedule">schedule</label>
+        <select class="form-select" id="f-schedule" name="schedule">
+          {% for s in ("daily", "weekdays", "mon-wed-fri", "manual") %}
+          <option value="{{ s }}" {% if s == settings.discovery.agent.schedule %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <label class="form-label" for="f-steps">step cap</label>
+        <input class="form-control" type="text" id="f-steps" name="max_steps"
+               value="{{ settings.discovery.agent.max_steps }}">
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <label class="form-label" for="f-cost">cost cap ($/run)</label>
+        <input class="form-control" type="text" id="f-cost" name="max_cost_usd"
+               value="{{ settings.discovery.agent.max_cost_usd }}">
+      </div>
+      <div class="col-6 col-md-4 col-xl-2 d-flex align-items-end">
+        {{ m.check("run_on_signal", "run on signal spikes",
+                   settings.discovery.agent.run_on_signal) }}
+      </div>
+      <div class="col-12 col-md-4 col-xl-2 d-flex justify-content-end">
+        <button class="btn btn-primary btn-sm" type="submit">
+          {{ m.icon("check", 12) }} save caps
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {# ── hunting profile: editable — every layer reads this one file ────────
      rules gate on seniorities/locations; the LLM rubric and the agent
      brief read the same file (config/profile.yaml, target: block).

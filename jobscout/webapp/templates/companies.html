@@ -6,6 +6,13 @@
 
 {% block content %}
 
+{% if company_saved is defined and company_saved %}
+{{ m.callout("Company saved — watchlist.yaml updated and re-validated.", "success") }}
+{% endif %}
+{% if error is defined and error %}
+{{ m.callout(error, "danger") }}
+{% endif %}
+
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
   <div>
     <h1 class="h4 mb-1">The living substrate</h1>
@@ -52,11 +59,13 @@
                   {{ m.badge("dark-pool", "purple", "no public board — monitored via signals") }}
                 {% endif %}
               </td>
-              <td>
+              <td class="text-nowrap">
+                <a class="btn btn-outline-secondary btn-sm" href="/companies/{{ r.id }}"
+                   title="edit watchlist entry">edit</a>
                 {% if r.career_url %}
                 <a class="btn btn-outline-secondary btn-sm" href="{{ r.career_url }}" target="_blank"
                    rel="noopener">link {{ m.icon("external", 10) }}</a>
-                {% else %}<span class="text-secondary">—</span>{% endif %}
+                {% endif %}
               </td>
               <td class="font-monospace">{{ r.postings_total }}</td>
               <td class="font-monospace">{{ r.rule_pass_new }}</td>

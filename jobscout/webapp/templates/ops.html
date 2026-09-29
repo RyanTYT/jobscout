@@ -74,9 +74,90 @@
   </div>
 </div>
 
+{% if models_cfg %}
+{# ── models & pricing: which model each tier runs on, what it costs,
+     and the spend caps. Prices feed the spend meter — refresh them from
+     the provider when it publishes pricing on its /models endpoint. #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Models &amp; pricing</h2>
+    <div class="d-flex align-items-center gap-2">
+      <form method="post" action="/ops/models/refresh-prices" data-busy-submit>
+        <button class="btn btn-outline-primary btn-sm" type="submit"
+                title="fetch per-token prices from the provider's /models list (works where the endpoint publishes pricing, e.g. OpenRouter)">
+          {{ m.icon("pulse", 12) }} refresh prices from provider
+        </button>
+      </form>
+      <span class="text-secondary small">config/models.yaml</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <form method="post" action="/ops/models" data-busy-submit>
+      <div class="table-responsive">
+        <table class="table align-middle mb-3">
+          <thead class="table-light">
+            <tr><th scope="col">tier</th><th scope="col">model</th>
+                <th scope="col">$ / mtok in</th><th scope="col">$ / mtok out</th>
+                <th scope="col">daily cap</th><th scope="col">purpose</th></tr>
+          </thead>
+          <tbody>
+            {% for t in ("bulk", "agent", "quality") %}
+            {% set tier = models_cfg.tiers[t] %}
+            <tr>
+              <td>{{ m.badge(t, "primary") }}</td>
+              <td><input class="form-control form-control-sm" type="text"
+                         name="model_{{ t }}" value="{{ tier.model }}"
+                         style="min-width: var(--field-min-w);"></td>
+              <td><input class="form-control form-control-sm" type="text"
+                         name="price_in_{{ t }}" value="{{ tier.price_in_per_mtok }}"></td>
+              <td><input class="form-control form-control-sm" type="text"
+                         name="price_out_{{ t }}" value="{{ tier.price_out_per_mtok }}"></td>
+              <td><input class="form-control form-control-sm" type="text"
+                         name="cap_{{ t }}" value="{{ tier.max_daily_usd }}"></td>
+              <td class="small text-secondary">{{ tier.purpose }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="d-flex flex-wrap gap-3 align-items-end">
+        <div>
+          <label class="form-label" for="f-monthly">monthly cap ($)</label>
+          <input class="form-control form-control-sm" type="text"
+                 id="f-monthly" name="monthly_usd"
+                 value="{{ models_cfg.caps.monthly_usd }}">
+        </div>
+        <div>
+          <label class="form-label" for="f-oncap">on cap</label>
+          <select class="form-select form-select-sm" id="f-oncap" name="on_cap">
+            {% for opt in ("rule-only", "fail", "skip") %}
+            <option value="{{ opt }}" {% if opt == models_cfg.caps.on_cap %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="flex-grow-1"></div>
+        <button class="btn btn-primary btn-sm" type="submit">
+          {{ m.icon("check", 12) }} save models
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 {# ── LLM credentials: the API key lives in .env (gitignored) — the only
      place secrets go. Saved keys take effect on the next scoring run:
      the client re-reads .env every time. The key is never echoed back. #}
+{% if models_saved %}
+{{ m.callout("models.yaml saved — validated, caps and prices updated.", "success") }}
+{% endif %}
+{% if models_error %}
+{{ m.callout(models_error, "danger") }}
+{% endif %}
+{% if models_refreshed %}
+{{ m.callout("Prices refreshed from the provider: " ~ models_refreshed, "info") }}
+{% endif %}
+
 {% if key_saved %}
 {{ m.callout("API key saved to .env — effective on the next LLM run (no restart needed).", "success") }}
 {% endif %}
@@ -113,6 +194,29 @@
       </form>
       {% endif %}
     </div>
+
+    <form method="post" action="/ops/cse-keys" data-busy-submit
+          class="mb-3 pb-3 border-bottom">
+      <label class="form-label">Search keys (Google CSE — the agent's web-search tier)</label>
+      <div class="d-flex flex-wrap gap-2">
+        <div class="flex-grow-1" style="min-width: var(--field-min-w);">
+          <input class="form-control" type="password" name="cse_key"
+                 autocomplete="off" spellcheck="false"
+                 placeholder="{% if cse_status.key_set %}saved ····{{ cse_status.key_tail }} — paste to replace{% else %}CSE API key{% endif %}">
+        </div>
+        <div style="min-width: 10rem;">
+          <input class="form-control" type="text" name="cse_cx"
+                 autocomplete="off" spellcheck="false"
+                 placeholder="{% if cse_status.cx %}{{ cse_status.cx }} — replace{% else %}CSE cx (engine id){% endif %}">
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" type="submit">save search keys</button>
+        {% if cse_status.key_set or cse_status.cx %}
+        <button class="btn btn-outline-danger btn-sm" type="submit"
+                formaction="/ops/cse-keys/clear">remove</button>
+        {% endif %}
+      </div>
+      <div class="form-text">both go to .env · empty fields keep the saved values</div>
+    </form>
 
     <form method="post" action="/ops/llm-key" data-busy-submit>
       <label class="form-label" for="f-api-key">Replace the saved key</label>

@@ -197,8 +197,53 @@ def create_app() -> FastAPI:
 
     # ── companies ────────────────────────────────────────────────────────
 
+    @app.get("/companies/{cid}", response_class=HTMLResponse)
+    def company_edit(request: Request, cid: str, error: str = Query("")):
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import watchlist_store
+
+        conn = db.connect()
+        try:
+            ctx = _ctx("companies", conn)
+        finally:
+            conn.close()
+        try:
+            tier, entry = watchlist_store.find(cid)
+        except watchlist_store.WatchlistStoreError as e:
+            return RedirectResponse(
+                f"/companies?error={_q(str(e))}", status_code=303)
+        return TEMPLATES.TemplateResponse(
+            request, "company_detail.html",
+            {**ctx, "cid": cid, "tier": tier, "entry": entry,
+             "tiers": watchlist_store.TIERS, "error": error},
+        )
+
+    @app.post("/companies/{cid}/save")
+    async def company_save(request: Request, cid: str):
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import watchlist_store
+
+        form = await request.form()
+        try:
+            watchlist_store.save(
+                cid,
+                name=form.get("name", ""),
+                domain=form.get("domain", ""),
+                tier=form.get("tier", "candidates"),
+                note=form.get("note", ""),
+                ats_text=form.get("ats", ""),
+            )
+            return RedirectResponse("/companies?company_saved=1",
+                                    status_code=303)
+        except watchlist_store.WatchlistStoreError as e:
+            return RedirectResponse(
+                f"/companies/{cid}?error={_q(str(e))}", status_code=303)
+
     @app.get("/companies", response_class=HTMLResponse)
-    def companies(request: Request):
+    def companies(request: Request, company_saved: str = Query(""),
+                  error: str = Query("")):
         conn = db.connect()
         try:
             rows = db.company_summary(conn)
@@ -214,7 +259,8 @@ def create_app() -> FastAPI:
             request,
             "companies.html",
             {**ctx, "rows": rows, "boards": boards, "signals": signals,
-             "kinds": kinds},
+             "kinds": kinds, "company_saved": company_saved == "1",
+             "error": error},
         )
 
     # ── discovery ────────────────────────────────────────────────────────
@@ -222,7 +268,8 @@ def create_app() -> FastAPI:
     @app.get("/discovery", response_class=HTMLResponse)
     def discovery_page(request: Request, ran: str = Query(""),
                        started: str = Query(""),
-                       saved: str = Query(""), error: str = Query("")):
+                       saved: str = Query(""), error: str = Query(""),
+                       caps_saved: str = Query("")):
         from jobscout.core.config import load_settings
         from jobscout.webapp import targeting_store
 
@@ -281,6 +328,7 @@ def create_app() -> FastAPI:
                 "latest_report": latest_report,
                 "recent_runs": recent_runs,
                 "just_started": started == "1",
+                "caps_saved": caps_saved == "1",
                 "running": _run_state["running"],
                 "run_out": _run_state["out"],
                 "run_error": _run_state["error"],
@@ -460,6 +508,27 @@ def create_app() -> FastAPI:
         finally:
             conn.close()
 
+    @app.post("/discovery/agent-caps")
+    async def discovery_agent_caps(request: Request):
+        """Agent caps editor: schedule, step cap, cost cap, run-on-signal."""
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import settings_store
+
+        form = await request.form()
+        try:
+            settings_store.save(
+                schedule=form.get("schedule", "weekdays"),
+                max_steps=form.get("max_steps", "60"),
+                max_cost_usd=form.get("max_cost_usd", "0.50"),
+                run_on_signal=form.get("run_on_signal") == "1",
+            )
+            return RedirectResponse("/discovery?caps_saved=1",
+                                    status_code=303)
+        except settings_store.SettingsStoreError as e:
+            return RedirectResponse(
+                f"/discovery?error={_q(str(e))}", status_code=303)
+
     @app.post("/discovery/targeting")
     async def discovery_targeting_save(request: Request):
         """Hunting-profile edits: line-patched into config/profile.yaml
@@ -485,6 +554,77 @@ def create_app() -> FastAPI:
         except targeting_store.TargetingError as e:
             return RedirectResponse(
                 f"/discovery?error={_q(str(e))}", status_code=303)
+
+    @app.post("/ops/models")
+    async def ops_models_save(request: Request):
+        """models.yaml editor: tier models + prices + caps, with rollback."""
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import models_store
+
+        form = await request.form()
+        tiers = {
+            t: {
+                "model": form.get(f"model_{t}", ""),
+                "price_in": form.get(f"price_in_{t}", ""),
+                "price_out": form.get(f"price_out_{t}", ""),
+                "max_daily_usd": form.get(f"cap_{t}", ""),
+            }
+            for t in models_store.TIERS
+        }
+        caps = {"monthly_usd": form.get("monthly_usd", ""),
+                "on_cap": form.get("on_cap", "rule-only")}
+        try:
+            models_store.save(tiers=tiers, caps=caps)
+            return RedirectResponse("/ops?models_saved=1", status_code=303)
+        except models_store.ModelsStoreError as e:
+            return RedirectResponse(
+                f"/ops?models_error={_q(str(e))}", status_code=303)
+
+    @app.post("/ops/models/refresh-prices")
+    def ops_models_refresh():
+        """Fetch live per-token prices from the provider's /models list
+        (OpenRouter-style) and update models.yaml prices only."""
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import models_store
+
+        try:
+            result = models_store.refresh_prices()
+        except models_store.ModelsStoreError as e:
+            result = {"error": str(e)}
+        if result.get("error"):
+            return RedirectResponse(
+                f"/ops?models_error={_q(result['error'])}", status_code=303)
+        note = "; ".join(result.get("updated") or [])
+        if result.get("missing"):
+            note += " — no match: " + ", ".join(result["missing"])
+        return RedirectResponse(
+            f"/ops?models_refreshed={_q(note or 'prices refreshed')}",
+            status_code=303)
+
+    @app.post("/ops/cse-keys")
+    async def ops_cse_save(request: Request):
+        """Search keys (JOBSCOUT_CSE_KEY / JOBSCOUT_CSE_CX) into .env."""
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import key_store
+
+        form = await request.form()
+        try:
+            key_store.save_cse(key=form.get("cse_key", ""),
+                               cx=form.get("cse_cx", ""))
+            return RedirectResponse("/ops?key_saved=1", status_code=303)
+        except key_store.KeyStoreError as e:
+            return RedirectResponse(
+                f"/ops?key_error={_q(str(e))}", status_code=303)
+
+    @app.post("/ops/cse-keys/clear")
+    def ops_cse_clear():
+        from jobscout.webapp import key_store
+
+        key_store.clear_cse()
+        return RedirectResponse("/ops?key_saved=1", status_code=303)
 
     @app.post("/ops/llm-key")
     async def ops_llm_key(request: Request):
@@ -587,9 +727,19 @@ def create_app() -> FastAPI:
 
     @app.get("/ops", response_class=HTMLResponse)
     def ops(request: Request, key_saved: str = Query(""),
-            key_error: str = Query("")):
-        from jobscout.webapp import key_store
+            key_error: str = Query(""), models_saved: str = Query(""),
+            models_error: str = Query(""),
+            models_refreshed: str = Query("")):
+        from jobscout.webapp import key_store, models_store
 
+        try:
+            cse_status = key_store.cse_status()
+        except Exception:                       # noqa: BLE001
+            cse_status = {"key_set": False, "key_tail": "", "cx": ""}
+        try:
+            models_cfg = models_store.current()
+        except Exception:                       # noqa: BLE001
+            models_cfg = None
         try:
             llm_status = key_store.status()
         except Exception:               # noqa: BLE001 — status is informational
@@ -629,6 +779,11 @@ def create_app() -> FastAPI:
                 "last_stats": last_stats,
             
                 "llm_status": llm_status,
+                "cse_status": cse_status,
+                "models_cfg": models_cfg,
+                "models_saved": models_saved == "1",
+                "models_error": models_error,
+                "models_refreshed": models_refreshed,
                 "running": _run_state["running"],
                 "key_saved": key_saved == "1",
                 "key_error": key_error,},
