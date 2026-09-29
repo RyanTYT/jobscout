@@ -8,7 +8,6 @@ and styles come exclusively from static/css/tokens.css variables.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from urllib.parse import quote
 
@@ -20,33 +19,13 @@ from fastapi.templating import Jinja2Templates
 from jobscout import __version__
 from jobscout.core import db
 from jobscout.core.models import WatchlistEntry
-from jobscout.webapp import ui
+from jobscout.webapp import agent_runner, ui
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 TEMPLATES.env.globals["linkify"] = ui.linkify
 TEMPLATES.env.globals["kind_meta"] = ui.signal_kind_meta
 TEMPLATES.env.globals["kind_desc"] = lambda k: ui.signal_kind_meta(k)["desc"]
-
-_run_state: dict = {"running": False, "out": "", "error": "",
-                    "focus": "", "proc": None, "cancel": False}
-
-
-def _strip_ansi(text: str) -> str:
-    """Console colour codes have no business in a web page."""
-    import re as _re
-
-    return _re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", text or "")
-
-
-def _last_error(text: str) -> str:
-    """The last `SomethingError: message` line from a CLI traceback."""
-    import re as _re
-
-    hits = _re.findall(
-        r"[A-Za-z_]*(?:Error|Exception|ConfigError)\b[^\n]*",
-        text or "")
-    return hits[-1].strip() if hits else ""
 
 
 def _llm_fields(row) -> dict:
@@ -429,10 +408,10 @@ def create_app() -> FastAPI:
                 "recent_runs": recent_runs,
                 "just_started": started == "1",
                 "caps_saved": caps_saved == "1",
-                "running": _run_state["running"],
-                "run_out": _run_state["out"],
-                "run_error": _run_state["error"],
-                "focus": _run_state["focus"],
+                "running": agent_runner.running(),
+                "run_out": agent_runner.state()["out"],
+                "run_error": agent_runner.state()["error"],
+                "focus": agent_runner.state()["focus"],
             },
         )
 
@@ -476,89 +455,16 @@ def create_app() -> FastAPI:
 
     @app.post("/discovery/run")
     def run_agent_now(focus: str = Form("")):
-        """Run the morning agent in a background thread — the button
-        returns immediately; the output panel below polls until it lands.
-        The CLI resolution works both in dev (.venv/bin/jobscout) and in
-        the packaged app (sys.executable IS the frozen jobscout-server)."""
-        import subprocess
-        import sys
-        import threading
-
-        if _run_state["running"]:
-            return RedirectResponse("/discovery?started=1", status_code=303)
-        _run_state["running"] = True
-        _run_state["out"] = ""
-        _run_state["error"] = ""
-        _run_state["cancel"] = False
-        focus = "profile" if focus == "profile" else ""
-        _run_state["focus"] = focus
-
-        def _launch():
-            proc = None
-            try:
-                if getattr(sys, "frozen", False):
-                    cli = sys.executable            # the frozen binary itself
-                else:
-                    cli = str(Path(sys.executable).parent / "jobscout")
-                env = {**os.environ}
-                if focus:
-                    env["JOBSCOUT_AGENT_FOCUS"] = focus
-                # Full hunt = the daily sweep (ATS polling + careers crawl +
-                # scoring — what fills the inbox) THEN the morning agent.
-                # Profile hunt = the agent alone with a focused brief.
-                commands = ([cli, "agent"] if focus
-                            else [[cli, "run", "--daily"], [cli, "agent"]])
-                out, err, returncode = "", "", 0
-                for cmd in (commands if isinstance(commands[0], list)
-                            else [commands]):
-                    # Popen (not subprocess.run) so a cancel can kill mid-run
-                    proc = subprocess.Popen(
-                        cmd, stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE, text=True, env=env,
-                    )
-                    _run_state["proc"] = proc
-                    try:
-                        o, e = proc.communicate(timeout=900)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
-                        o, e = proc.communicate()
-                        _run_state["error"] = "run timed out after 900s"
-                        _run_state["out"] = _strip_ansi(
-                            (out or "") + (err or "") + (o or "") + (e or "")
-                        )[-8000:]
-                        return
-                    out += (o or "")
-                    err += (e or "")
-                    returncode = returncode or proc.returncode
-                _run_state["out"] = _strip_ansi(
-                    (out or "") + (err or ""))[-8000:]
-                if _run_state["cancel"]:
-                    _run_state["error"] = "run cancelled by you"
-                elif proc.returncode != 0:
-                    _run_state["error"] = _last_error(_run_state["out"]) or (
-                        f"the agent exited with code {proc.returncode}")
-                else:
-                    _run_state["error"] = ""
-            except OSError as e:
-                _run_state["out"] = f"failed to launch the jobscout agent: {e}"
-                _run_state["error"] = _run_state["out"]
-            finally:
-                _run_state["proc"] = None
-                _run_state["running"] = False
-                _run_state["cancel"] = False
-
-        threading.Thread(target=_launch, daemon=True).start()
+        """Full hunt (focus="") chains run --daily + the morning agent;
+        a profile hunt runs the agent alone. Background thread — the
+        button returns immediately (agent_runner owns the lifecycle)."""
+        agent_runner.launch(focus)
         return RedirectResponse("/discovery?started=1", status_code=303)
 
     @app.post("/discovery/run/cancel")
     def run_agent_cancel():
         """Kill the in-flight agent run (the button on the run panel)."""
-        if not _run_state["running"]:
-            return RedirectResponse("/discovery", status_code=303)
-        _run_state["cancel"] = True
-        proc = _run_state.get("proc")
-        if proc is not None and proc.poll() is None:
-            proc.kill()
+        agent_runner.cancel()
         return RedirectResponse("/discovery?started=1", status_code=303)
 
     @app.get("/discovery/run-status", response_class=HTMLResponse)
@@ -575,11 +481,12 @@ def create_app() -> FastAPI:
             ).fetchone()
         finally:
             conn.close()
+        st = agent_runner.state()
         return TEMPLATES.TemplateResponse(
             request, "_run_status.html",
-            {"running": _run_state["running"], "run_out": _run_state["out"],
-             "run_error": _run_state["error"], "agent_spend": agent_spend,
-             "focus": _run_state["focus"]},
+            {"running": st["running"], "run_out": st["out"],
+             "run_error": st["error"], "focus": st["focus"],
+             "agent_spend": agent_spend},
         )
 
     @app.get("/ops/spend", response_class=HTMLResponse)
@@ -592,7 +499,7 @@ def create_app() -> FastAPI:
             conn.close()
         return TEMPLATES.TemplateResponse(
             request, "_ops_spend.html",
-            {"spend": spend, "running": _run_state["running"]},
+            {"spend": spend, "running": agent_runner.running()},
         )
 
     # ── applications / packets ───────────────────────────────────────────
@@ -1001,7 +908,7 @@ def create_app() -> FastAPI:
                 "models_saved": models_saved == "1",
                 "models_error": models_error,
                 "models_refreshed": models_refreshed,
-                "running": _run_state["running"],
+                "running": agent_runner.running(),
                 "key_saved": key_saved == "1",
                 "key_error": key_error,},
         )

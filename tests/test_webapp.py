@@ -630,9 +630,9 @@ def test_run_agent_now_returns_immediately(client, monkeypatch):
 
 
 def test_run_panel_error_callout(client):
-    from jobscout.webapp.routes import _run_state
+    from jobscout.webapp import agent_runner as _ar
 
-    _run_state.update(running=False, out="some output",
+    _ar._state.update(running=False, out="some output",
                       error="ConfigError: missing config file: models.yaml")
     try:
         r = client.get("/discovery/run-status")
@@ -640,7 +640,7 @@ def test_run_panel_error_callout(client):
         assert "run failed" in r.text
         assert "ConfigError: missing config file" in r.text
     finally:
-        _run_state.update(running=False, out="", error="")
+        _ar._state.update(running=False, out="", error="")
 
 
 def test_run_panel_has_button_and_spend(client):
@@ -651,29 +651,29 @@ def test_run_panel_has_button_and_spend(client):
 
 
 def test_run_panel_running_state_polls(client):
-    from jobscout.webapp.routes import _run_state
+    from jobscout.webapp import agent_runner as _ar
 
-    _run_state.update(running=True, out="", error="")
+    _ar._state.update(running=True, out="", error="")
     try:
         r = client.get("/discovery/run-status")
         assert "every 3s" in r.text
         assert "full hunt running" in r.text
         assert "Run agent now" not in r.text         # button swapped for state
     finally:
-        _run_state.update(running=False, out="", error="")
+        _ar._state.update(running=False, out="", error="")
 
 
 def test_ops_spend_partial_polls_while_running(client):
-    from jobscout.webapp.routes import _run_state
+    from jobscout.webapp import agent_runner as _ar
 
-    _run_state.update(running=True, out="", error="")
+    _ar._state.update(running=True, out="", error="")
     try:
         r = client.get("/ops/spend")
         assert r.status_code == 200
         assert "every 3s" in r.text
         assert "live" in r.text
     finally:
-        _run_state.update(running=False, out="", error="")
+        _ar._state.update(running=False, out="", error="")
 
 
 def test_credentials_card_replace_and_remove_semantics(client, db_file):
@@ -905,7 +905,7 @@ def test_run_cancel_kills_and_labels(client, monkeypatch):
     import threading
     import time
 
-    from jobscout.webapp.routes import _run_state
+    from jobscout.webapp import agent_runner as _ar
 
     started = threading.Event()
 
@@ -936,10 +936,10 @@ def test_run_cancel_kills_and_labels(client, monkeypatch):
     c = client.post("/discovery/run/cancel", follow_redirects=False)
     assert c.status_code == 303
     for _ in range(30):                        # wait for the thread to land
-        if not _run_state["running"]:
+        if not _ar._state["running"]:
             break
         time.sleep(0.1)
-    assert _run_state["error"] == "run cancelled by you"
+    assert _ar._state["error"] == "run cancelled by you"
 
 
 def test_discovery_reports_read_from_runtime_root(client, monkeypatch, tmp_path):
