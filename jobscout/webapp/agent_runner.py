@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -125,7 +126,7 @@ def _run(focus: str) -> None:
         _state["cancel"] = False
 
 
-def agent_spend(conn) -> "sqlite3.Row":
+def agent_spend(conn) -> sqlite3.Row:
     """30-day agent-tier spend (the run panel's live stats)."""
     return conn.execute(
         "SELECT COUNT(*) AS calls, COALESCE(SUM(cost_usd), 0) AS cost, "
