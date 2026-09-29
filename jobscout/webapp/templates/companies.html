@@ -92,6 +92,12 @@
                 {% else %}
                 {{ m.badge(route.label, "light", route.detail) }}
                 {% endif %}
+                {% if route.kind != "apply" %}
+                <a class="badge text-bg-light border" title="generate a cold interest email from your resume"
+                   href="/companies/{{ r.id }}?outreach=cold_email">cold email</a>
+                <a class="badge text-bg-light border" title="web-search LinkedIn contacts + draft reachouts"
+                   href="/companies/{{ r.id }}?outreach=linkedin">linkedin</a>
+                {% endif %}
               </td>
               <td>{% if r.tier %}{{ m.badge(r.tier, "light") }}{% endif %}</td>
               <td class="small text-secondary text-truncate" style="max-width: 12rem;">

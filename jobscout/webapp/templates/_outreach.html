@@ -1,0 +1,133 @@
+{# _outreach.html — the outreach panel on the company detail page.
+     Polls itself while any generation is running; renders the drafts
+     (cold email / linkedin contacts) with copy + open actions. #}
+{% import "components/macros.html" as m %}
+
+{% set any_running = st["cold_email"]["running"] or st["linkedin"]["running"] %}
+<div id="outreach-panel"
+     {% if any_running %}hx-get="/companies/{{ cid }}/outreach"
+     hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+
+{% for kind, label, icon in [
+     ("cold_email", "Cold email", "news"),
+     ("linkedin", "LinkedIn reachout", "radar"),
+] %}
+{% set s = st[kind] %}
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">{{ label }}</h2>
+    {% if s.running %}
+    <span class="badge text-bg-primary">
+      <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+      generating
+    </span>
+    {% elif s.status == "done" %}
+    <span class="badge text-bg-success">drafted</span>
+    {% elif s.status == "failed" %}
+    <span class="badge text-bg-danger">failed</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+
+    {% if s.running %}
+    <div class="d-flex align-items-center gap-2 text-secondary small">
+      <span class="spinner-grow spinner-grow-sm" role="status"></span>
+      {% if kind == "linkedin" %}searching for LinkedIn contacts, then
+      drafting reachouts{% else %}drafting from your resume + this
+      company's context{% endif %} — this panel refreshes every 3s
+    </div>
+
+    {% elif s.status == "done" and s.content %}
+      {# ── cold email draft ──────────────────────────────────────────── #}
+      {% if kind == "cold_email" %}
+      {% set draft = s.content | from_json %}
+      {% if draft %}
+      <div class="mb-2">
+        <strong>Subject:</strong> <span id="oe-subject">{{ draft.subject }}</span>
+        <button class="btn btn-outline-secondary btn-sm ms-2" type="button"
+                data-copy-target="#oe-subject" title="copy subject">copy</button>
+      </div>
+      <pre class="mb-2 border rounded p-2 small" id="oe-body"
+           style="white-space: pre-wrap;">{{ draft.body }}</pre>
+      <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-outline-secondary btn-sm" type="button"
+                data-copy-target="#oe-body">{{ m.icon("doc", 11) }} copy body</button>
+        {% if contact_email %}
+        <a class="btn btn-primary btn-sm"
+           href="mailto:{{ contact_email }}?subject={{ draft.subject | urlencode }}&body={{ draft.body | urlencode }}">
+          {{ m.icon("news", 11) }} send via {{ contact_email }}
+        </a>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# ── linkedin contacts ─────────────────────────────────────────── #}
+      {% else %}
+      {% set draft = s.content | from_json %}
+      {% if draft and draft.contacts %}
+      {% for c in draft.contacts %}
+      <div class="border rounded p-2 mb-2">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <span class="fw-medium">{{ c.name }}
+            <span class="text-secondary small">— {{ c.url }}</span></span>
+          <span class="d-flex gap-2">
+            <a class="btn btn-outline-secondary btn-sm" href="{{ c.url }}"
+               target="_blank" rel="noopener">{{ m.icon("external", 10) }} profile</a>
+          </span>
+        </div>
+        <div class="small mt-1"><strong>connection note</strong>
+          ({{ (c.connection_note or "") | length }} chars):
+          <span id="on-{{ loop.index }}">{{ c.connection_note }}</span>
+          <button class="btn btn-outline-secondary btn-sm ms-1" type="button"
+                  data-copy-target="#on-{{ loop.index }}">copy</button>
+        </div>
+        <div class="small mt-1"><strong>message:</strong>
+          <span id="om-{{ loop.index }}">{{ c.message }}</span>
+          <button class="btn btn-outline-secondary btn-sm ms-1" type="button"
+                  data-copy-target="#om-{{ loop.index }}">copy</button>
+        </div>
+      </div>
+      {% endfor %}
+      {% endif %}
+      {% endif %}
+      <div class="d-flex justify-content-end mt-2">
+        <form method="post"
+              action="/companies/{{ cid }}/outreach/{{ kind }}">
+          <button class="btn btn-outline-secondary btn-sm" type="submit"
+                  title="discard this draft and generate a fresh one">
+            regenerate</button>
+        </form>
+      </div>
+
+    {% elif s.status == "failed" %}
+    {{ m.callout(s.error or "generation failed", "danger") }}
+    <div class="d-flex justify-content-end">
+      <form method="post" action="/companies/{{ cid }}/outreach/{{ kind }}">
+        <button class="btn btn-outline-secondary btn-sm" type="submit">retry</button>
+      </form>
+    </div>
+
+    {% else %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span class="text-secondary small">
+        {% if kind == "linkedin" %}
+        live web search for LinkedIn profiles at this company, then draft
+        reachouts from your resume
+        {% else %}
+        a concise interest email drafted from your resume + this company's
+        context{% if contact_email %} — sends to {{ contact_email }}{% endif %}
+        {% endif %}
+      </span>
+      <form method="post" action="/companies/{{ cid }}/outreach/{{ kind }}">
+        <button class="btn btn-primary btn-sm" type="submit">
+          {{ m.icon(icon, 11) }} generate{{ " " + label | lower }}
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endfor %}
+
+</div>

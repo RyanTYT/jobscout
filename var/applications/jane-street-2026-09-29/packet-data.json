@@ -1,0 +1,16 @@
+{
+ "name": "Jane Doe",
+ "contact": "jane@example.com",
+ "links": [],
+ "summary": "Dry-run tailored summary: senior engineer, details pending the filled master resume.",
+ "experience": [
+  {
+   "company": "Acme Trading",
+   "title": "Senior Software Engineer",
+   "dates": "2019-06 \u2013 present",
+   "bullets": []
+  }
+ ],
+ "projects": [],
+ "skills": []
+}

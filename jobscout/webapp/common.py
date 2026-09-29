@@ -24,6 +24,17 @@ TEMPLATES.env.globals["kind_meta"] = ui.signal_kind_meta
 TEMPLATES.env.globals["kind_desc"] = lambda k: ui.signal_kind_meta(k)["desc"]
 
 
+def _from_json(value):
+    """Parse a stored JSON string for templates (outreach drafts)."""
+    try:
+        return json.loads(value) if value else None
+    except (ValueError, TypeError):
+        return None
+
+
+TEMPLATES.env.filters["from_json"] = _from_json
+
+
 def ctx(active: str, conn) -> dict:
     """Nav context: counts + the profile-missing badge."""
     counts = ui.nav_counts(conn)

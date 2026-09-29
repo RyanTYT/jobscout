@@ -21,7 +21,7 @@ def db_path() -> Path:
     return core_paths.db_path()
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -129,6 +129,21 @@ CREATE TABLE IF NOT EXISTS apply_runs (
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_apply_runs_packet ON apply_runs(packet_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS outreach (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id  TEXT NOT NULL,
+    kind        TEXT NOT NULL,             -- cold_email | linkedin
+    status      TEXT NOT NULL,             -- running | done | failed
+    content     TEXT,                      -- JSON draft (subject/body or contacts)
+    error       TEXT,
+    model       TEXT,
+    cost_usd    REAL NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_outreach_company_kind
+    ON outreach(company_id, kind);
 
 CREATE TABLE IF NOT EXISTS llm_cache (
     cache_key   TEXT PRIMARY KEY,          -- sha256(model + prompt) or (content_hash, profile_version)

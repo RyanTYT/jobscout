@@ -1,0 +1,21 @@
+packet_id: pk-21ba5a51c4fe
+posting_id: p_2026-09-28_e79a979f
+posting_title: ASIC Engineer
+company: Jane Street
+posting_url: https://www.janestreet.com/join-jane-street/apply/8233259002?gh_jid=8233259002
+status: needs_input
+reasons:
+- 'master resume missing 3 required field(s): Phone, Country, LinkedIn'
+model: fake-tailor
+cost_usd: 0.0
+generated: 2026-09-29T14:39Z
+dry_run: true
+files:
+- claim_check.yaml
+- cover_letter.md
+- fill_sheet.yaml
+- packet-data.json
+- resume.md
+- resume.pdf
+- resume.typ
+- tailor.yaml

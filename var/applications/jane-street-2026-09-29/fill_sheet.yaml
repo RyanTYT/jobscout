@@ -1,0 +1,159 @@
+fields:
+- label: Full Name
+  canonical_key: full_name
+  required: true
+  value: Jane Doe
+  value_source: identity.full_name
+  confidence: exact
+  note: ''
+- label: Preferred Name
+  canonical_key: preferred_name
+  required: false
+  value: null
+  value_source: identity.preferred_name
+  confidence: missing
+  note: ''
+- label: Email
+  canonical_key: email
+  required: true
+  value: jane@example.com
+  value_source: identity.email
+  confidence: exact
+  note: ''
+- label: Phone
+  canonical_key: phone
+  required: true
+  value: null
+  value_source: identity.phone
+  confidence: missing
+  note: ''
+- label: City
+  canonical_key: city
+  required: false
+  value: null
+  value_source: identity.location.city
+  confidence: missing
+  note: ''
+- label: Region / State
+  canonical_key: region
+  required: false
+  value: null
+  value_source: identity.location.region
+  confidence: missing
+  note: ''
+- label: Country
+  canonical_key: country
+  required: true
+  value: null
+  value_source: identity.location.country
+  confidence: missing
+  note: ''
+- label: LinkedIn
+  canonical_key: linkedin
+  required: true
+  value: null
+  value_source: identity.links.linkedin
+  confidence: missing
+  note: ''
+- label: GitHub
+  canonical_key: github
+  required: false
+  value: null
+  value_source: identity.links.github
+  confidence: missing
+  note: ''
+- label: Personal Website
+  canonical_key: personal_website
+  required: false
+  value: null
+  value_source: identity.links.personal_website
+  confidence: missing
+  note: ''
+- label: Current Company
+  canonical_key: current_company
+  required: true
+  value: Acme Trading
+  value_source: 'derived: latest experience (end=present)'
+  confidence: derived
+  note: ''
+- label: Current Title
+  canonical_key: current_title
+  required: true
+  value: Senior Software Engineer
+  value_source: 'derived: latest experience (end=present)'
+  confidence: derived
+  note: ''
+- label: Years of Experience
+  canonical_key: years_experience
+  required: true
+  value: 7
+  value_source: 'derived: earliest dates.start'
+  confidence: derived
+  note: ''
+- label: Highest Degree
+  canonical_key: highest_degree
+  required: true
+  value: BS
+  value_source: 'derived: education[-1]'
+  confidence: derived
+  note: ''
+- label: School
+  canonical_key: school
+  required: true
+  value: NUS
+  value_source: education[-1].school
+  confidence: exact
+  note: ''
+- label: Field of Study
+  canonical_key: field
+  required: false
+  value: null
+  value_source: education[-1].field
+  confidence: missing
+  note: ''
+- label: Graduation Year
+  canonical_key: graduation_year
+  required: false
+  value: null
+  value_source: education[-1].dates.end
+  confidence: missing
+  note: ''
+- label: Work Authorization
+  canonical_key: work_authorization
+  required: false
+  value: null
+  value_source: work_authorization[0].status
+  confidence: missing
+  note: ''
+- label: Salary Expectation
+  canonical_key: salary_expectation
+  required: true
+  value: defer to conversation
+  value_source: extras.salary.policy
+  confidence: policy
+  note: policy value
+- label: Notice Period
+  canonical_key: notice_period
+  required: false
+  value: null
+  value_source: extras.notice_period
+  confidence: missing
+  note: ''
+- label: Earliest Start
+  canonical_key: earliest_start
+  required: false
+  value: null
+  value_source: extras.availability
+  confidence: missing
+  note: ''
+- label: Referral / How did you hear
+  canonical_key: referral_source
+  required: false
+  value: company careers page
+  value_source: extras.referrals.policy
+  confidence: policy
+  note: honest default
+unmatched: []
+policy_flags:
+- salary_expectation
+- referral_source

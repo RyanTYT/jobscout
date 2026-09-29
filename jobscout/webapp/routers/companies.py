@@ -100,8 +100,43 @@ def register(app):
                 "promote it from the editor when it earns it"),
             status_code=303)
 
+    @app.get("/companies/{cid}/outreach", response_class=HTMLResponse)
+    def company_outreach_status(request: Request, cid: str):
+        """HTMX partial: outreach generation state (polled while running)."""
+        from jobscout.webapp.runners import outreach as outreach_runner
+
+        conn = db.connect()
+        try:
+            st = {k: outreach_runner.status(conn, cid, k)
+                  for k in outreach_runner.KINDS}
+            company = conn.execute(
+                "SELECT contact_email FROM companies WHERE id = ?",
+                (cid,)).fetchone()
+            contact_email = company["contact_email"] if company else None
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(
+            request, "_outreach.html",
+            {"cid": cid, "contact_email": contact_email, "st": st},
+        )
+
+    @app.post("/companies/{cid}/outreach/{kind}")
+    def company_outreach_start(cid: str, kind: str):
+        from jobscout.webapp.runners import outreach as outreach_runner
+
+        if kind not in outreach_runner.KINDS:
+            return RedirectResponse(f"/companies/{cid}", status_code=303)
+        conn = db.connect()
+        try:
+            outreach_runner.start(cid, kind)
+        finally:
+            conn.close()
+        return RedirectResponse(f"/companies/{cid}?outreach={kind}",
+                                status_code=303)
+
     @app.get("/companies/{cid}", response_class=HTMLResponse)
-    def company_edit(request: Request, cid: str, error: str = Query("")):
+    def company_edit(request: Request, cid: str, error: str = Query(""),
+                     outreach: str = Query("")):
         from urllib.parse import quote as _q
 
         from jobscout.webapp.stores import watchlist_store
@@ -116,10 +151,41 @@ def register(app):
         except watchlist_store.WatchlistStoreError as e:
             return RedirectResponse(
                 f"/companies?error={_q(str(e))}", status_code=303)
+        outreach_started = ""
+        if outreach in ("cold_email", "linkedin"):
+            from jobscout.webapp.runners import outreach as outreach_runner
+
+            conn = db.connect()
+            try:
+                outreach_runner.start(cid, outreach)
+                st = {k: outreach_runner.status(conn, cid, k)
+                      for k in outreach_runner.KINDS}
+                company = conn.execute(
+                    "SELECT contact_email FROM companies WHERE id = ?",
+                    (cid,)).fetchone()
+                contact_email = company["contact_email"] if company else None
+            finally:
+                conn.close()
+            outreach_started = outreach
+        else:
+            conn = db.connect()
+            try:
+                from jobscout.webapp.runners import outreach as outreach_runner
+
+                st = {k: outreach_runner.status(conn, cid, k)
+                      for k in outreach_runner.KINDS}
+                company = conn.execute(
+                    "SELECT contact_email FROM companies WHERE id = ?",
+                    (cid,)).fetchone()
+                contact_email = company["contact_email"] if company else None
+            finally:
+                conn.close()
         return TEMPLATES.TemplateResponse(
             request, "company_detail.html",
             {**ctx, "cid": cid, "tier": tier, "entry": entry,
-             "tiers": watchlist_store.TIERS, "error": error},
+             "tiers": watchlist_store.TIERS, "error": error,
+             "outreach_started": outreach_started, "st": st,
+             "contact_email": contact_email},
         )
 
     @app.post("/companies/{cid}/save")

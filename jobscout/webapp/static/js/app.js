@@ -263,6 +263,22 @@
     }
   });
 
+  /* ── copy-to-clipboard: [data-copy-target] copies another element ──── */
+  document.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-copy-target]");
+    if (!el) return;
+    e.preventDefault();
+    var src = document.querySelector(el.getAttribute("data-copy-target"));
+    var text = src ? (src.textContent || src.innerText || "") : "";
+    if (navigator.clipboard && text) {
+      navigator.clipboard.writeText(text).then(function () {
+        toast("copied to clipboard", "success");
+      }, function () {
+        toast("copy failed — select the text manually", "danger");
+      });
+    }
+  });
+
   /* ── whole-row navigation: tr[data-row-link] ────────────────────────── */
   // plain left-clicks anywhere in the row navigate to its link; clicks on
   // real links/buttons/controls keep their own behaviour, and modifier

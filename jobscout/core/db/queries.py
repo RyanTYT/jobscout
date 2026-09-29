@@ -393,6 +393,41 @@ def unscored_rule_pass(conn: sqlite3.Connection, limit: int = 200) -> list[sqlit
     ).fetchall()
 
 
+# ── outreach drafts (cold email / linkedin reachout) ──────────────────────
+
+
+def upsert_outreach(conn: sqlite3.Connection, *, company_id: str, kind: str,
+                    status: str, content: str | None = None,
+                    error: str | None = None, model: str | None = None,
+                    cost_usd: float = 0.0) -> None:
+    now = _utcnow()
+    conn.execute(
+        """
+        INSERT INTO outreach (company_id, kind, status, content, error, model,
+                              cost_usd, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(company_id, kind) DO UPDATE SET
+            status = excluded.status,
+            content = excluded.content,
+            error = excluded.error,
+            model = excluded.model,
+            cost_usd = excluded.cost_usd,
+            updated_at = excluded.updated_at
+        """,
+        (company_id, kind, status, content, error, model, cost_usd,
+         now, now),
+    )
+    conn.commit()
+
+
+def latest_outreach(conn: sqlite3.Connection, company_id: str,
+                    kind: str) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM outreach WHERE company_id = ? AND kind = ?",
+        (company_id, kind),
+    ).fetchone()
+
+
 # ── P2: dashboard aggregates ─────────────────────────────────────────────────
 
 
