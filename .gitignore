@@ -24,3 +24,7 @@ build/
 # repo-level dist/ and build/ ignores must not swallow the Tauri scaffold
 !desktop/dist/
 !desktop/dist/index.html
+
+# packet compile intermediates (render copies the template beside the data)
+applications/*/resume.typ
+applications/*/packet-data.json
