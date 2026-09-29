@@ -26,6 +26,29 @@
     toast("Theme: " + next, "primary");
   });
 
+  /* ── HTMX failures echo to the user — no silent dead buttons ───────── */
+  document.body.addEventListener("htmx:responseError", function (e) {
+    var xhr = e.detail.xhr;
+    var reason = "";
+    try {
+      var parsed = JSON.parse(xhr.responseText);
+      reason = parsed.detail || parsed.error || "";
+    } catch (err) {
+      reason = "";
+    }
+    if (!reason) {
+      reason = (xhr.responseText || "").trim().slice(0, 200);
+    }
+    toast("request failed (" + xhr.status + "): " +
+          (reason || "no detail returned"), "danger");
+  });
+  document.body.addEventListener("htmx:sendError", function () {
+    toast("network error — request never reached the server", "danger");
+  });
+  document.body.addEventListener("htmx:timeout", function () {
+    toast("request timed out", "danger");
+  });
+
   /* ── toasts (bootstrap.Toast) ───────────────────────────────────────── */
 
   var toastContainer = null;

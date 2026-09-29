@@ -787,3 +787,47 @@ def test_resume_download_serves_file(client, monkeypatch, tmp_path):
     r = client.get("/profile/resume-download")
     assert r.status_code == 200
     assert "full_name" in r.text
+
+
+# ── button failures echo to the user (no silent dead buttons) ──────────────
+
+
+def test_mode_failure_flashes_on_page(client, monkeypatch):
+    from jobscout.core import config as core_config
+
+    def boom(mode):
+        raise core_config.ConfigError("yaml exploded")
+
+    monkeypatch.setattr(core_config, "set_discovery_mode", boom)
+    # routes import set_discovery_mode inside the handler from core.config
+    r = client.post("/discovery/mode", data={"mode": "agent"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    assert "error=" in r.headers["location"]
+    page = client.get(r.headers["location"])
+    assert "mode change failed" in page.text
+
+
+def test_prepare_failure_flashes_on_posting(client, monkeypatch):
+    from jobscout.packets import orchestrator as orch
+
+    def boom(conn, pid, dry_run, force):
+        raise orch.PacketError("resume exploded")
+
+    monkeypatch.setattr(orch, "prepare_packet", boom)
+    # the handler imports prepare_packet from the orchestrator module
+    import jobscout.webapp.routes as routes_mod  # noqa: F401
+
+    r = client.post("/posting/p_int_1/prepare", data={"dry_run": "true"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+    assert "error=" in r.headers["location"]
+    page = client.get(r.headers["location"])
+    assert "packet preparation failed" in page.text
+
+
+def test_htmx_failure_toast_handler_present(client):
+    r = client.get("/static/js/app.js")
+    assert "htmx:responseError" in r.text
+    assert "htmx:sendError" in r.text
+    assert "request failed" in r.text

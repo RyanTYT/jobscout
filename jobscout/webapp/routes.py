@@ -152,7 +152,7 @@ def create_app() -> FastAPI:
     # ── posting detail ───────────────────────────────────────────────────
 
     @app.get("/posting/{pid}", response_class=HTMLResponse)
-    def posting_detail(request: Request, pid: str):
+    def posting_detail(request: Request, pid: str, error: str = Query("")):
         conn = db.connect()
         try:
             row = db.get_posting(conn, pid)
@@ -166,6 +166,7 @@ def create_app() -> FastAPI:
             request,
             "posting_detail.html",
             {**ctx, "p": row, "llm": _llm_fields(row), "boards": _boards(row),
+             "prepare_error": error,
              "packet": packet},
         )
 
@@ -287,13 +288,17 @@ def create_app() -> FastAPI:
         )
 
     @app.post("/discovery/mode")
-    def set_mode(mode: str = Form(...), request: Request = None):
+    def set_mode(mode: str = Form(...)):
+        from urllib.parse import quote as _q
+
         from jobscout.core.config import set_discovery_mode
 
         try:
             set_discovery_mode(mode)
         except Exception as e:  # noqa: BLE001
-            return HTMLResponse(f"failed: {e}", status_code=400)
+            return RedirectResponse(
+                f"/discovery?error={_q(f'mode change failed: {e}')}",
+                status_code=303)
         return RedirectResponse("/discovery", status_code=303)
 
     @app.post("/discovery/run")
@@ -545,6 +550,8 @@ def create_app() -> FastAPI:
 
     @app.post("/posting/{pid}/prepare")
     def prepare_now(pid: str, dry_run: bool = Form(False)):
+        from urllib.parse import quote as _q
+
         from jobscout.packets.orchestrator import PacketError, prepare_packet
 
         db.init_db()
@@ -553,7 +560,9 @@ def create_app() -> FastAPI:
             result = prepare_packet(conn, pid, dry_run=dry_run, force=True)
         except PacketError as e:
             conn.close()
-            return HTMLResponse(f"failed: {e}", status_code=400)
+            return RedirectResponse(
+                f"/posting/{pid}?error={_q(f'packet preparation failed: {e}')}",
+                status_code=303)
         conn.close()
         return RedirectResponse(
             f"/packet/{result['packet_id']}?prepared=1", status_code=303
