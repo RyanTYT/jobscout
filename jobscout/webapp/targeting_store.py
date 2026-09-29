@@ -15,6 +15,7 @@ from datetime import date
 from pathlib import Path
 
 from jobscout.core import config as core_config
+from jobscout.webapp import config_store as cs
 
 # tokens the rule gate can actually produce (rules._SENIORITY_PATTERNS)
 LEVEL_TOKENS = ("junior", "senior", "staff", "lead",
@@ -56,54 +57,15 @@ def _split_csv(raw: str) -> list[str]:
     return out
 
 
-# ── yaml rendering (inline lists, minimal quoting) ──────────────────────────
-
-
-def _yaml_inline(s: str) -> str:
-    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 .\-+/&]*", s or ""):
-        return s
-    return '"' + (s or "").replace('"', '\\"') + '"'
-
-
-def _render_list(items: list[str]) -> str:
-    if not items:
-        return "[]"
-    return "[" + ", ".join(_yaml_inline(i) for i in items) + "]"
-
-
-# ── line patching (comments preserved) ───────────────────────────────────────
-
-def _target_key_index(lines: list[str], key: str) -> int | None:
-    pat = re.compile(rf"^  {re.escape(key)}:")
-    for i, line in enumerate(lines):
-        if pat.match(line):
-            return i
-    return None
-
+# ── line patching: thin recipes over config_store ─────────────────────────
 
 def _set_list_block(lines: list[str], key: str, items: list[str]) -> bool:
-    """Replace `  key:` plus its multi-line continuation block (list items
-    and deeper-indented comments) with one rendered inline-list line."""
-    i = _target_key_index(lines, key)
-    if i is None:
-        return False
-    end = i + 1
-    while end < len(lines):
-        nxt = lines[end]
-        if not nxt.strip():
-            break
-        if re.match(r"^  \w[\w-]*:", nxt):      # next sibling key
-            break
-        if nxt[0] not in " \t":                  # column-0 comment/section
-            break
-        end += 1
-    comment = f"   # {_COMMENTS[key]}" if items and key in _COMMENTS else ""
-    lines[i:end] = [f"  {key}: {_render_list(items)}{comment}"]
-    return True
+    return cs.set_list_block(lines, key, items, indent="  ",
+                             comment=_COMMENTS.get(key, ""))
 
 
 def _set_remote(lines: list[str], *, allowed: bool, preference: str) -> bool:
-    i = _target_key_index(lines, "remote")
+    i = cs.find_key(lines, "remote", indent="  ")
     if i is None:
         return False
     patched = {"allowed": False, "preference": False}
@@ -157,34 +119,29 @@ def save(*, seniorities: list[str], primary_locations: str,
     primary = _split_csv(primary_locations)
     others = [loc for loc in _split_csv(other_locations) if loc not in primary]
 
-    original = path.read_text(encoding="utf-8")
-    lines = original.splitlines()
-    if not all([
-        _set_list_block(lines, "roles", _split_csv(roles)),
-        _set_list_block(lines, "seniorities", levels),
-        _set_list_block(lines, "locations", primary + others),
-        _set_list_block(lines, "primary_locations", primary),
-        _set_list_block(lines, "stack", _split_csv(stack)),
-        _set_remote(lines, allowed=remote_allowed,
-                    preference=remote_preference),
-        _bump_version(lines),
-    ]):
-        raise TargetingError(
-            "profile.yaml structure not recognised — the target: block "
-            "should hold plain keys at two-space indent; edit by hand once "
-            "and retry")
+    def _mutate(lines):
+        for key, items in (
+                ("roles", _split_csv(roles)),
+                ("seniorities", levels),
+                ("locations", primary + others),
+                ("primary_locations", primary),
+                ("stack", _split_csv(stack)),
+        ):
+            cs.require(_set_list_block(lines, key, items),
+                       f"target.{key}")
+        cs.require(_set_remote(lines, allowed=remote_allowed,
+                               preference=remote_preference), "target.remote")
+        cs.require(_bump_version(lines), "profile_version")
 
-    new_text = "\n".join(lines) + ("\n" if original.endswith("\n") else "")
-    path.write_text(new_text, encoding="utf-8")
-    try:
+    def _validate():
         profile = core_config.load_profile()
         t = profile.target
         if (t.seniorities != levels or t.primary_locations != primary
                 or t.locations != primary + others):
             raise core_config.ConfigError("round-trip mismatch")
-        return {"profile_version": profile.profile_version,
-                "target": t}
-    except Exception as e:                       # rollback — file restored
-        path.write_text(original, encoding="utf-8")
-        raise TargetingError(
-            f"rejected by validation — file restored: {e}") from e
+        return {"profile_version": profile.profile_version, "target": t}
+
+    return cs.commit(path, _mutate, _validate, error_cls=TargetingError,
+                     structure_msg="profile.yaml structure not recognised "
+                     "— the target: block should hold plain keys at "
+                     "two-space indent; edit by hand once and retry")

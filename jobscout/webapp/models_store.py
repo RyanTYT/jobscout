@@ -17,6 +17,7 @@ import re
 from pathlib import Path
 
 from jobscout.core import config as core_config
+from jobscout.webapp import config_store as cs
 
 
 class ModelsStoreError(Exception):
@@ -59,18 +60,9 @@ def _tier_index(lines: list[str], tier: str) -> int | None:
 
 def _set_key(lines: list[str], key: str, value: str, indent: str = "    ",
               start: int = 0, end: int | None = None) -> bool:
-    """Replace `key: <anything>` (keeping its trailing comment) within a
-    bounded region; returns False when the key isn't there to patch."""
-    limit = end if end is not None else len(lines)
-    pat = re.compile(
-        rf"^{re.escape(indent)}{re.escape(key)}:(\s*[^\n#]*)(\s+#.*)?$")
-    for i in range(start, limit):
-        m = pat.match(lines[i])
-        if m:
-            comment = m.group(2) or ""
-            lines[i] = f"{indent}{key}: {value}{comment}"
-            return True
-    return False
+    """Bounded, comment-preserving key patch (config_store primitive)."""
+    return cs.set_key(lines, key, value, indent=indent, start=start,
+                      end=end)
 
 
 def _region(lines: list[str], tier: str) -> tuple[int, int] | None:
@@ -109,49 +101,44 @@ def save(*, tiers: dict, caps: dict) -> dict:
         "on_cap": caps["on_cap"],
     }
 
-    path = _path()
-    original = path.read_text(encoding="utf-8")
-    lines = original.splitlines()
-    ok = True
-    for tier, vals in parsed.items():
-        region = _region(lines, tier)
-        if region is None:
-            ok = False
-            break
-        s, e = region
-        ok &= _set_key(lines, "model", vals["model"], start=s, end=e)
-        ok &= _set_key(lines, "price_in_per_mtok", str(vals["price_in_per_mtok"]),
-                       start=s, end=e)
-        ok &= _set_key(lines, "price_out_per_mtok", str(vals["price_out_per_mtok"]),
-                       start=s, end=e)
-        ok &= _set_key(lines, "max_daily_usd", str(vals["max_daily_usd"]),
-                       start=s, end=e)
-    caps_region = _region(lines, "caps")
-    if caps_region and ok:
+    def _mutate(lines):
+        for tier, vals in parsed.items():
+            region = _region(lines, tier)
+            if region is None:
+                raise cs.StructureError(f"no tiers.{tier} block")
+            s, e = region
+            cs.require(_set_key(lines, "model", vals["model"],
+                                start=s, end=e), f"{tier}.model")
+            cs.require(_set_key(lines, "price_in_per_mtok",
+                                str(vals["price_in_per_mtok"]),
+                                start=s, end=e), f"{tier}.price_in")
+            cs.require(_set_key(lines, "price_out_per_mtok",
+                                str(vals["price_out_per_mtok"]),
+                                start=s, end=e), f"{tier}.price_out")
+            cs.require(_set_key(lines, "max_daily_usd",
+                                str(vals["max_daily_usd"]),
+                                start=s, end=e), f"{tier}.cap")
+        caps_region = _region(lines, "caps")
+        if caps_region is None:
+            raise cs.StructureError("no caps block")
         s, e = caps_region
-        ok &= _set_key(lines, "monthly_usd", str(caps_out["monthly_usd"]),
-                       indent="  ", start=s, end=e)
-        ok &= _set_key(lines, "on_cap", caps_out["on_cap"],
-                       indent="  ", start=s, end=e)
-    else:
-        ok = False
-    if not ok:
-        raise ModelsStoreError(
-            "models.yaml structure not recognised — keys should sit at "
-            "four-space indent inside tiers:/caps:")
+        cs.require(_set_key(lines, "monthly_usd",
+                            str(caps_out["monthly_usd"]), indent="  ",
+                            start=s, end=e), "caps.monthly_usd")
+        cs.require(_set_key(lines, "on_cap", caps_out["on_cap"],
+                            indent="  ", start=s, end=e), "caps.on_cap")
 
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    try:
+    def _validate():
         cfg = core_config.load_models_cfg()
         for tier in TIERS:
-            t = cfg.tiers[tier]
-            if t.model != parsed[tier]["model"]:
+            if cfg.tiers[tier].model != parsed[tier]["model"]:
                 raise core_config.ConfigError(f"{tier} round-trip mismatch")
         return {"tiers": cfg.tiers, "caps": cfg.caps}
-    except Exception as e:                       # rollback
-        path.write_text(original, encoding="utf-8")
-        raise ModelsStoreError(
-            f"rejected by validation — file restored: {e}") from e
+
+    return cs.commit(_path(), _mutate, _validate, error_cls=ModelsStoreError,
+                     structure_msg="models.yaml structure not recognised "
+                     "— keys should sit at four-space indent inside "
+                     "tiers:/caps:")
 
 
 # ── provider price refresh ───────────────────────────────────────────────────

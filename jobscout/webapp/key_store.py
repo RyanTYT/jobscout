@@ -9,11 +9,11 @@ masked tail confirms it's set.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from jobscout.core import config as core_config
 from jobscout.core import paths as core_paths
+from jobscout.webapp import config_store as cs
 
 
 class KeyStoreError(Exception):
@@ -46,29 +46,11 @@ def status() -> dict:
 
 
 def _upsert(path: Path, env_name: str, value: str) -> None:
-    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
-    pat = re.compile(rf"^{re.escape(env_name)}\s*=", re.I)
-    if any(pat.match(line.strip()) for line in lines if line.strip()):
-        lines = [
-            f"{env_name}={value}" if pat.match(line.strip()) else line
-            for line in lines
-        ]
-    else:
-        if lines and lines[-1].strip():
-            lines.append("")
-        lines.append(f"{env_name}={value}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    cs.env_upsert(path, env_name, value)
 
 
 def _drop(path: Path, env_name: str) -> None:
-    if not path.is_file():
-        return
-    pat = re.compile(rf"^{re.escape(env_name)}\s*=", re.I)
-    lines = [
-        line for line in path.read_text(encoding="utf-8").splitlines()
-        if not pat.match(line.strip())
-    ]
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    cs.env_drop(path, env_name)
 
 
 def save_key(raw_key: str) -> dict:
@@ -144,14 +126,5 @@ def clear_brave() -> dict:
 def clear_key() -> dict:
     """Remove the key line from .env (LLM work degrades gracefully again)."""
     settings = core_config.load_settings()
-    key_env = settings.llm.api_key_env
-    path = _env_path()
-    if not path.is_file():
-        return status()
-    pat = re.compile(rf"^{re.escape(key_env)}\s*=", re.I)
-    lines = [
-        line for line in path.read_text(encoding="utf-8").splitlines()
-        if not pat.match(line.strip())
-    ]
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _drop(_env_path(), settings.llm.api_key_env)
     return status()

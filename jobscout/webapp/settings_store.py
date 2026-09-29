@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 from jobscout.core import config as core_config
+from jobscout.webapp import config_store as cs
 
 SCHEDULES = ("daily", "weekdays", "mon-wed-fri", "manual")
 SEARCH_PROVIDERS = ("auto", "cse", "brave", "llm", "ddg")
@@ -81,27 +82,18 @@ def save_search(*, provider: str, llm_model: str) -> dict:
             f"rejected by validation — file restored: {e}") from e
 
 
-def _set(lines: list[str], key: str, value: str) -> bool:
-    """Patch `  agent:`'s 4-space `key:` line, preserving its comment."""
-    # locate the agent block
-    agent_i = None
-    for i, line in enumerate(lines):
-        if re.match(r"^  agent:\s*$", line):
-            agent_i = i
-            break
+def _agent_block(lines: list[str]) -> tuple[int, int]:
+    """(start, end) of the 4-space discovery.agent block."""
+    agent_i = cs.find_key(lines, "agent", indent="  ")
     if agent_i is None:
-        return False
-    pat = re.compile(
-        rf"^(    ){re.escape(key)}:(\s*[^\n#]*)(\s+#.*)?$")
+        raise cs.StructureError("no discovery.agent block")
+    end = len(lines)
     for j in range(agent_i + 1, len(lines)):
         s = lines[j]
-        if re.match(r"^  \w[\w-]*:\s*$", s) or re.match(r"^\w", s):
-            return False                    # left the agent block
-        m = pat.match(s)
-        if m:
-            lines[j] = f"    {key}: {value}{m.group(3) or ''}"
-            return True
-    return False
+        if re.match(r"^  \w[\w-]*:\s*$", s) or (s and s[0] not in " \t"):
+            end = j
+            break
+    return agent_i + 1, end
 
 
 def save(*, schedule: str, max_steps: str, max_cost_usd: str,
@@ -121,20 +113,20 @@ def save(*, schedule: str, max_steps: str, max_cost_usd: str,
     if cost < 0 or cost > 100:
         raise SettingsStoreError("cost cap must be between 0 and 100")
 
-    path = _path()
-    original = path.read_text(encoding="utf-8")
-    lines = original.splitlines()
-    if not all([
-        _set(lines, "schedule", schedule),
-        _set(lines, "max_steps", str(steps)),
-        _set(lines, "max_cost_usd", str(cost)),
-        _set(lines, "run_on_signal", str(run_on_signal).lower()),
-    ]):
-        raise SettingsStoreError(
-            "settings.yaml structure not recognised — the discovery.agent "
-            "block should hold plain four-space keys")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    try:
+    def _mutate(lines):
+        start, end = _agent_block(lines)
+        cs.require(cs.set_key(lines, "schedule", schedule, indent="    ",
+                              start=start, end=end), "agent.schedule")
+        cs.require(cs.set_key(lines, "max_steps", str(steps), indent="    ",
+                              start=start, end=end), "agent.max_steps")
+        cs.require(cs.set_key(lines, "max_cost_usd", str(cost),
+                              indent="    ", start=start, end=end),
+                   "agent.max_cost_usd")
+        cs.require(cs.set_key(lines, "run_on_signal",
+                              str(run_on_signal).lower(), indent="    ",
+                              start=start, end=end), "agent.run_on_signal")
+
+    def _validate():
         agent = core_config.load_settings().discovery.agent
         if (agent.max_steps != steps
                 or abs(agent.max_cost_usd - cost) > 1e-9
@@ -142,7 +134,9 @@ def save(*, schedule: str, max_steps: str, max_cost_usd: str,
                 or agent.run_on_signal != run_on_signal):
             raise core_config.ConfigError("round-trip mismatch")
         return {"agent": agent}
-    except Exception as e:                       # rollback
-        path.write_text(original, encoding="utf-8")
-        raise SettingsStoreError(
-            f"rejected by validation — file restored: {e}") from e
+
+    return cs.commit(_path(), _mutate, _validate,
+                     error_cls=SettingsStoreError,
+                     structure_msg="settings.yaml structure not "
+                                   "recognised — the discovery.agent block "
+                                   "should hold plain four-space keys")
