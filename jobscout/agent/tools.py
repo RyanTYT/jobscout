@@ -21,7 +21,7 @@ import httpx
 from jobscout.core import db
 from jobscout.core import paths as core_paths
 from jobscout.core.schema import ProfileCfg, Settings
-from jobscout.sources.ats.base import soft_get, strip_html
+from jobscout.sources.postings.base import soft_get, strip_html
 
 SYSTEM_PROMPT = (
     "You are jobscout's discovery agent. You find target companies for a senior "

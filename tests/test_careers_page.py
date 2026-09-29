@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from jobscout.sources.careers_page import (
+from jobscout.sources.postings.careers import (
     extract_jobpostings,
     jsonld_to_posting,
     parse_wp_feed,

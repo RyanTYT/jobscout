@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 
 from jobscout.core import db
-from jobscout.sources.ats.base import soft_get
+from jobscout.sources.postings.base import soft_get
 
 _API = "https://api.github.com"
 

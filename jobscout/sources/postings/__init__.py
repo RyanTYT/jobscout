@@ -1,6 +1,6 @@
 """ATS board connector registry."""
 
-from jobscout.sources.ats import ashby, greenhouse, lever, smartrecruiters
+from jobscout.sources.postings import ashby, greenhouse, lever, smartrecruiters
 
 FETCHERS = {
     "greenhouse": greenhouse.fetch,

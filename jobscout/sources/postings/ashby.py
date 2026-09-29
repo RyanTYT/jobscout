@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import httpx
 
-from jobscout.sources.ats.base import RawPosting, SourceError, SourceNotFound, strip_html
+from jobscout.sources.postings.base import RawPosting, SourceError, SourceNotFound, strip_html
 
 BASE = "https://api.ashbyhq.com/posting-api/job-board/{org}"
 

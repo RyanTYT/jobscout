@@ -32,7 +32,7 @@ from hashlib import sha256
 import httpx
 
 from jobscout.core import db
-from jobscout.sources.ats.base import soft_get, strip_html
+from jobscout.sources.postings.base import soft_get, strip_html
 
 
 def run_monitoring(client: httpx.Client, conn: sqlite3.Connection) -> dict:

@@ -10,7 +10,7 @@ from jobscout.agent import tools as agent_tools
 from jobscout.agent.harness import FakeAgentModel, run_morning
 from jobscout.core import db as core_db
 from jobscout.core.schema import Settings, TargetCfg
-from jobscout.sources.ats.base import make_client
+from jobscout.sources.postings.base import make_client
 
 
 @pytest.fixture()

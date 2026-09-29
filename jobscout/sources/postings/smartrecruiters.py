@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import httpx
 
-from jobscout.sources.ats.base import RawPosting, SourceError, SourceNotFound, polite
+from jobscout.sources.postings.base import RawPosting, SourceError, SourceNotFound, polite
 
 BASE = "https://api.smartrecruiters.com/v1/companies/{cid}/postings"
 

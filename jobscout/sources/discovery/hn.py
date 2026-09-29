@@ -14,8 +14,8 @@ from urllib.parse import urlparse
 import httpx
 
 from jobscout.core import db
-from jobscout.sources.ats.base import soft_get
 from jobscout.sources.discovery.blocklist import is_blocked
+from jobscout.sources.postings.base import soft_get
 
 _SEARCH = "https://hn.algolia.com/api/v1/search"
 

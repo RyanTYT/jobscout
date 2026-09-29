@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 import httpx
 
 from jobscout.core import db
-from jobscout.sources.ats.base import soft_get
+from jobscout.sources.postings.base import soft_get
 
 DEFAULT_FEEDS = (
     "https://techcrunch.com/tag/funding/feed/",

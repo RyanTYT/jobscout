@@ -14,8 +14,8 @@ import time
 import httpx
 
 from jobscout.core.db import slugify
-from jobscout.sources.ats import FETCHERS
-from jobscout.sources.ats.base import SourceError, SourceNotFound, make_client
+from jobscout.sources.postings import FETCHERS
+from jobscout.sources.postings.base import SourceError, SourceNotFound, make_client
 
 PROBE_PROVIDERS = ("greenhouse", "lever", "ashby", "smartrecruiters")
 

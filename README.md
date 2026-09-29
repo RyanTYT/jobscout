@@ -7,6 +7,25 @@ application packets built entirely from a single master resume.
 **Read [PLAN.md](PLAN.md) first** — it is the single source of truth for design
 and progress. [AGENTS.md](AGENTS.md) covers conventions for coding agents.
 
+## The layout (one job per area)
+
+```
+jobscout/                 the pipeline package
+  core/                   kernel: paths · config · schema · db · resume
+  sources/postings/       ATS boards + dark-pool careers pages → postings
+  sources/discovery/      signal + company discovery (cse, github, hn, news, rss, monitoring)
+  scoring/                gates: rules (deterministic) + llm_bulk (cheap tier)
+  agent/                  judgment: brief · harness (tool loop) · tools
+  packets/                applications: field_map · tailor · cover_letter · claim_check · render
+  webapp/                 dashboard: routers/ · config stores (one engine) · agent_runner · apply
+config/ master_resume/    inputs (user-editable; shipped in the dmg)
+var/                      ALL runtime outputs: data · digest · logs · morning_reports · research · applications
+desktop/                  the Tauri shell + PyInstaller freeze
+tests/                    conftest + one file per area
+```
+
+The package map in `jobscout/__init__.py` carries the same story inline.
+
 ## Quickstart (dev)
 
 ```bash

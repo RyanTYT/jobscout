@@ -27,14 +27,14 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 from jobscout.core.db import slugify
-from jobscout.sources.ats import FETCHERS
-from jobscout.sources.ats.base import (
+from jobscout.sources.postings import FETCHERS
+from jobscout.sources.postings.base import (
     RawPosting,
     SourceError,
     SourceNotFound,
     strip_html,
 )
-from jobscout.sources.ats.base import (
+from jobscout.sources.postings.base import (
     soft_get as _get,
 )
 

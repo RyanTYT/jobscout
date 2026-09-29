@@ -16,8 +16,8 @@ from jobscout.core import db
 from jobscout.core.config import load_profile, load_settings
 from jobscout.scoring.rules import guess_seniority, rule_filter
 from jobscout.sources import careers_page
-from jobscout.sources.ats import FETCHERS
-from jobscout.sources.ats.base import make_client
+from jobscout.sources.postings import FETCHERS
+from jobscout.sources.postings.base import make_client
 
 
 def run_daily(force: bool = False) -> int:
@@ -155,7 +155,7 @@ def run_daily(force: bool = False) -> int:
 
         # ── monitoring (P8): careers page changes + sitemap diffs ──────────
         try:
-            from jobscout.sources.monitoring import run_monitoring
+            from jobscout.sources.discovery.monitoring import run_monitoring
 
             monitoring_stats = run_monitoring(client, conn)
         except Exception as e:  # noqa: BLE001 — monitoring must never break the run

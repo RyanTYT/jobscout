@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 
 import httpx
 
-from jobscout.sources.ats.base import RawPosting, SourceError, SourceNotFound, strip_html
+from jobscout.sources.postings.base import RawPosting, SourceError, SourceNotFound, strip_html
 
 BASE = "https://api.lever.co/v0/postings/{token}"
 

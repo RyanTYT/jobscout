@@ -7,7 +7,7 @@ import sqlite3
 import pytest
 
 from jobscout.core import db as core_db
-from jobscout.sources import monitoring
+from jobscout.sources.discovery import monitoring
 
 RICH_CAREERS_HTML = """
 <html><body>

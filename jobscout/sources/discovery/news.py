@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 import httpx
 
 from jobscout.core import db
-from jobscout.sources.ats.base import soft_get
+from jobscout.sources.postings.base import soft_get
 
 _RSS_URL = "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
 
