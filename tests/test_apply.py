@@ -267,8 +267,8 @@ def test_jobscout_home_relocates_runtime(monkeypatch, tmp_path):
     home = tmp_path / "appdata"
     monkeypatch.setattr(paths.os, "environ", {"JOBSCOUT_HOME": str(home)})
     assert paths.repo_root() == home.resolve()
-    assert paths.db_path() == home.resolve() / "data" / "jobscout.db"
-    assert paths.applications_dir() == home.resolve() / "applications"
+    assert paths.db_path() == home.resolve() / "var" / "data" / "jobscout.db"
+    assert paths.applications_dir() == home.resolve() / "var" / "applications"
 
 
 def test_jobscout_home_unset_uses_repo(monkeypatch):
