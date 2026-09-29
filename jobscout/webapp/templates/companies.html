@@ -80,8 +80,7 @@
                 {% set route = routes.get(r.id) %}
                 {% if route.kind == "apply" %}
                 <a class="badge text-bg-success" title="{{ route.detail }}"
-                   href="{{ r.career_url or ('https://' + r.domain) if (r.career_url or r.domain) else '#' }}"
-                   {% if r.career_url or r.domain %}target="_blank" rel="noopener"{% endif %}>
+                   href="/?company={{ r.id }}">
                   {{ m.icon("arrow-right", 10) }} apply</a>
                 {% elif route.kind == "email" %}
                 {%- set subject = "Interest in opportunities at " ~ r.name -%}
