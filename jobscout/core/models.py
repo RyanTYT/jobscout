@@ -243,8 +243,20 @@ class RunCfg(BaseModel):
     skip_if_run_within_hours: int = 20
 
 
+class SearchCfg(BaseModel):
+    """Which engine powers the agent's web_search tool (agent/tools.py).
+
+    auto: first configured of CSE -> Brave -> LLM-search -> DuckDuckGo.
+    llm: a search-grounded chat model (e.g. OpenRouter :online plugins or
+    sonar) queried through the existing LLM key — no extra signup, a few
+    cents per run; the slug lives in llm_model."""
+    provider: Literal["auto", "cse", "brave", "llm", "ddg"] = "auto"
+    llm_model: str = ""
+
+
 class Settings(BaseModel):
     discovery: DiscoveryCfg = Field(default_factory=DiscoveryCfg)
+    search: SearchCfg = Field(default_factory=SearchCfg)
     dashboard: DashboardCfg = Field(default_factory=DashboardCfg)
     sidecar: SidecarCfg = Field(default_factory=SidecarCfg)
     llm: LlmCfg = Field(default_factory=LlmCfg)

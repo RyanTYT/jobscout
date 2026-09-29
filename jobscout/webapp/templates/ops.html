@@ -159,6 +159,49 @@
 {{ m.callout("Prices refreshed from the provider: " ~ models_refreshed, "info") }}
 {% endif %}
 
+{% if search_saved %}
+{{ m.callout("Search provider saved — the next agent run uses it.", "success") }}
+{% endif %}
+
+{# ── web search: which engine powers the agent's web_search tool ──────── #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Web search engine</h2>
+    <span class="text-secondary small">settings.yaml · search.provider</span>
+  </div>
+  <div class="card-body">
+    <form method="post" action="/ops/search-provider" class="row g-3 align-items-end" data-busy-submit>
+      <div class="col-6 col-md-4 col-xl-2">
+        <label class="form-label" for="f-search-provider">engine</label>
+        <select class="form-select" id="f-search-provider" name="provider">
+          {% set opts = [
+            ("auto", "auto — first configured (CSE → Brave → LLM → DDG)"),
+            ("cse", "Google CSE — free 100/day (needs keys below)"),
+            ("brave", "Brave — free 2000/month (needs key below)"),
+            ("llm", "LLM search model — no extra key, cents/run"),
+            ("ddg", "DuckDuckGo — free, no key, unofficial"),
+          ] %}
+          {% for val, label in opts %}
+          <option value="{{ val }}" {% if val == search_cfg.provider %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-6 col-xl-4">
+        <label class="form-label" for="f-search-model">search model slug <span class="text-secondary">(llm engine only)</span></label>
+        <input class="form-control" type="text" id="f-search-model" name="llm_model"
+               value="{{ search_cfg.llm_model }}"
+               placeholder="openai/gpt-4o-mini:online — search-grounded slug">
+        <div class="form-text">any web-enabled model your provider serves; queried through your existing LLM key</div>
+      </div>
+      <div class="col-12 col-md-2 col-xl-2 d-flex justify-content-end">
+        <button class="btn btn-primary btn-sm" type="submit">
+          {{ m.icon("check", 12) }} save engine
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% if key_saved %}
 {{ m.callout("API key saved to .env — effective on the next LLM run (no restart needed).", "success") }}
 {% endif %}

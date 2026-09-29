@@ -42,3 +42,7 @@ run:
   agent_hour: 7             # launchd com.jobscout.agent (installed via --with-agent)
   agent_minute: 0
   skip_if_run_within_hours: 20   # idempotency: skip when last good run is fresh
+
+search:
+  provider: auto
+  llm_model: ""

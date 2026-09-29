@@ -186,34 +186,127 @@ def _get_context(ctx: AgentCtx) -> str:
     return "\n\n".join(parts)[:6000]
 
 
-def _web_search(query: str, num_results: int = 5, ctx: AgentCtx = None) -> str:
-    n = max(1, min(8, int(num_results or 5)))
+def _fmt(items: list[tuple[str, str, str]]) -> str:
+    if not items:
+        return "no results"
+    return "\n".join(
+        f"{i+1}. {t} — {u}\n   {s[:160]}" for i, (t, u, s) in enumerate(items))
+
+
+def _cse_search(query: str, n: int, ctx: AgentCtx) -> str | None:
     key = (ctx.env.get("JOBSCOUT_CSE_API_KEY") or "").strip()
     cx = (ctx.env.get("JOBSCOUT_CSE_CX") or "").strip()
-    if key and cx:
-        r = soft_get(ctx.client, "https://www.googleapis.com/customsearch/v1",
-                     params={"key": key, "cx": cx, "q": query, "num": n})
-        if r is not None:
-            items = r.json().get("items") or []
-            if items:
-                return "\n".join(
-                    f"{i+1}. {it.get('title', '')} — {it.get('link', '')}\n   {it.get('snippet', '')[:160]}"
-                    for i, it in enumerate(items[:n])
-                )
-            return "no results"
+    if not (key and cx):
+        return None
+    r = soft_get(ctx.client, "https://www.googleapis.com/customsearch/v1",
+                 params={"key": key, "cx": cx, "q": query, "num": n})
+    if r is None:
+        return None
+    items = r.json().get("items") or []
+    return _fmt([(it.get("title", ""), it.get("link", ""),
+                  it.get("snippet", "")) for it in items[:n]])
+
+
+def _brave_search(query: str, n: int, ctx: AgentCtx) -> str | None:
     brave = (ctx.env.get("JOBSCOUT_BRAVE_API_KEY") or "").strip()
-    if brave:
-        r = _brave_get(ctx, query, n)
-        if r is not None:
-            results = r.json().get("web", {}).get("results") or []
-            if results:
-                return "\n".join(
-                    f"{i+1}. {it.get('title', '')} — {it.get('url', '')}"
-                    for i, it in enumerate(results[:n])
-                )
-            return "no results"
-    return ("no search provider configured (set JOBSCOUT_CSE_API_KEY + JOBSCOUT_CSE_CX, "
-            "or JOBSCOUT_BRAVE_API_KEY in .env) — use fetch() on known URLs instead")
+    if not brave:
+        return None
+    r = _brave_get(ctx, query, n)
+    if r is None:
+        return None
+    results = r.json().get("web", {}).get("results") or []
+    return _fmt([(it.get("title", ""), it.get("url", ""), "")
+                 for it in results[:n]])
+
+
+def _llm_search(query: str, n: int, ctx: AgentCtx) -> str | None:
+    """Search-grounded chat model as the engine (no extra key — reuses the
+    LLM provider; e.g. OpenRouter :online plugins or sonar-style models).
+    Prompts for a JSON result list and parses it; a few cents per run."""
+    model = ((ctx.settings.search.llm_model or "").strip()
+             if ctx.settings else "")
+    if not model:
+        return None
+    import json as _json
+
+    settings = ctx.settings or None
+    base = (ctx.env.get((settings.llm.base_url_env if settings
+                         else "JOBSCOUT_LLM_BASE_URL") or "")
+            or "").strip().rstrip("/")
+    key = (ctx.env.get((settings.llm.api_key_env if settings
+                        else "JOBSCOUT_LLM_API_KEY") or "")
+           or "").strip()
+    if not (base and key):
+        return None
+    prompt = (
+        f"Search the web for: {query}\n"
+        f"Return ONLY a JSON array of the top {n} results, each exactly "
+        '"[{\"title\": \"...\", \"url\": \"...\", \"snippet\": \"...\"}]". '
+        "No prose, no markdown fences."
+    )
+    try:
+        r = ctx.client.post(
+            base + "/chat/completions",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"model": model,
+                  "messages": [{"role": "user", "content": prompt}],
+                  "temperature": 0},
+            timeout=30.0,
+        )
+        r.raise_for_status()
+        text = (r.json().get("choices") or [{}])[0].get("message", {}).get(
+            "content", "")
+        start, end = text.find("["), text.rfind("]")
+        if start == -1 or end <= start:
+            return None
+        items = _json.loads(text[start:end + 1])
+        return _fmt([(str(i.get("title", "")), str(i.get("url", "")),
+                      str(i.get("snippet", ""))) for i in items[:n]])
+    except Exception:
+        return None
+
+
+def _ddg_search(query: str, n: int, ctx: AgentCtx) -> str | None:
+    """DuckDuckGo via the ddgs package — free, no key. Unofficial endpoint:
+    rate-limited and occasionally broken; fine as a manual fallback."""
+    try:
+        from ddgs import DDGS
+    except ImportError:
+        return None
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=n))
+        return _fmt([(r.get("title", ""), r.get("href", r.get("url", "")),
+                      r.get("body", "")) for r in results[:n]])
+    except Exception:
+        return None
+
+
+# engines resolve at CALL time (globals lookup) so tests can patch them
+SEARCH_ENGINE_NAMES = ("cse", "brave", "llm", "ddg")
+
+
+def _engine(name: str):
+    return globals().get(f"_{name}_search")
+
+
+def _web_search(query: str, num_results: int = 5, ctx: AgentCtx = None) -> str:
+    n = max(1, min(8, int(num_results or 5)))
+    cfg = (ctx.settings.search if ctx and ctx.settings else None)
+    chosen = (cfg.provider if cfg else "auto")
+
+    if chosen == "auto":
+        order = ["cse", "brave", "llm", "ddg"]
+    else:
+        order = [chosen]
+    for name in order:
+        fn = _engine(name)
+        result = fn(query, n, ctx) if fn else None
+        if result is not None:
+            return result
+    return (f"no search provider produced results (provider={chosen}). "
+            "Configure CSE/Brave keys, a search model slug, or pick ddg "
+            "on the Ops page — meanwhile use fetch() on known URLs.")
 
 
 def _brave_get(ctx: AgentCtx, query: str, n: int):

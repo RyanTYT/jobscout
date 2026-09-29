@@ -132,8 +132,8 @@ def test_price_refresh_writes_matched_prices(cfg_dir, monkeypatch):
 
         def json(self):
             return {"data": [
-                {"id": "deepseek/deepseek-chat",
-                 "pricing": {"prompt": "0.00000027", "completion": "0.0000011"}},
+                {"id": "~deepseek/deepseek-v4-flash-latest",
+                 "pricing": {"prompt": "0.00000001", "completion": "0.0000004"}},
                 {"id": "deepseek/deepseek-reasoner",
                  "pricing": {"prompt": "0.00000055", "completion": "0.00000219"}},
             ]}
@@ -145,7 +145,7 @@ def test_price_refresh_writes_matched_prices(cfg_dir, monkeypatch):
     assert "error" not in result, result
     assert len(result["updated"]) == 3                 # all tiers matched
     cfg = ms.current()
-    assert cfg.tiers["bulk"].price_in_per_mtok == 0.27
+    assert cfg.tiers["bulk"].price_in_per_mtok == 0.01
 
 
 def test_price_refresh_no_pricing_reports_clearly(cfg_dir, monkeypatch):
@@ -423,12 +423,90 @@ def test_brave_route_and_card(client, env_file):
     assert "JOBSCOUT_BRAVE_API_KEY=bb-1234" in env_file.read_text(encoding="utf-8")
 
 
-def test_tools_prefer_brave_when_only_brave_set():
-    """The agent's web_search falls back to Brave — env contract check."""
+def test_search_provider_dispatch_contract():
+    """All four engines are dispatched by name + read their env keys."""
     import inspect
 
     from jobscout.agent import tools
 
+    mod = inspect.getsource(tools)
+    assert "JOBSCOUT_BRAVE_API_KEY" in mod
+    assert "JOBSCOUT_CSE_API_KEY" in mod
+    assert tools.SEARCH_ENGINE_NAMES == ("cse", "brave", "llm", "ddg")
+    # provider selection honours settings.search.provider
     src = inspect.getsource(tools._web_search)
-    assert "JOBSCOUT_BRAVE_API_KEY" in src
-    assert "JOBSCOUT_CSE_API_KEY" in src
+    assert 'cfg.provider' in src
+
+
+# ── search provider selection ────────────────────────────────────────────
+
+
+def test_search_settings_roundtrip_and_append(cfg_dir):
+    from jobscout.webapp import settings_store as ss
+
+    # the repo settings.yaml has no search: block yet — save appends it
+    before = (cfg_dir / "settings.yaml").read_text(encoding="utf-8")
+    assert "search:" not in before
+    ss.save_search(provider="ddg", llm_model="")
+    search = core_config.load_settings().search
+    assert search.provider == "ddg"
+    after = (cfg_dir / "settings.yaml").read_text(encoding="utf-8")
+    assert "discovery mode switch lives here" in after      # untouched
+    # rewrite in place
+    ss.save_search(provider="llm", llm_model="openai/gpt-4o-mini:online")
+    assert core_config.load_settings().search.llm_model == "openai/gpt-4o-mini:online"
+
+
+def test_search_settings_llm_needs_model(cfg_dir):
+    from jobscout.webapp import settings_store as ss
+
+    with pytest.raises(ss.SettingsStoreError):
+        ss.save_search(provider="llm", llm_model=" ")
+    assert "search:" not in (cfg_dir / "settings.yaml").read_text(encoding="utf-8")
+
+
+def test_search_provider_route_and_card(client, cfg_dir):
+    r = client.get("/ops")
+    assert 'name="provider"' in r.text
+    assert "Web search engine" in r.text
+    assert "DuckDuckGo" in r.text
+    r2 = client.post("/ops/search-provider", data={
+        "provider": "ddg", "llm_model": "",
+    }, follow_redirects=False)
+    assert r2.status_code == 303
+    assert "search_saved=1" in r2.headers["location"]
+    assert core_config.load_settings().search.provider == "ddg"
+
+
+def test_web_search_dispatch_honours_provider(monkeypatch):
+    """provider=ddg routes to the ddg engine even with CSE keys set."""
+    from jobscout.agent import tools
+    from jobscout.core.models import SearchCfg, Settings
+
+    calls = []
+    monkeypatch.setattr(tools, "_ddg_search",
+                        lambda q, n, ctx: calls.append(q) or "1. ddg result")
+
+    class Ctx:
+        settings = Settings(search=SearchCfg(provider="ddg"))
+        env = {"JOBSCOUT_CSE_API_KEY": "x", "JOBSCOUT_CSE_CX": "y"}
+
+    out = tools._web_search("test query", 3, Ctx())
+    assert "ddg result" in out and calls == ["test query"]
+
+
+def test_web_search_auto_falls_through_to_ddg(monkeypatch):
+    from jobscout.agent import tools
+    from jobscout.core.models import Settings
+
+    monkeypatch.setattr(tools, "_cse_search", lambda q, n, ctx: None)
+    monkeypatch.setattr(tools, "_brave_search", lambda q, n, ctx: None)
+    monkeypatch.setattr(tools, "_llm_search", lambda q, n, ctx: None)
+    monkeypatch.setattr(tools, "_ddg_search",
+                        lambda q, n, ctx: "1. ddg result")
+
+    class Ctx:
+        settings = Settings()
+        env = {}
+
+    assert "ddg result" in tools._web_search("q", 3, Ctx())

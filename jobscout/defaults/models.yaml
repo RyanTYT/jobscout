@@ -5,19 +5,19 @@
 
 tiers:
   bulk:
-    model: deepseek/deepseek-chat
+    model: ~deepseek/deepseek-v4-flash-latest
     max_daily_usd: 0.25
     purpose: bulk scoring, field mapping, claim checks (cached by content hash)
     # approximate prices — update to your provider's current pricing (USD per 1M tokens)
-    price_in_per_mtok: 0.27
-    price_out_per_mtok: 1.10
+    price_in_per_mtok: 0.01
+    price_out_per_mtok: 0.40
 
   agent:
-    model: deepseek/deepseek-chat
+    model: ~deepseek/deepseek-v4-flash-latest
     max_daily_usd: 1.00
     purpose: morning discovery harness (step+cost capped, PLAN §1.2)
-    price_in_per_mtok: 0.27
-    price_out_per_mtok: 1.10
+    price_in_per_mtok: 0.01
+    price_out_per_mtok: 0.40
 
   quality:
     model: deepseek/deepseek-reasoner

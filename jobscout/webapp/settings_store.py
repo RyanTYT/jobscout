@@ -15,6 +15,7 @@ from pathlib import Path
 from jobscout.core import config as core_config
 
 SCHEDULES = ("daily", "weekdays", "mon-wed-fri", "manual")
+SEARCH_PROVIDERS = ("auto", "cse", "brave", "llm", "ddg")
 
 
 class SettingsStoreError(Exception):
@@ -30,6 +31,54 @@ def _path() -> Path:
 
 def current():
     return core_config.load_settings().discovery.agent
+
+
+def current_search():
+    return core_config.load_settings().search
+
+
+def save_search(*, provider: str, llm_model: str) -> dict:
+    """Write the search: block (appended when the file predates it)."""
+    if provider not in SEARCH_PROVIDERS:
+        raise SettingsStoreError(f"invalid provider: {provider!r}")
+    llm_model = (llm_model or "").strip()
+    if provider == "llm" and not llm_model:
+        raise SettingsStoreError(
+            "the llm engine needs a search model slug (e.g. "
+            "openai/gpt-4o-mini:online or a sonar model)")
+    path = _path()
+    original = path.read_text(encoding="utf-8")
+    lines = original.splitlines()
+    model_line = f"  llm_model: {llm_model}" if llm_model else '  llm_model: ""'
+    block = ["search:",
+             f"  provider: {provider}",
+             model_line]
+    # find an existing top-level search: block to replace
+    start = None
+    for i, line in enumerate(lines):
+        if re.match(r"^search:\s*$", line):
+            start = i
+            break
+    if start is not None:
+        end = start + 1
+        while end < len(lines) and (not lines[end] or lines[end][0] in " \t"
+                                    or lines[end].startswith("#")):
+            end += 1
+        lines[start:end] = block
+    else:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines += block
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        search = core_config.load_settings().search
+        if search.provider != provider:
+            raise core_config.ConfigError("round-trip mismatch")
+        return {"search": search}
+    except Exception as e:
+        path.write_text(original, encoding="utf-8")
+        raise SettingsStoreError(
+            f"rejected by validation — file restored: {e}") from e
 
 
 def _set(lines: list[str], key: str, value: str) -> bool:

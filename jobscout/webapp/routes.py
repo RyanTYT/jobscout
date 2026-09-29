@@ -660,6 +660,23 @@ def create_app() -> FastAPI:
         finally:
             conn.close()
 
+    @app.post("/ops/search-provider")
+    async def ops_search_provider(request: Request):
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp import settings_store
+
+        form = await request.form()
+        try:
+            settings_store.save_search(
+                provider=form.get("provider", "auto"),
+                llm_model=form.get("llm_model", ""),
+            )
+            return RedirectResponse("/ops?search_saved=1", status_code=303)
+        except settings_store.SettingsStoreError as e:
+            return RedirectResponse(
+                f"/ops?key_error={_q(str(e))}", status_code=303)
+
     @app.post("/discovery/agent-caps")
     async def discovery_agent_caps(request: Request):
         """Agent caps editor: schedule, step cap, cost cap, run-on-signal."""
@@ -902,7 +919,9 @@ def create_app() -> FastAPI:
     def ops(request: Request, key_saved: str = Query(""),
             key_error: str = Query(""), models_saved: str = Query(""),
             models_error: str = Query(""),
-            models_refreshed: str = Query("")):
+            models_refreshed: str = Query(""),
+            search_saved: str = Query("")):
+        from jobscout.core import config as core_config
         from jobscout.webapp import key_store, models_store
 
         try:
@@ -958,6 +977,9 @@ def create_app() -> FastAPI:
                 "llm_status": llm_status,
                 "cse_status": cse_status,
                 "brave_status": brave_status,
+                "search_cfg": (core_config.load_settings().search
+                               if True else None),
+                "search_saved": search_saved == "1",
                 "models_cfg": models_cfg,
                 "models_saved": models_saved == "1",
                 "models_error": models_error,
