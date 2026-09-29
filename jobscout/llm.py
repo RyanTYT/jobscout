@@ -21,7 +21,7 @@ import httpx
 
 from jobscout.core import db
 from jobscout.core.config import load_env, load_models_cfg, load_settings
-from jobscout.core.models import TierCfg
+from jobscout.core.schema import TierCfg
 
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 

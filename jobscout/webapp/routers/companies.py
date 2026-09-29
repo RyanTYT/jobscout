@@ -6,7 +6,7 @@ from fastapi import Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from jobscout.core import db
-from jobscout.core.models import WatchlistEntry
+from jobscout.core.schema import WatchlistEntry
 from jobscout.webapp.common import (
     TEMPLATES,
 )

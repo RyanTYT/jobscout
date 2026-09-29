@@ -9,7 +9,6 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from jobscout.core import config as core_config
 from jobscout.core import paths as core_paths
 from jobscout.webapp import key_store as ks
 
@@ -21,7 +20,6 @@ def env_file(tmp_path, monkeypatch):
     f = tmp_path / ".env"
     f.write_text(ENV_HEADER, encoding="utf-8")
     monkeypatch.setattr(core_paths, "env_path", lambda: f)
-    monkeypatch.setattr(core_config, "env_path", lambda: f)
     return f
 
 

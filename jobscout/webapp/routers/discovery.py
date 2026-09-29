@@ -56,7 +56,7 @@ def register(app):
         try:
             target = load_profile().target
         except Exception:                 # noqa: BLE001 — profile optional here
-            from jobscout.core.models import TargetCfg
+            from jobscout.core.schema import TargetCfg
 
             target = TargetCfg()
         from jobscout.core import paths as core_paths

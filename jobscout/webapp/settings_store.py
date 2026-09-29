@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 from jobscout.core import config as core_config
+from jobscout.core import paths as core_paths
 from jobscout.webapp import config_store as cs
 
 SCHEDULES = ("daily", "weekdays", "mon-wed-fri", "manual")
@@ -24,7 +25,7 @@ class SettingsStoreError(Exception):
 
 
 def _path() -> Path:
-    p = Path(core_config.config_dir()) / "settings.yaml"
+    p = Path(core_paths.config_dir()) / "settings.yaml"
     if not p.is_file():
         raise SettingsStoreError(f"missing config file: {p}")
     return p

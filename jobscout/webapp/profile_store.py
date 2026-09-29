@@ -98,8 +98,8 @@ def upload_resume(text: str) -> dict:
     for the flash."""
     import yaml
 
-    from jobscout.core.models import MasterResume
     from jobscout.core.resume import load_master_resume
+    from jobscout.core.schema import MasterResume
 
     path = _resume_path()
     try:

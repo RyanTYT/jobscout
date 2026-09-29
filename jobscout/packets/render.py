@@ -8,7 +8,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from jobscout.core.models import MasterResume
+from jobscout.core.schema import MasterResume
 
 
 def _bullet_text(resume: MasterResume, bullet_id: str, rephrased: dict) -> str:

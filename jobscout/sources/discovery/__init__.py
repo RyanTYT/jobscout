@@ -12,7 +12,7 @@ import httpx
 
 from jobscout import watchlist as wlmod
 from jobscout.core import db
-from jobscout.core.models import ProfileCfg, Settings, WatchlistEntry
+from jobscout.core.schema import ProfileCfg, Settings, WatchlistEntry
 from jobscout.sources.ats.base import soft_get  # noqa: F401 — used by rss/hn/cse
 from jobscout.sources.discovery import cse, github, hn, news, rss
 from jobscout.sources.discovery.blocklist import BLOCKED_DOMAINS, is_blocked  # noqa: F401
@@ -34,7 +34,7 @@ def add_candidate(
 
     Returns (added, ats_tokens). Existing companies are left untouched.
     """
-    from jobscout.ats_probe import probe_company
+    from jobscout.sources.ats.probe import probe_company
 
     if wlmod.find(wl, name) is not None:
         return False, {}

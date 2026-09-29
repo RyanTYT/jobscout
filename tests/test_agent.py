@@ -9,7 +9,7 @@ import pytest
 from jobscout.agent import tools as agent_tools
 from jobscout.agent.harness import FakeAgentModel, run_morning
 from jobscout.core import db as core_db
-from jobscout.core.models import Settings, TargetCfg
+from jobscout.core.schema import Settings, TargetCfg
 from jobscout.sources.ats.base import make_client
 
 
@@ -34,16 +34,16 @@ def wl():
 
     w = wlmod.Watchlist()
     w.B.append(
-        __import__("jobscout.core.models", fromlist=["WatchlistEntry"]).WatchlistEntry(
+        __import__("jobscout.core.schema", fromlist=["WatchlistEntry"]).WatchlistEntry(
             name="Wintermute", domain="wintermute.com"
         )
     )
     return w
 
 
-SETTINGS = Settings(discovery=__import__("jobscout.core.models", fromlist=["DiscoveryCfg"]).DiscoveryCfg())
+SETTINGS = Settings(discovery=__import__("jobscout.core.schema", fromlist=["DiscoveryCfg"]).DiscoveryCfg())
 
-PROFILE = __import__("jobscout.core.models", fromlist=["ProfileCfg"]).ProfileCfg(
+PROFILE = __import__("jobscout.core.schema", fromlist=["ProfileCfg"]).ProfileCfg(
     profile_version="t",
     target=TargetCfg(roles=["quant developer"], stack=["rust"], domains=["market-data"]),
 )
@@ -144,7 +144,8 @@ def test_set_discovery_mode_roundtrip(tmp_path, monkeypatch):
     src = "discovery:\n  mode: hybrid\n  agent:\n    schedule: weekdays\n" 
     settings_file = tmp_path / "settings.yaml"
     settings_file.write_text(src)
-    monkeypatch.setattr(core_config, "config_dir", lambda: tmp_path)
+    monkeypatch.setattr("jobscout.core.paths.config_dir",
+                        lambda: tmp_path)
     core_config.set_discovery_mode("agent")
     assert "mode: \"agent\"" in settings_file.read_text()
     core_config.set_discovery_mode("off")
@@ -161,7 +162,7 @@ def test_brief_carries_targeting():
 
     from jobscout.agent.brief import build_brief
     from jobscout.core.config import load_settings
-    from jobscout.core.models import ProfileCfg, TargetCfg
+    from jobscout.core.schema import ProfileCfg, TargetCfg
 
     profile = ProfileCfg(target=TargetCfg(
         roles=["backend engineer"], seniorities=["junior"],
@@ -181,7 +182,7 @@ def test_brief_targeting_defaults():
 
     from jobscout.agent.brief import build_brief
     from jobscout.core.config import load_settings
-    from jobscout.core.models import ProfileCfg
+    from jobscout.core.schema import ProfileCfg
 
     brief = build_brief(sqlite3.connect(":memory:"), ProfileCfg(),
                         load_settings())

@@ -15,9 +15,9 @@ from pathlib import Path
 
 import yaml
 
+from jobscout.core import paths as _paths
 from jobscout.core.db import slugify
-from jobscout.core.models import Watchlist, WatchlistEntry
-from jobscout.core.paths import config_dir
+from jobscout.core.schema import Watchlist, WatchlistEntry
 
 TIER_KEYS = ("A", "B", "C", "candidates")
 
@@ -42,7 +42,7 @@ HEADER = """\
 
 
 def path() -> Path:
-    return config_dir() / "watchlist.yaml"
+    return _paths.config_dir() / "watchlist.yaml"
 
 
 def load() -> Watchlist:

@@ -688,18 +688,18 @@ def test_credentials_card_replace_and_remove_semantics(client, db_file):
 
     fake = pathlib.Path("/tmp/_fake.env")
     fake.write_text("JOBSCOUT_LLM_API_KEY=sk-zzz\n", encoding="utf-8")
-    from jobscout.core import config as core_config
-
-    orig_store, orig_cfg = _ks._env_path, core_config.env_path
+    from jobscout.core import paths as _cp
+    orig_store, orig_cp = _ks._env_path, _cp.env_path
     _ks._env_path = lambda: fake
-    core_config.env_path = lambda: fake     # status() reads via load_env
+    from jobscout.core import paths as _cp
+    _cp.env_path = lambda: fake     # status() reads via load_env
     try:
         r = client.get("/ops")
         assert "remove key" in r.text
         assert "data-confirm-prompt" in r.text
         assert "key saved" in r.text and "zzz" in r.text
     finally:
-        _ks._env_path, core_config.env_path = orig_store, orig_cfg
+        _ks._env_path, _cp.env_path = orig_store, orig_cp
         fake.unlink(missing_ok=True)
 
 

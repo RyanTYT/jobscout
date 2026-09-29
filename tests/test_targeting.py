@@ -24,7 +24,8 @@ def cfg_dir(tmp_path, monkeypatch):
         src = Path(__file__).resolve().parents[1] / "config" / extra
         if src.is_file():
             (d / extra).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-    monkeypatch.setattr(core_config, "config_dir", lambda: d)
+    from jobscout.core import paths as core_paths
+    monkeypatch.setattr(core_paths, "config_dir", lambda: d)
     return d
 
 

@@ -7,7 +7,7 @@ import sqlite3
 import pytest
 
 from jobscout.core import db as core_db
-from jobscout.core.models import ProfileCfg
+from jobscout.core.schema import ProfileCfg
 from jobscout.sources.discovery.blocklist import is_blocked
 from jobscout.sources.discovery.cse import queries_for_today
 from jobscout.sources.discovery.hn import keyword_match, parse_comment
@@ -15,7 +15,7 @@ from jobscout.sources.discovery.rss import _entries, _funding_name
 
 PROFILE = ProfileCfg(
     profile_version="t",
-    target=__import__("jobscout.core.models", fromlist=["TargetCfg"]).TargetCfg(
+    target=__import__("jobscout.core.schema", fromlist=["TargetCfg"]).TargetCfg(
         roles=["quant developer"], stack=["rust", "c++"], domains=["market-data"],
     ),
 )

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from jobscout.core.models import MasterResume
 from jobscout.core.resume import field_map
+from jobscout.core.schema import MasterResume
 
 # (label, canonical_key, required)
 CHECKLIST: list[tuple[str, str, bool]] = [

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 
-from jobscout.core.models import MasterResume
+from jobscout.core.schema import MasterResume
 from jobscout.llm import LlmError, LlmResponse
 
 SYSTEM = (

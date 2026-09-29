@@ -17,6 +17,7 @@ import re
 from pathlib import Path
 
 from jobscout.core import config as core_config
+from jobscout.core import paths as core_paths
 from jobscout.webapp import config_store as cs
 
 
@@ -25,7 +26,7 @@ class ModelsStoreError(Exception):
 
 
 def _path() -> Path:
-    p = Path(core_config.config_dir()) / "models.yaml"
+    p = Path(core_paths.config_dir()) / "models.yaml"
     if not p.is_file():
         raise ModelsStoreError(f"missing config file: {p}")
     return p

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 
-from jobscout.core.models import ProfileCfg
+from jobscout.core.schema import ProfileCfg
 
 _DEALBREAKER_PATTERNS = {
     "clearance_required": (

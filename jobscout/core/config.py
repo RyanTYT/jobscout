@@ -8,13 +8,13 @@ from typing import Any
 
 import yaml
 
-from jobscout.core.models import (
+from jobscout.core import paths as _paths
+from jobscout.core.schema import (
     ModelsCfg,
     ProfileCfg,
     Settings,
     Watchlist,
 )
-from jobscout.core.paths import config_dir, env_path
 
 
 class ConfigError(Exception):
@@ -46,24 +46,28 @@ def _load(path: Path, model: type, label: str):
 
 
 def load_settings() -> Settings:
-    return _load(config_dir() / "settings.yaml", Settings, "settings.yaml")
+    return _load(_paths.config_dir() / "settings.yaml", Settings,
+                 "settings.yaml")
 
 
 def load_models_cfg() -> ModelsCfg:
-    return _load(config_dir() / "models.yaml", ModelsCfg, "models.yaml")
+    return _load(_paths.config_dir() / "models.yaml", ModelsCfg,
+                 "models.yaml")
 
 
 def load_profile() -> ProfileCfg:
-    return _load(config_dir() / "profile.yaml", ProfileCfg, "profile.yaml")
+    return _load(_paths.config_dir() / "profile.yaml", ProfileCfg,
+                 "profile.yaml")
 
 
 def load_watchlist() -> Watchlist:
-    return _load(config_dir() / "watchlist.yaml", Watchlist, "watchlist.yaml")
+    return _load(_paths.config_dir() / "watchlist.yaml", Watchlist,
+                 "watchlist.yaml")
 
 
 def load_env() -> dict[str, str]:
     """Parse .env (KEY=VALUE lines) if present; never raises."""
-    path = env_path()
+    path = _paths.env_path()
     if not path.is_file():
         return {}
     out: dict[str, str] = {}
@@ -81,7 +85,7 @@ def set_discovery_mode(mode: str) -> None:
     (preserves the file's comments)."""
     if mode not in ("off", "pipeline", "agent", "hybrid"):
         raise ConfigError(f"invalid discovery mode: {mode!r}")
-    path = config_dir() / "settings.yaml"
+    path = _paths.config_dir() / "settings.yaml"
     if not path.is_file():
         raise ConfigError(f"missing config file: {path}")
     lines = path.read_text(encoding="utf-8").splitlines()

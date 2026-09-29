@@ -4,8 +4,8 @@ in research notes + master resume. The claim-check gate screens the output.
 
 from __future__ import annotations
 
-from jobscout.core.models import MasterResume
 from jobscout.core.paths import research_dir
+from jobscout.core.schema import MasterResume
 from jobscout.llm import LlmError, LlmResponse
 
 SYSTEM = (

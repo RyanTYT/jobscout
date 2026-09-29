@@ -154,9 +154,9 @@ def add_company(
 ) -> None:
     """Add a company to the watchlist (ATS boards probed automatically, P1)."""
     from jobscout import watchlist as wlmod
-    from jobscout.ats_probe import probe_company
-    from jobscout.core.models import WatchlistEntry
+    from jobscout.core.schema import WatchlistEntry
     from jobscout.sources.ats.base import make_client
+    from jobscout.sources.ats.probe import probe_company
 
     if tier not in ("A", "B", "C", "candidate"):
         console.print(f"[red]tier must be A, B, C, or candidate — got {tier!r}[/]")
@@ -222,9 +222,9 @@ def probe(
     no_careers: bool = typer.Option(False, "--no-careers", help="Skip careers-page discovery"),
 ) -> None:
     """Probe ATS boards + careers page for a company (the full ATS-absence probe, P3)."""
-    from jobscout.ats_probe import probe_company
     from jobscout.sources import careers_page
     from jobscout.sources.ats.base import make_client
+    from jobscout.sources.ats.probe import probe_company
 
     client = make_client()
     try:

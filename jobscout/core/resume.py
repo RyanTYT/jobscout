@@ -10,8 +10,8 @@ from typing import Any
 
 import yaml
 
-from jobscout.core.models import MasterResume
 from jobscout.core.paths import master_resume_dir
+from jobscout.core.schema import MasterResume
 
 
 class ResumeError(Exception):

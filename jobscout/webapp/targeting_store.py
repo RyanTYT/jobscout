@@ -15,6 +15,7 @@ from datetime import date
 from pathlib import Path
 
 from jobscout.core import config as core_config
+from jobscout.core import paths as core_paths
 from jobscout.webapp import config_store as cs
 
 # tokens the rule gate can actually produce (rules._SENIORITY_PATTERNS)
@@ -38,7 +39,7 @@ class TargetingError(Exception):
 
 
 def _profile_path() -> Path:
-    return Path(core_config.config_dir()) / "profile.yaml"
+    return Path(core_paths.config_dir()) / "profile.yaml"
 
 
 def current():

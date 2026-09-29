@@ -20,7 +20,7 @@ import httpx
 
 from jobscout.core import db
 from jobscout.core import paths as core_paths
-from jobscout.core.models import ProfileCfg, Settings
+from jobscout.core.schema import ProfileCfg, Settings
 from jobscout.sources.ats.base import soft_get, strip_html
 
 SYSTEM_PROMPT = (

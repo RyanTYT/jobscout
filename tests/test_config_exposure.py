@@ -28,15 +28,10 @@ def cfg_dir(tmp_path, monkeypatch):
     for name in CONFIG_FILES:
         src = REPO / "config" / name
         (d / name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-    # config_dir is imported BY NAME into several modules — patch each
-    # (the profile-store lesson): core.config, watchlist, and the source
-    from jobscout import watchlist as _wl
-    from jobscout.core import config as _cc
+    # config_dir resolution now goes through the paths MODULE at call
+    # time everywhere — one patch point, no by-name import landmines
     from jobscout.core import paths as core_paths
 
-    monkeypatch.setattr(core_config, "config_dir", lambda: d)
-    monkeypatch.setattr(_cc, "config_dir", lambda: d)
-    monkeypatch.setattr(_wl, "config_dir", lambda: d)
     monkeypatch.setattr(core_paths, "config_dir", lambda: d)
     return d
 
@@ -211,7 +206,6 @@ def env_file(tmp_path, monkeypatch):
     f = tmp_path / ".env"
     f.write_text("JOBSCOUT_LLM_API_KEY=sk-x\n", encoding="utf-8")
     monkeypatch.setattr(core_paths, "env_path", lambda: f)
-    monkeypatch.setattr(core_config, "env_path", lambda: f)
     return f
 
 
@@ -339,7 +333,7 @@ def test_brief_has_profile_driven_search_step():
 
     from jobscout.agent.brief import build_brief
     from jobscout.core.config import load_settings
-    from jobscout.core.models import ProfileCfg, TargetCfg
+    from jobscout.core.schema import ProfileCfg, TargetCfg
 
     profile = ProfileCfg(target=TargetCfg(
         roles=["backend engineer"], stack=["rust"], domains=["execution"],
@@ -481,7 +475,7 @@ def test_search_provider_route_and_card(client, cfg_dir):
 def test_web_search_dispatch_honours_provider(monkeypatch):
     """provider=ddg routes to the ddg engine even with CSE keys set."""
     from jobscout.agent import tools
-    from jobscout.core.models import SearchCfg, Settings
+    from jobscout.core.schema import SearchCfg, Settings
 
     calls = []
     monkeypatch.setattr(tools, "_ddg_search",
@@ -497,7 +491,7 @@ def test_web_search_dispatch_honours_provider(monkeypatch):
 
 def test_web_search_auto_falls_through_to_ddg(monkeypatch):
     from jobscout.agent import tools
-    from jobscout.core.models import Settings
+    from jobscout.core.schema import Settings
 
     monkeypatch.setattr(tools, "_cse_search", lambda q, n, ctx: None)
     monkeypatch.setattr(tools, "_brave_search", lambda q, n, ctx: None)

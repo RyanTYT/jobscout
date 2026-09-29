@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 from jobscout.core import config as core_config
+from jobscout.core import paths as core_paths
 from jobscout.core.db import slugify
 
 TIERS = ("A", "B", "C", "candidates")
@@ -23,7 +24,7 @@ class WatchlistStoreError(Exception):
 
 
 def _path() -> Path:
-    p = Path(core_config.config_dir()) / "watchlist.yaml"
+    p = Path(core_paths.config_dir()) / "watchlist.yaml"
     if not p.is_file():
         raise WatchlistStoreError(f"missing config file: {p}")
     return p
