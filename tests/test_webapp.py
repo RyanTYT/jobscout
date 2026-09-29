@@ -542,3 +542,76 @@ def test_applications_rows_carry_row_links(client, db_file, tmp_path):
     _seed_packet(db_file, tmp_path)
     r = client.get("/applications")
     assert 'data-row-link="/packet/pk_w1"' in r.text
+
+
+# ── button sweep: every referenced URL must resolve to a real route ────────
+
+
+def test_every_button_url_matches_a_route(client, db_file, tmp_path):
+    """Catches URL mismatches (button posts somewhere no route listens —
+    the run-agent 404/500 class of bug) across every page, statically:
+    hrefs, form actions, and HTMX hx-get/hx-post/hx-boost targets."""
+    import re as _re
+
+    from jobscout.webapp.routes import create_app as _create
+
+    _seed_packet(db_file, tmp_path)
+    app = _create()
+    registered = set()
+    prefixes = set()
+    for r in app.routes:
+        path = getattr(r, "path", None)
+        if path:
+            base = (path.split("{")[0].rstrip("/") or "/")
+            registered.add(base)
+            if "{" in path and base != "/":
+                prefixes.add(base)
+
+    url_re = _re.compile(
+        r'(?:href|action|hx-get|hx-post|hx-boost)="(/[^"]*)"')
+    pages = ["/", "/companies", "/discovery", "/applications", "/ops",
+             "/profile", "/posting/p_int_1", "/packet/pk_w1",
+             "/applications/runs", "/discovery/run-status"]
+    checked = 0
+    for page in pages:
+        r = client.get(page)
+        assert r.status_code == 200, f"{page} -> {r.status_code}"
+        for url in url_re.findall(r.text):
+            base = url.split("?")[0].split("#")[0].rstrip("/") or "/"
+            if base.startswith("/static"):
+                continue
+            ok = (base in registered
+                  or any(base.startswith(pre + "/") for pre in prefixes))
+            assert ok, (
+                f"{page} references {url!r} but no route is registered "
+                f"for {base!r}")
+            checked += 1
+    assert checked >= 40, f"sweep too small ({checked}) — page render broken?"
+
+
+def test_run_agent_now_returns_immediately(client, monkeypatch):
+    """The run-agent button: 303 instantly, run happens in background."""
+    import subprocess
+    import threading
+    import time
+
+    done = threading.Event()
+
+    def fake_run(*a, **kw):
+        done.set()
+        time.sleep(0.2)
+        return
+
+    # the handler imports subprocess INSIDE the function — the module
+    # object is shared, so patching subprocess.run covers it
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    r = client.post("/discovery/run", follow_redirects=False)
+    assert r.status_code == 303
+    assert "started=1" in r.headers["location"]
+    assert done.wait(5)                      # the background thread fired
+
+    status = client.get("/discovery/run-status")
+    assert status.status_code == 200
+    # while the fake run sleeps, running=True polls
+    assert "running" in status.text or "run-status" in status.text

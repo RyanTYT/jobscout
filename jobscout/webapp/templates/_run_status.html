@@ -1,0 +1,29 @@
+{# _run_status.html — live state of the background agent run. Polls
+   itself every 3s while running; renders the output when it lands. #}
+{% import "components/macros.html" as m %}
+
+{% if running %}
+<div hx-get="/discovery/run-status" hx-trigger="every 3s" hx-swap="outerHTML"
+     id="run-status">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h2 class="card-title mb-0 h6">Agent run</h2>
+      <span class="badge text-bg-primary">
+        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+        running
+      </span>
+    </div>
+    <div class="card-body text-secondary small">
+      the morning agent is running in the background — this panel refreshes
+      itself until the output lands
+    </div>
+  </div>
+</div>
+{% elif run_out %}
+<div id="run-status">
+  <div class="card">
+    <div class="card-header"><h2 class="card-title mb-0 h6">Last run output</h2></div>
+    <div class="card-body"><pre class="mb-0 small" style="white-space: pre-wrap;">{{ run_out }}</pre></div>
+  </div>
+</div>
+{% endif %}

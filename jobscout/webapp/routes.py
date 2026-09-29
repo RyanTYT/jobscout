@@ -26,7 +26,7 @@ TEMPLATES.env.globals["linkify"] = ui.linkify
 TEMPLATES.env.globals["kind_meta"] = ui.signal_kind_meta
 TEMPLATES.env.globals["kind_desc"] = lambda k: ui.signal_kind_meta(k)["desc"]
 
-_run_output_holder: dict = {"out": ""}
+_run_state: dict = {"running": False, "out": ""}
 
 
 def _llm_fields(row) -> dict:
@@ -203,6 +203,7 @@ def create_app() -> FastAPI:
 
     @app.get("/discovery", response_class=HTMLResponse)
     def discovery_page(request: Request, ran: str = Query(""),
+                       started: str = Query(""),
                        saved: str = Query(""), error: str = Query("")):
         from jobscout.core.config import load_settings
         from jobscout.webapp import targeting_store
@@ -261,7 +262,7 @@ def create_app() -> FastAPI:
                 "reports": [r.name for r in reports[-10:]],
                 "latest_report": latest_report,
                 "recent_runs": recent_runs,
-                "run_output": _run_output_holder.get("out") if ran == "1" else None,
+                "just_started": started == "1",
             },
         )
 
@@ -276,19 +277,48 @@ def create_app() -> FastAPI:
         return RedirectResponse("/discovery", status_code=303)
 
     @app.post("/discovery/run")
-    def run_agent_now(request: Request = None):
+    def run_agent_now():
+        """Run the morning agent in a background thread — the button
+        returns immediately; the output panel below polls until it lands.
+        The CLI resolution works both in dev (.venv/bin/jobscout) and in
+        the packaged app (sys.executable IS the frozen jobscout-server)."""
         import subprocess
         import sys
+        import threading
 
-        cli = str(Path(sys.executable).parent / "jobscout")
-        try:
-            proc = subprocess.run(
-                [cli, "agent"], capture_output=True, text=True, timeout=900
-            )
-            _run_output_holder["out"] = ((proc.stdout or "") + (proc.stderr or ""))[-8000:]
-        except subprocess.TimeoutExpired:
-            _run_output_holder["out"] = "run timed out after 900s (caps should prevent this)"
-        return RedirectResponse("/discovery?ran=1", status_code=303)
+        if _run_state["running"]:
+            return RedirectResponse("/discovery?started=1", status_code=303)
+        _run_state["running"] = True
+        _run_state["out"] = ""
+
+        def _launch():
+            try:
+                if getattr(sys, "frozen", False):
+                    cli = sys.executable            # the frozen binary itself
+                else:
+                    cli = str(Path(sys.executable).parent / "jobscout")
+                proc = subprocess.run(
+                    [cli, "agent"], capture_output=True, text=True, timeout=900
+                )
+                _run_state["out"] = ((proc.stdout or "") + (proc.stderr or ""))[-8000:]
+            except subprocess.TimeoutExpired:
+                _run_state["out"] = ("run timed out after 900s "
+                                     "(caps should prevent this)")
+            except OSError as e:
+                _run_state["out"] = f"failed to launch the jobscout agent: {e}"
+            finally:
+                _run_state["running"] = False
+
+        threading.Thread(target=_launch, daemon=True).start()
+        return RedirectResponse("/discovery?started=1", status_code=303)
+
+    @app.get("/discovery/run-status", response_class=HTMLResponse)
+    def discovery_run_status(request: Request):
+        """HTMX partial: live state of the background agent run."""
+        return TEMPLATES.TemplateResponse(
+            request, "_run_status.html",
+            {"running": _run_state["running"], "run_out": _run_state["out"]},
+        )
 
     # ── applications / packets ───────────────────────────────────────────
 
