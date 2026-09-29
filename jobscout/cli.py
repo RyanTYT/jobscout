@@ -57,13 +57,25 @@ def init_home() -> None:
     from jobscout.core.db import init_db
     from jobscout.core.paths import config_dir, master_resume_dir, repo_root
 
-    defaults = Path(__file__).resolve().parent / "defaults"
+    # seed source: the bundled snapshot (frozen apps; the release build
+    # copies live config/ into jobscout/defaults/), falling back to the
+    # repo's own config/ in dev — no second copy of config to keep in sync
+    bundled = Path(__file__).resolve().parent / "defaults"
+    if bundled.is_dir():
+        seed_dir = bundled
+        resume_seed = bundled / "resume.yaml"
+    else:
+        # dev: the package sits inside the repo checkout (repo_root() is
+        # JOBSCOUT_HOME-relocated, i.e. the destination — not the source)
+        repo = Path(__file__).resolve().parents[1]
+        seed_dir = repo / "config"
+        resume_seed = repo / "master_resume" / "resume.yaml"
     seeds = [
-        (defaults / "settings.yaml", config_dir() / "settings.yaml"),
-        (defaults / "profile.yaml", config_dir() / "profile.yaml"),
-        (defaults / "models.yaml", config_dir() / "models.yaml"),
-        (defaults / "watchlist.yaml", config_dir() / "watchlist.yaml"),
-        (defaults / "resume.yaml", master_resume_dir() / "resume.yaml"),
+        (seed_dir / "settings.yaml", config_dir() / "settings.yaml"),
+        (seed_dir / "profile.yaml", config_dir() / "profile.yaml"),
+        (seed_dir / "models.yaml", config_dir() / "models.yaml"),
+        (seed_dir / "watchlist.yaml", config_dir() / "watchlist.yaml"),
+        (resume_seed, master_resume_dir() / "resume.yaml"),
     ]
     for src, dst in seeds:
         if not dst.is_file():

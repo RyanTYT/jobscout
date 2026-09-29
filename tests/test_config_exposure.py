@@ -134,8 +134,8 @@ def test_price_refresh_writes_matched_prices(cfg_dir, monkeypatch):
             return {"data": [
                 {"id": "~deepseek/deepseek-v4-flash-latest",
                  "pricing": {"prompt": "0.00000001", "completion": "0.0000004"}},
-                {"id": "deepseek/deepseek-reasoner",
-                 "pricing": {"prompt": "0.00000055", "completion": "0.00000219"}},
+                {"id": "deepseek/deepseek-v4-pro",
+                 "pricing": {"prompt": "0.00000096", "completion": "0.00000191"}},
             ]}
 
 
@@ -444,9 +444,8 @@ def test_search_provider_dispatch_contract():
 def test_search_settings_roundtrip_and_append(cfg_dir):
     from jobscout.webapp import settings_store as ss
 
-    # the repo settings.yaml has no search: block yet — save appends it
-    before = (cfg_dir / "settings.yaml").read_text(encoding="utf-8")
-    assert "search:" not in before
+    # the repo settings.yaml ships a search: block (sonar default); save
+    # must rewrite it in place either way
     ss.save_search(provider="ddg", llm_model="")
     search = core_config.load_settings().search
     assert search.provider == "ddg"
@@ -460,9 +459,10 @@ def test_search_settings_roundtrip_and_append(cfg_dir):
 def test_search_settings_llm_needs_model(cfg_dir):
     from jobscout.webapp import settings_store as ss
 
+    before = (cfg_dir / "settings.yaml").read_bytes()
     with pytest.raises(ss.SettingsStoreError):
         ss.save_search(provider="llm", llm_model=" ")
-    assert "search:" not in (cfg_dir / "settings.yaml").read_text(encoding="utf-8")
+    assert (cfg_dir / "settings.yaml").read_bytes() == before
 
 
 def test_search_provider_route_and_card(client, cfg_dir):

@@ -8,7 +8,6 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from jobscout.core import paths as core_paths
 from jobscout.core.models import MasterResume
 
 
@@ -121,11 +120,9 @@ def render_typst_pdf(out_dir: Path, plan: dict | None, resume: MasterResume) -> 
     typst = shutil.which("typst")
     if typst is None:
         return None
-    # repo checkout first; the frozen app falls back to the template
-    # bundled inside the jobscout package (packets/templates/resume.typ)
-    template = core_paths.repo_root() / "templates" / "resume.typ"
-    if not template.is_file():
-        template = Path(__file__).resolve().parent / "templates" / "resume.typ"
+    # the one template source: bundled inside the package (works in dev
+    # AND in the frozen app — no repo-relative fallback to keep in sync)
+    template = Path(__file__).resolve().parent / "templates" / "resume.typ"
     if not template.is_file():
         return None
 

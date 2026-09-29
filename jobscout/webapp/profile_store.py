@@ -167,12 +167,19 @@ def current_values() -> dict:
 
 
 def missing_required() -> list[str]:
-    """Labels of required fields still empty — mirrors the fill sheet."""
+    """Labels of required fields still empty — the required set is the
+    SAME registry the fill sheet uses (packets/field_map.CHECKLIST), so
+    the profile editor and packet readiness can never disagree."""
+    from jobscout.packets.field_map import CHECKLIST
+
     vals = current_values()
-    required = {"full_name", "email", "phone", "country", "linkedin",
-                "current_company", "current_title", "school", "degree"}
     by_key = {f.key: f for f in FIELDS}
-    return [by_key[k].label for k in sorted(required) if not vals.get(k)]
+    out = []
+    for _label, key, required in CHECKLIST:
+        f = by_key.get(key)
+        if required and f and not vals.get(key):
+            out.append(f.label)
+    return out
 
 
 # ── writing (textual patches, comments preserved) ────────────────────────────

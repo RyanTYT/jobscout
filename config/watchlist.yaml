@@ -333,3 +333,281 @@ candidates:
   note: 'HN Who-is-hiring: LayerTwo | <a href="https:&#x2F;&#x2F;layertwo.info&#x2F;"
     rel="nofollow">https:&#x2F;&#x2F;layertwo'
   found_via: hn-whoishiring
+- name: Hexagonal
+  domain: hexagonalconsulting.com
+  ats: {}
+  note: 'HN Who-is-hiring: Hexagonal | Experienced Frontend Developer | France, Netherlands
+    | Full-time | REMOTE<p>Hexagonal is'
+  found_via: hn-whoishiring
+- name: joyn.de
+  domain: joyn.de
+  ats: {}
+  note: 'HN Who-is-hiring: joyn.de | Full Time | ONSITE&#x2F;REMOTE (London, UK and
+    Munich, GER)<p>We&#x27;re building a stream'
+  found_via: hn-whoishiring
+- name: Apixio
+  domain: apixio.com
+  ats: {}
+  note: 'HN Who-is-hiring: Apixio | San Mateo ONSITE | Frontend Tech Lead, Backend
+    Tech Lead, Director of Engineering At Apixio'
+  found_via: hn-whoishiring
+- name: SPARETECH
+  domain: sparetech.io
+  ats:
+    greenhouse: sparetech
+  note: 'HN Who-is-hiring: SPARETECH | Stuttgart, Germany | (Senior) Software Engineers
+    | Full-time | ONSITE (Remote possible) '
+  found_via: hn-whoishiring
+- name: Revolut
+  domain: revolut.com
+  ats: {}
+  note: 'HN Who-is-hiring: Revolut | Software Engineers and many more | London, Krakow,
+    Berlin, New York, Moscow, Vilnius | Ful'
+  found_via: hn-whoishiring
+- name: Horizon technologies
+  domain: horizontech.dev
+  ats: {}
+  note: 'HN Who-is-hiring: Horizon technologies | Remote (Preferable India) | Part-Time
+    | Python | Javascript | <a href="https:'
+  found_via: hn-whoishiring
+- name: Nightwatch.io
+  domain: nightwatch.io
+  ats: {}
+  note: 'HN Who-is-hiring: Nightwatch.io | Remote | Full-time | Elixir, Rust, Ruby,
+    Go<p>This is a fully remote position, full-'
+  found_via: hn-whoishiring
+- name: Blue Canvas
+  domain: bluecanvas.io
+  ats: {}
+  note: 'HN Who-is-hiring: Blue Canvas | Senior Engineer | Berlin, flexible on-site
+    | <a href="https:&#x2F;&#x2F;bluecanvas.io"'
+  found_via: hn-whoishiring
+- name: You&#x27;re very fortunate, indeed
+  domain: zoonk.org
+  ats: {}
+  note: 'HN Who-is-hiring: You&#x27;re very fortunate, indeed. :) It&#x27;s very frustrating
+    when you can&#x27;t find a job ali'
+  found_via: hn-whoishiring
+- name: Brain Corporation
+  domain: braincorp.com
+  ats:
+    greenhouse: braincorporation
+  note: 'HN Who-is-hiring: Brain Corporation | Multiple Openings |San Diego, CA |
+    Mostly Onsite<p>Brain Corp is a San Diego-bas'
+  found_via: hn-whoishiring
+- name: Ferrum Health
+  domain: ferrumhealth.com
+  ats: {}
+  note: 'HN Who-is-hiring: Ferrum Health | REMOTE | Full Time | Senior Backend Engineer
+    | <a href="https:&#x2F;&#x2F;ferrumheal'
+  found_via: hn-whoishiring
+- name: Pioneer
+  domain: pioneer.app
+  ats: {}
+  note: 'HN Who-is-hiring: Pioneer | REMOTE&#x2F;ONSITE | Good Engineer | <a href="https:&#x2F;&#x2F;pioneer.app"
+    rel="nofollow'
+  found_via: hn-whoishiring
+- name: SerpApi
+  domain: serpapi.com
+  ats: {}
+  note: 'HN Who-is-hiring: SerpApi | <a href="https:&#x2F;&#x2F;serpapi.com" rel="nofollow">https:&#x2F;&#x2F;serpapi.com</a>
+    |'
+  found_via: hn-whoishiring
+- name: Syncari
+  domain: syncari.com
+  ats: {}
+  note: 'HN Who-is-hiring: Syncari|Remote|UI &amp; Backend Engineers<p>Syncari is
+    a distributed SaaS data management platform f'
+  found_via: hn-whoishiring
+- name: Ava (www.ava.me)
+  domain: ava.me
+  ats: {}
+  note: 'HN Who-is-hiring: Ava (www.ava.me) | San Francisco and Paris | FullStack,
+    Software &amp; Backend Engineers, Product De'
+  found_via: hn-whoishiring
+- name: EDITED
+  domain: edited.com
+  ats:
+    ashby: edited
+  note: 'HN Who-is-hiring: EDITED | Engineering Positions | London, UK | Onsite |
+    Full-Time | Visa<p>We help retailers win. We '
+  found_via: hn-whoishiring
+- name: Trusted Science and Technology
+  domain: trustedst.com
+  ats: {}
+  note: 'HN Who-is-hiring: Trusted Science and Technology | Embedded Developer with
+    C&#x2F;Python | seL4 developer | Full Time '
+  found_via: hn-whoishiring
+- name: Expensify
+  domain: expensify.com
+  ats:
+    ashby: expensify
+  note: 'HN Who-is-hiring: Expensify | Full-Stack, PHP, Java, C++, iOS, Android, and&#x2F;or
+    Infrastructure Engineer | San Fran'
+  found_via: hn-whoishiring
+- name: Duolingo
+  domain: duolingo.com
+  ats:
+    greenhouse: duolingo
+  note: 'HN Who-is-hiring: Duolingo | Mobile, Backend, Web, Distributed Systems |
+    Pittsburgh, New York City, Bellevue<p>We are '
+  found_via: hn-whoishiring
+- name: Lateral
+  domain: lateral.io
+  ats: {}
+  note: 'HN Who-is-hiring: Lateral | Berlin, Germany | Onsite (currently temporarily
+    remote) | Full-time | <a href="https:&#x2F'
+  found_via: hn-whoishiring
+- name: Kira Systems
+  domain: kirasystems.com
+  ats: {}
+  note: 'HN Who-is-hiring: Kira Systems | Software Developer - DevOps Team, QE Specialist(onsite
+    only) | Toronto, Canada | Remo'
+  found_via: hn-whoishiring
+- name: CareRev
+  domain: carerev.com
+  ats: {}
+  note: 'HN Who-is-hiring: CareRev | Los Angeles, CA | Data, Product, Web, Back-end&#x2F;API,
+    Android, Tools<p>We provide softw'
+  found_via: hn-whoishiring
+- name: Nightfall AI
+  domain: nightfall.ai
+  ats: {}
+  note: 'HN Who-is-hiring: Nightfall AI | Backend, Systems, Machine Learning, Full
+    Stack, DevOps | San Francisco, CA or Lehi, U'
+  found_via: hn-whoishiring
+- name: Kaiser Permanente Medical Informatics
+  domain: kp.org
+  ats: {}
+  note: 'HN Who-is-hiring: Kaiser Permanente Medical Informatics | Machine Learning
+    Engineers and Scientists (Data Science Team'
+  found_via: hn-whoishiring
+- name: Postscript.io (YC W19)
+  domain: postscript.io
+  ats:
+    greenhouse: postscript
+  note: 'HN Who-is-hiring: Postscript.io (YC W19) | REMOTE (PT-ET Timezones) | Full-time
+    Engineers (Full Stack)<p>Postscript is'
+  found_via: hn-whoishiring
+- name: Element Human
+  domain: elementhuman.com
+  ats: {}
+  note: 'HN Who-is-hiring: Element Human | London (UK) | Full-time, Onsite initially
+    with remote progression (in the office for'
+  found_via: hn-whoishiring
+- name: Relevant Healthcare Technologies
+  domain: relevant.healthcare
+  ats: {}
+  note: 'HN Who-is-hiring: Relevant Healthcare Technologies | Various Engineering,
+    Design, and Product Roles | Full-time, Onsit'
+  found_via: hn-whoishiring
+- name: Flow Commerce
+  domain: flow.io
+  ats: {}
+  note: 'HN Who-is-hiring: Flow Commerce | Hoboken, NJ and Dublin, Ireland | Senior
+    Backend &#x2F; Senior Frontend &#x2F; Senio'
+  found_via: hn-whoishiring
+- name: Uplight
+  domain: uplight.com
+  ats: {}
+  note: 'HN Who-is-hiring: Uplight | Various Engineering Openings | Full-time, Onsite
+    | Boulder, Denver, Vancouver, Boston, Pun'
+  found_via: hn-whoishiring
+- name: Onai
+  domain: onai.com
+  ats: {}
+  note: 'HN Who-is-hiring: Onai | | San Jose or New York | FULL TIME, CONTRACTORS,
+    GRADUATE INTERNS, POSTDOCTORAL FELLOWS, VISA'
+  found_via: hn-whoishiring
+- name: peregrine.io
+  domain: peregrine.io
+  ats: {}
+  note: 'HN Who-is-hiring: peregrine.io | Software Engineer | San Francisco, CA |
+    Full-time | ONSITE<p>Founded in 2018, Peregri'
+  found_via: hn-whoishiring
+- name: Partoo
+  domain: partoo.fr
+  ats: {}
+  note: 'HN Who-is-hiring: Partoo | Full-Stack Engineer &#x2F; Tech Lead | Paris,
+    France | Full-time | Onsite | <a href="https:'
+  found_via: hn-whoishiring
+- name: a.i. solutions
+  domain: ai-solutions.com
+  ats: {}
+  note: 'HN Who-is-hiring: a.i. solutions | Washington, D.C. area | ONSITE | Software
+    Engineer | Full-time<p>FreeFlyer is a des'
+  found_via: hn-whoishiring
+- name: MeetKai
+  domain: meetkai.com
+  ats: {}
+  note: 'HN Who-is-hiring: MeetKai | Full-Time &#x2F; Intern | REMOTE | Los Angeles
+    &#x2F; US &#x2F; China | 50-180K + Equity f'
+  found_via: hn-whoishiring
+- name: byte
+  domain: byte.co
+  ats: {}
+  note: 'HN Who-is-hiring: byte | New York, San Francisco, Remote (USA) | Full Time
+    | iOS&#x2F;Android&#x2F;Golang | <a href="h'
+  found_via: hn-whoishiring
+- name: Genesis Therapeutics
+  domain: genesistherapeutics.ai
+  ats: {}
+  note: 'HN Who-is-hiring: Genesis Therapeutics | South San Francisco, CA | Onsite
+    (Flexible WFH) | Full-time | <a href="https:'
+  found_via: hn-whoishiring
+- name: PBS
+  domain: pbs.org
+  ats: {}
+  note: 'HN Who-is-hiring: PBS | Various Engineers | Full-Time | ONSITE (Flexible
+    WFH) | Alexandria, VA<p>PBS serves the Americ'
+  found_via: hn-whoishiring
+- name: Vetspire
+  domain: vetspire.com
+  ats: {}
+  note: 'HN Who-is-hiring: Vetspire | Full Stack Software Engineer | Austin, TX |
+    Full-Time | <a href="https:&#x2F;&#x2F;vetspi'
+  found_via: hn-whoishiring
+- name: Growth Hackers
+  domain: goingmeta.io
+  ats: {}
+  note: 'HN Who-is-hiring: Growth Hackers | GoingMeta.io GmbH, Vienna Austria Europe<p>Tech
+    we&#x27;re using: React&#x2F;Redux,'
+  found_via: hn-whoishiring
+- name: Fold
+  domain: foldapp.com
+  ats: {}
+  note: 'HN Who-is-hiring: Fold | San Francisco, CA; Atlanta, GA | Software Engineer
+    | ONSITE &amp; REMOTE | Full-time | $110k-'
+  found_via: hn-whoishiring
+- name: Cytora
+  domain: cytora.com
+  ats: {}
+  note: 'HN Who-is-hiring: Cytora | London, United Kingdom | Full Time | ONSITE (WFH
+    currently due to covid) | Golang, JavaScri'
+  found_via: hn-whoishiring
+- name: HackerRank
+  domain: hackerrank.com
+  ats:
+    greenhouse: hackerrank
+    smartrecruiters: hackerrank
+  note: 'HN Who-is-hiring: HackerRank | Bangalore, India | Fulltime | Senior&#x2F;Lead
+    Devops Engineer, Lead SDET, Lead Backend'
+  found_via: hn-whoishiring
+- name: Sequoia Capital
+  domain: sequoiacap.com
+  ats: {}
+  note: 'HN Who-is-hiring: Sequoia Capital | Full Time | Platform Engineer | <a href="https:&#x2F;&#x2F;www.sequoiacap.com"
+    rel'
+  found_via: hn-whoishiring
+- name: The Pacific Financial Group
+  domain: tpfg.com
+  ats: {}
+  note: 'HN Who-is-hiring: The Pacific Financial Group | DevOps Engineer | REMOTE
+    (US based) | Full Time | tpfg.com<p>The Pacif'
+  found_via: hn-whoishiring
+- name: ngrok
+  domain: ngrok.com
+  ats: {}
+  note: 'HN Who-is-hiring: ngrok | San Francisco &amp; Seattle | ONSITE | Full-time
+    | <a href="https:&#x2F;&#x2F;ngrok.com&#x2F'
+  found_via: hn-whoishiring
