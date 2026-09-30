@@ -1,0 +1,61 @@
+{% import "components/macros.html" as m %}
+{# _followup.html — the nudge panel on the packet page. Polls while
+   generating; renders the draft (copy + "in your mail Drafts" when the
+   email account is linked — never sent by the app). #}
+<div id="followup-panel"
+     {% if running %}hx-get="/packet/{{ pid }}/follow-up-status"
+     hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+{% set draft = (row.content or "{}") | from_json if row else none %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Follow-up nudge</h2>
+    {% if running %}
+    <span class="badge text-bg-primary">
+      <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+      drafting
+    </span>
+    {% elif row and row.status == "done" %}
+    <span class="badge text-bg-success">drafted</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% if running %}
+    <div class="d-flex align-items-center gap-2 text-secondary small">
+      <span class="spinner-grow spinner-grow-sm" role="status"></span>
+      drafting from your resume + this application's timeline — refreshes
+      every 3s
+    </div>
+    {% elif draft and draft.subject %}
+    <div class="mb-2"><strong>Subject:</strong>
+      <span id="fu-subject">{{ draft.subject }}</span></div>
+    <pre class="mb-2 border rounded p-2 small" id="fu-body"
+         style="white-space: pre-wrap;">{{ draft.body }}</pre>
+    <div class="d-flex flex-wrap gap-2">
+      <button class="btn btn-outline-secondary btn-sm" type="button"
+              data-copy-target="#fu-body">{{ m.icon("doc", 11) }} copy body</button>
+      {% if draft.detail and draft.detail.draft_saved %}
+      <span class="badge text-bg-success">saved to your mail Drafts —
+        review &amp; send from your client</span>
+      {% elif draft.detail and draft.detail.draft_error %}
+      <span class="badge text-bg-warning"
+             title="{{ draft.detail.draft_error }}">not saved to mail —
+        copy and send manually</span>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span class="text-secondary small">
+        a polite follow-up drafted from your resume + the timeline (applied
+        date, OA/interview record) — draft-first, saved to your mail
+        Drafts when email tracking is linked
+      </span>
+      <form method="post" action="/packet/{{ pid }}/follow-up">
+        <button class="btn btn-primary btn-sm" type="submit">
+          {{ m.icon("pulse", 11) }} draft follow-up
+        </button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+</div>

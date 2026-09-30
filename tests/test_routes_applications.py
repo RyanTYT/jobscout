@@ -1,3 +1,4 @@
+
 """test_routes_applications — route tests split from the old test_webapp god-file
 (one file per router area; shared fixtures in conftest.py)"""
 
@@ -152,3 +153,85 @@ def test_new_stages_render_groups(client, db_file, tmp_path):
     r = client.get("/applications")
     assert "Interview in progress" in r.text
     assert "pk_w1" in r.text
+
+
+# ── timeline: applied stamps, manual entries, quiet detection ──────────────
+
+
+def test_set_status_stamps_and_records_event(client, db_file, tmp_path):
+    _seed_packet(db_file, tmp_path)
+    client.post("/packet/pk_w1/status", data={"status": "applied"},
+                headers={"HX-Request": "true"})
+    import sqlite3
+
+    c = sqlite3.connect(db_file)
+    row = c.execute("SELECT applied_at FROM packets WHERE id = 'pk_w1'"
+                    ).fetchone()
+    events = c.execute("SELECT kind, title FROM application_events"
+                       " WHERE packet_id = 'pk_w1'").fetchall()
+    c.close()
+    assert row[0] is not None                    # stamped
+    assert ("applied", "state → applied") in events  # auto timeline event
+
+
+def test_manual_timeline_entry_roundtrip(client, db_file, tmp_path):
+    _seed_packet(db_file, tmp_path)
+    r = client.post("/packet/pk_w1/events", data={
+        "kind": "oa", "event_date": "2026-10-02",
+        "title": "CodeSignal OA", "notes": "2 mediums + SQL question",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    page = client.get("/packet/pk_w1")
+    assert "CodeSignal OA" in page.text
+    assert "2 mediums + SQL" in page.text
+    assert "Timeline" in page.text
+
+
+def test_timeline_empty_rejected(client, db_file, tmp_path):
+    _seed_packet(db_file, tmp_path)
+    r = client.post("/packet/pk_w1/events", data={
+        "kind": "note", "event_date": "", "title": "", "notes": "",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert "error=" in r.headers["location"]
+
+
+def test_board_shows_applied_age_and_quiet(client, db_file, tmp_path):
+    import sqlite3
+    from datetime import UTC, datetime, timedelta
+
+    _seed_packet(db_file, tmp_path)
+    c = sqlite3.connect(db_file)
+    old = (datetime.now(UTC) - timedelta(days=20)).strftime("%Y-%m-%d")
+    c.execute("UPDATE packets SET status = 'applied', applied_at = ?,"
+              " updated_at = ? WHERE id = 'pk_w1'", (old, old))
+    c.commit()
+    c.close()
+    r = client.get("/applications")
+    assert "20d" in r.text
+    assert "quiet" in r.text                    # the stale badge
+    assert "follow up?" in r.text
+
+
+def test_follow_up_route_starts_draft(client, db_file, tmp_path,
+                                      monkeypatch):
+    _seed_packet(db_file, tmp_path)
+    import sqlite3
+
+    c = sqlite3.connect(db_file)
+    c.execute("UPDATE packets SET status = 'applied',"
+              " applied_at = '2026-09-01' WHERE id = 'pk_w1'")
+    c.commit()
+    c.close()
+    started = {}
+    monkeypatch.setattr(
+        "jobscout.webapp.routers.applications.outreach_runner"
+        if False else "jobscout.webapp.runners.outreach.start_follow_up",
+        lambda pid: started.update(pid=pid))
+    r = client.post("/packet/pk_w1/follow-up", follow_redirects=False)
+    assert r.status_code == 303
+    assert started["pid"] == "pk_w1"
+    r2 = client.get("/packet/pk_w1/follow-up-status")
+    assert r2.status_code == 200
+
+

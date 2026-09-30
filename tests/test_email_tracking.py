@@ -396,3 +396,56 @@ def test_applications_email_check_and_panel(client, cfg_dir):
     assert "Email activity" in page.text
     assert "interview invite" in page.text
     assert "in your mail Drafts" in page.text
+
+
+def test_follow_up_generation_full_flow(monkeypatch, tmp_path,
+                                         cfg_dir, env_file):
+    import sys
+    from pathlib import Path as _P
+    sys.path.insert(0, str(_P(__file__).parent))
+
+    """The nudge: packet context → draft → (no email linked) → stored."""
+    import sqlite3
+
+    from jobscout.webapp.runners import outreach as orr
+
+    db_file = tmp_path / "fu.db"
+    c = sqlite3.connect(db_file)
+    c.executescript(db.SCHEMA)
+    db._migrate(c)
+    db.upsert_company(c, name="Acme", domain="acme.io", tier="A")
+    c.execute(
+        "INSERT INTO postings (id, source, company_id, url, url_hash, title,"
+        " rule_pass, status, first_seen, last_seen, content_hash)"
+        " VALUES ('p1', 's', 'acme', 'u', 'h', 'Engineer', 1, 'new',"
+        " 'd', 'd', 'ch')")
+    c.execute(
+        "INSERT INTO packets (id, posting_id, status, applied_at)"
+        " VALUES ('pk1', 'p1', 'applied', '2026-09-01')")
+    c.commit()
+    c.close()
+
+    def fake_connect():
+        cc = sqlite3.connect(db_file)
+        cc.row_factory = sqlite3.Row
+        return cc
+
+    monkeypatch.setattr(db, "connect", fake_connect)
+
+    class FakeLlm:
+        def chat(self, tier, messages, json_mode=True, **kw):
+
+            class R:
+                text = '{"subject": "Following up on my application", '\
+                       '"body": "Gracious nudge."}'
+                model = "fake"
+                cost_usd = 0.001
+            return R()
+
+    monkeypatch.setattr(orr, "_llm", lambda: FakeLlm())
+    orr._generate_follow_up(fake_connect(), "pk1")
+    row = db.latest_outreach(fake_connect(), "acme", "follow_up")
+    assert row["status"] == "done"
+    draft = json.loads(row["content"])
+    assert draft["subject"].startswith("Following up")
+    assert draft["detail"]["days"] >= 0

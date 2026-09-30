@@ -21,7 +21,7 @@ def db_path() -> Path:
     return core_paths.db_path()
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -87,6 +87,8 @@ CREATE TABLE IF NOT EXISTS packets (
     dir         TEXT,                      -- applications/<company-slug>-<date>/
     model       TEXT,
     cost_usd    REAL,
+    applied_at  TEXT,                      -- when status first hit 'applied'
+    decided_at  TEXT,                      -- when offer/rejected landed
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -144,6 +146,18 @@ CREATE TABLE IF NOT EXISTS email_events (
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_email_events_company ON email_events(company_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS application_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    packet_id   TEXT NOT NULL,
+    kind        TEXT NOT NULL,             -- applied|oa|phone_screen|onsite|note|offer|rejected|follow_up
+    event_date  TEXT NOT NULL,             -- YYYY-MM-DD (user-editable)
+    title       TEXT,
+    notes       TEXT,                      -- interview notes, OA questions, anything
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_app_events_packet
+    ON application_events(packet_id, event_date);
 
 CREATE TABLE IF NOT EXISTS outreach (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -262,6 +276,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
     ccols = {r[1] for r in conn.execute("PRAGMA table_info(companies)")}
     if "contact_email" not in ccols:
         conn.execute("ALTER TABLE companies ADD COLUMN contact_email TEXT")
+    pcols = {r[1] for r in conn.execute("PRAGMA table_info(packets)")}
+    if "applied_at" not in pcols:
+        conn.execute("ALTER TABLE packets ADD COLUMN applied_at TEXT")
+    if "decided_at" not in pcols:
+        conn.execute("ALTER TABLE packets ADD COLUMN decided_at TEXT")
 
 
 # ── P2: rule verdicts, scores, statuses ──────────────────────────────────────

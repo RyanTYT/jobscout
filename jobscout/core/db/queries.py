@@ -428,6 +428,41 @@ def latest_outreach(conn: sqlite3.Connection, company_id: str,
     ).fetchone()
 
 
+# ── application timeline (the interview/OA record) ─────────────────────────
+
+
+EVENT_KINDS = ("applied", "oa", "phone_screen", "onsite", "note",
+               "offer", "rejected", "follow_up")
+
+
+def record_app_event(conn, *, packet_id: str, kind: str, event_date: str,
+                     title: str | None = None, notes: str | None = None,
+                     auto: bool = False) -> int:
+    now = _utcnow()
+    cur = conn.execute(
+        "INSERT INTO application_events (packet_id, kind, event_date,"
+        " title, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (packet_id, kind, event_date or now[:10], title, notes, now),
+    )
+    if auto:
+        conn.execute(
+            "UPDATE packets SET updated_at = ? WHERE id = ?",
+            (now, packet_id))
+    conn.commit()
+    return cur.lastrowid
+
+
+def list_app_events(conn, packet_id: str) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM application_events WHERE packet_id = ?"
+        " ORDER BY event_date DESC, id DESC", (packet_id,)).fetchall()
+
+
+def delete_app_event(conn, event_id: int) -> None:
+    conn.execute("DELETE FROM application_events WHERE id = ?", (event_id,))
+    conn.commit()
+
+
 # ── email tracking (the follow-through watcher) ────────────────────────────
 
 
@@ -609,12 +644,26 @@ def set_packet_status(conn: sqlite3.Connection, packet_id: str,
     status = canon_status(status)
     if status not in PACKET_STATUSES:
         return False
+    # stamp the milestone dates + every state change becomes a timeline
+    # event (the application's own record, not just a mutable column)
+    stamps = ""
+    if status == "applied":
+        stamps = ", applied_at = COALESCE(applied_at, date('now'))"
+    elif status in ("offer", "rejected"):
+        stamps = (", applied_at = COALESCE(applied_at, date('now'))"
+                  ", decided_at = date('now')")
     cur = conn.execute(
-        "UPDATE packets SET status = ?, updated_at = datetime('now') WHERE id = ?",
+        f"UPDATE packets SET status = ?, updated_at = datetime('now')"
+        f"{stamps} WHERE id = ?",
         (status, packet_id),
     )
     conn.commit()
-    return cur.rowcount > 0
+    ok = cur.rowcount > 0
+    if ok:
+        record_app_event(conn, packet_id=packet_id, kind=status,
+                         event_date=_utcnow()[:10],
+                         title=f"state → {status}")
+    return ok
 
 
 # ── apply runs (webapp/apply.py launcher) ───────────────────────────────────

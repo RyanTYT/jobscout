@@ -10,6 +10,87 @@
   {{ m.icon("arrow-left", 12) }} packet board
 </a>
 
+{% if nudge %}
+{{ m.callout("Follow-up drafting — the panel below refreshes itself until the draft lands.", "success") }}
+{% endif %}
+
+{# ── application timeline: applied dates, OA questions, interview notes ── #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Timeline</h2>
+    <span class="text-secondary small">
+      the application's own record — state changes land here automatically
+    </span>
+  </div>
+  <div class="card-body">
+    {% if events %}
+    <div class="vstack gap-2 mb-3">
+      {% for e in events %}
+      <div class="border rounded p-2 d-flex gap-2 align-items-start">
+        <span class="font-monospace small text-secondary text-nowrap">
+          {{ e.event_date }}</span>
+        {{ m.badge(e.kind | replace("_", " "), {
+           "applied": "primary", "oa": "warning", "phone_screen": "info",
+           "onsite": "info", "offer": "success", "rejected": "secondary",
+           "follow_up": "light"}.get(e.kind, "light")) }}
+        <div class="flex-grow-1 small">
+          {% if e.title %}<div class="fw-medium">{{ e.title }}</div>{% endif %}
+          {% if e.notes %}<div class="text-secondary"
+              style="white-space: pre-wrap;">{{ e.notes }}</div>{% endif %}
+        </div>
+        <form method="post"
+              action="/packet/{{ pk.id }}/events/{{ e.id }}/delete">
+          <button class="btn btn-outline-secondary btn-sm" type="submit"
+                  title="delete this entry">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-secondary small mb-3">nothing recorded yet — state
+      changes (applied, interviewing, offer…) land here automatically; add
+      OAs, screens, and interview notes below.</p>
+    {% endif %}
+
+    <form method="post" action="/packet/{{ pk.id }}/events"
+          class="row g-2 align-items-end" data-busy-submit>
+      <div class="col-6 col-md-2">
+        <label class="form-label" for="f-ev-date">date</label>
+        <input class="form-control form-control-sm" type="text"
+               id="f-ev-date" name="event_date"
+               value="{{ today }}" placeholder="YYYY-MM-DD">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label" for="f-ev-kind">kind</label>
+        <select class="form-select form-select-sm" id="f-ev-kind" name="kind">
+          {% for k in event_kinds %}
+          <option value="{{ k }}">{{ k | replace("_", " ") }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="f-ev-title">title</label>
+        <input class="form-control form-control-sm" type="text"
+               id="f-ev-title" name="title"
+               placeholder="e.g. CodeSignal OA — 2 mediums + SQL">
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label" for="f-ev-notes">notes / questions</label>
+        <input class="form-control form-control-sm" type="text"
+               id="f-ev-notes" name="notes"
+               placeholder="what they asked, what to prep next">
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="submit">
+          {{ m.icon("check", 11) }} add to timeline
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% include "_followup.html" %}
+
 {% if just_prepared %}
 {{ m.callout("Packet prepared — review the fill sheet and claim-check below. "
              "Nothing is ever auto-submitted; you press submit on the employer's site.",

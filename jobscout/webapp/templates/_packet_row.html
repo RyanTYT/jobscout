@@ -44,6 +44,18 @@
     </select>
   </td>
   <td class="font-monospace text-secondary">${{ "%.4f" | format(pk.cost_usd or 0) }}</td>
+  <td class="small text-nowrap">
+    {% if pk.applied_at %}
+    <span class="font-monospace text-secondary"
+          title="applied {{ pk.applied_at }}">{{ quiet_days }}d</span>
+    {% if quiet and quiet_days >= 14 and pk.status in ("applied", "interviewing") %}
+    {{ m.badge("quiet " ~ quiet_days ~ "d — follow up?", "warning",
+               "no activity for " ~ quiet_days ~ " days — the packet page has a follow-up nudge") }}
+    {% endif %}
+    {% else %}
+    <span class="text-secondary">—</span>
+    {% endif %}
+  </td>
   <td class="small text-secondary font-monospace text-nowrap">{{ (pk.updated_at or "")[:16] | replace("T", " ") }}</td>
   <td class="text-end">
     <a class="btn btn-outline-primary btn-sm" href="/packet/{{ pk.id }}">

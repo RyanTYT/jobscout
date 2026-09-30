@@ -20,6 +20,30 @@ from jobscout.webapp.common import (
 )
 
 
+def _today() -> str:
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC).strftime("%Y-%m-%d")
+
+
+def _quiet(item: dict) -> dict:
+    """Days since the packet last moved (updated_at) + applied age."""
+    from datetime import UTC, datetime
+
+    pk = item["row"]
+    updated = (pk["updated_at"] or "")[:10]
+    days = 0
+    try:
+        if updated:
+            days = (datetime.now(UTC).date()
+                    - datetime.strptime(updated, "%Y-%m-%d").date()).days
+    except ValueError:
+        pass
+    item["quiet_days"] = days
+    item["quiet"] = days >= 14
+    return item
+
+
 def register(app):
     @app.get("/applications", response_class=HTMLResponse)
     def applications(request: Request, applied: str = Query(""),
@@ -48,8 +72,8 @@ def register(app):
                         manifest = _yaml.safe_load(mp.read_text(encoding="utf-8")) or {}
                     except ValueError:
                         manifest = {}
-            manifests.append({"row": pk, "manifest": manifest,
-                              "missing": apply_mod.sheet_missing_count(pk)})
+            manifests.append(_quiet({"row": pk, "manifest": manifest,
+                              "missing": apply_mod.sheet_missing_count(pk)}))
         return TEMPLATES.TemplateResponse(
             request, "applications.html",
             {**ctx, "packets": manifests, "runs": runs,
@@ -58,6 +82,81 @@ def register(app):
                                 for r in runs),
              "just_applied": applied == "1", "error": error, "auto_count": auto,
              "assist_count": assist, "apply_note": note, "apply_error": error},
+        )
+
+    @app.post("/packet/{pid}/events")
+    async def packet_add_event(pid: str, request: Request):
+        """Manual timeline entry: OA questions, interview notes, anything."""
+        from urllib.parse import quote as _q
+
+        form = await request.form()
+        kind = form.get("kind", "note")
+        event_date = (form.get("event_date", "") or "").strip()
+        title = (form.get("title", "") or "").strip()
+        notes = (form.get("notes", "") or "").strip()
+        if kind not in db.EVENT_KINDS:
+            return RedirectResponse(
+                f"/packet/{pid}?error={_q('unknown event kind')}",
+                status_code=303)
+        if not title and not notes:
+            msg = _q("give the entry a title or some notes")
+            return RedirectResponse(
+                f"/packet/{pid}?error={msg}", status_code=303)
+        conn = db.connect()
+        try:
+            if db.get_packet(conn, pid) is None:
+                return RedirectResponse("/applications", status_code=303)
+            db.record_app_event(conn, packet_id=pid, kind=kind,
+                                event_date=event_date, title=title,
+                                notes=notes, auto=True)
+        finally:
+            conn.close()
+        return RedirectResponse(f"/packet/{pid}", status_code=303)
+
+    @app.post("/packet/{pid}/events/{eid}/delete")
+    def packet_delete_event(pid: str, eid: int):
+        conn = db.connect()
+        try:
+            db.delete_app_event(conn, eid)
+        finally:
+            conn.close()
+        return RedirectResponse(f"/packet/{pid}", status_code=303)
+
+    @app.post("/packet/{pid}/follow-up")
+    def packet_follow_up(pid: str):
+        """The nudge: draft a follow-up email (background; draft-first —
+        appended to the mail account's Drafts when linked, never sent)."""
+        from jobscout.webapp.runners import outreach as outreach_runner
+
+        conn = db.connect()
+        try:
+            pk = db.get_packet(conn, pid)
+        finally:
+            conn.close()
+        if pk is None:
+            return RedirectResponse("/applications", status_code=303)
+        outreach_runner.start_follow_up(pid)
+        return RedirectResponse(f"/packet/{pid}?nudge=1", status_code=303)
+
+    @app.get("/packet/{pid}/follow-up-status", response_class=HTMLResponse)
+    def packet_follow_up_status(request: Request, pid: str):
+        """HTMX partial: the follow-up draft state (polled while running)."""
+        from jobscout.webapp.runners import outreach as outreach_runner
+
+        conn = db.connect()
+        try:
+            pk = db.get_packet(conn, pid)
+            company_id = None
+            if pk is not None and "company_id" in pk.keys():
+                company_id = pk["company_id"]
+            row = (db.latest_outreach(conn, company_id, "follow_up")
+                   if company_id else None)
+        finally:
+            conn.close()
+        running = outreach_runner.follow_up_running(pid)
+        return TEMPLATES.TemplateResponse(
+            request, "_followup.html",
+            {"pid": pid, "running": running, "row": row},
         )
 
     @app.post("/applications/email-check")
@@ -116,7 +215,8 @@ def register(app):
             conn.close()
 
     @app.get("/packet/{pid}", response_class=HTMLResponse)
-    def packet_detail(request: Request, pid: str, prepared: str = Query("")):
+    def packet_detail(request: Request, pid: str, prepared: str = Query(""),
+                      nudge: str = Query("")):
         conn = db.connect()
         try:
             pk = db.get_packet(conn, pid)
@@ -151,6 +251,8 @@ def register(app):
                 "cover_letter": _load("cover_letter.md"),
                 "tailor": _load("tailor.yaml") or {},
                 "just_prepared": prepared == "1",
+                "nudge": nudge == "1",
+                "today": _today(),
             },
         )
 
@@ -189,10 +291,13 @@ def register(app):
             from jobscout.webapp.runners.apply import sheet_missing_count
 
             missing = sheet_missing_count(row)
+            item = _quiet({"row": row, "manifest": manifest,
+                           "missing": missing})
             resp = TEMPLATES.TemplateResponse(
                 request, "_packet_row.html",
                 {"request": request, "pk": row, "man": manifest,
-                 "missing": missing})
+                 "missing": missing, "quiet_days": item["quiet_days"],
+                 "quiet": item["quiet"]})
             return _toast(resp, f"State updated: {status}", "success")
         return RedirectResponse(f"/packet/{pid}", status_code=303)
 

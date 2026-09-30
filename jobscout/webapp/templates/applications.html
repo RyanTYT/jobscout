@@ -92,13 +92,16 @@
         <tr><th scope="col" class="ps-4"></th><th scope="col">posting</th>
             <th scope="col">company</th><th scope="col">details</th>
             <th scope="col">state</th><th scope="col">cost</th>
-            <th scope="col">updated</th><th scope="col"></th></tr>
+            <th scope="col">applied</th><th scope="col">updated</th>
+            <th scope="col"></th></tr>
       </thead>
       <tbody>
         {% for item in stage_rows %}
         {% set pk = item.row %}
         {% set man = item.manifest %}
         {% set missing = item.missing %}
+        {% set quiet_days = item.quiet_days %}
+        {% set quiet = item.quiet %}
         {% include "_packet_row.html" with context %}
         {% endfor %}
       </tbody>

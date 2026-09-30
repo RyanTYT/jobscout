@@ -29,7 +29,7 @@ from jobscout.core import db
 
 _state: dict[str, dict] = {}
 
-KINDS = ("cold_email", "linkedin")
+KINDS = ("cold_email", "linkedin", "follow_up")
 
 
 # ── lifecycle ───────────────────────────────────────────────────────────────
@@ -223,6 +223,116 @@ def _chat_json(system: str, user: str) -> tuple[dict, str, float]:
     if text.startswith("```"):
         text = text.strip("`").removeprefix("json").strip()
     return json.loads(text), resp.model, resp.cost_usd
+
+
+def start_follow_up(packet_id: str) -> None:
+    """Draft a follow-up email for a stale application (the nudge).
+    Keyed by packet: pk-<id>:follow_up."""
+    key = f"pk-{packet_id}:follow_up"
+    if _state.get(key, {}).get("running"):
+        return
+    _state[key] = {"running": True, "error": ""}
+    threading.Thread(target=_run_follow_up, args=(packet_id,),
+                     daemon=True).start()
+
+
+def _run_follow_up(packet_id: str) -> None:
+    key = f"pk-{packet_id}:follow_up"
+    conn = None
+    try:
+        conn = db.connect()
+        _generate_follow_up(conn, packet_id)
+    except Exception as e:                     # noqa: BLE001 — surfaced in UI
+        _state[key] = {"running": False, "error": str(e)[:300]}
+        if conn is not None:
+            conn.close()
+        return
+    finally:
+        st = _state.get(key, {})
+        _state[key] = {"running": False, "error": st.get("error", "")}
+    if conn is not None:
+        conn.close()
+
+
+def follow_up_running(packet_id: str) -> bool:
+    return _state.get(f"pk-{packet_id}:follow_up", {}).get("running", False)
+
+
+def _generate_follow_up(conn, packet_id: str) -> None:
+    """A polite nudge: the application, its age, the timeline — drafted
+    from the resume (honesty contract), appended to the account's DRAFTS
+    when email tracking is linked (never sent)."""
+    from datetime import UTC, datetime
+
+    pk = conn.execute(
+        "SELECT pk.id, pk.status, pk.applied_at, pk.updated_at, p.title,"
+        " c.id AS company_id, c.name AS company_name, c.domain"
+        " FROM packets pk JOIN postings p ON p.id = pk.posting_id"
+        " JOIN companies c ON c.id = p.company_id"
+        " WHERE pk.id = ?", (packet_id,)).fetchone()
+    if pk is None:
+        raise RuntimeError(f"unknown packet: {packet_id}")
+    if not pk["applied_at"]:
+        raise RuntimeError("no applied date — mark the application applied "
+                           "first")
+    events = conn.execute(
+        "SELECT kind, event_date, title, notes FROM application_events"
+        " WHERE packet_id = ? ORDER BY event_date DESC, id DESC LIMIT 5",
+        (packet_id,)).fetchall()
+    days = (datetime.now(UTC).date()
+            - datetime.strptime(pk["applied_at"], "%Y-%m-%d").date()).days
+
+    system = (
+        "You draft short, polite follow-up emails for job applications. "
+        "You may ONLY state facts from the provided master resume and "
+        "timeline — never invent. Under 130 words, plain text, no "
+        'placeholders. Output ONLY JSON: {"subject": "...", "body": "..."}.'
+    )
+    timeline = "\n".join(
+        f"- {e['event_date']} {e['kind']}: {e['title'] or ''}"
+        for e in events) or "(none recorded)"
+    user = (
+        f"APPLICATION: {pk['title']} at {pk['company_name']}"
+        f" (applied {pk['applied_at']}, {days} days ago)"
+        f"\nSTATE: {pk['status']}\nTIMELINE:\n{timeline}\n\n"
+        f"CANDIDATE (master resume):\n{_resume_context()}\n\n"
+        "Draft a follow-up: confirm continued interest, add ONE piece of "
+        "true value (a relevant fact from the resume), and ask for a "
+        "status update — gracious, not pushy."
+    )
+    draft, model, cost = _chat_json(system, user)
+
+    # append to the mail Drafts when linked (draft-first: never sent)
+    detail = {"days": days}
+    try:
+        from jobscout.webapp.runners import email_tracker
+
+        user_email, pw, host = email_tracker._creds()
+        if user_email and pw:
+            from jobscout.clients.mail import MailClient
+
+            MailClient(user_email, pw, host or None).append_draft(
+                to_addr=_hr_address(conn, pk["company_id"]),
+                subject=draft["subject"], body=draft["body"])
+            detail["draft_saved"] = True
+    except Exception as e:                     # noqa: BLE001 — best effort
+        detail["draft_error"] = str(e)[:200]
+
+    db.upsert_outreach(conn, company_id=pk["company_id"], kind="follow_up",
+                       status="done",
+                       content=json.dumps({**draft, "detail": detail}),
+                       model=model, cost_usd=cost)
+
+
+def _hr_address(conn, company_id: str) -> str:
+    row = conn.execute(
+        "SELECT contact_email, domain FROM companies WHERE id = ?",
+        (company_id,)).fetchone()
+    if row and row["contact_email"]:
+        return row["contact_email"]
+    if row and row["domain"]:
+        return f"jobs@{row['domain']}"
+    return "careers@example.com"                # user edits in their client
 
 
 def _generate(conn, company_id: str, kind: str) -> None:
