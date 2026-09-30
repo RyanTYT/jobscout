@@ -319,16 +319,17 @@ def test_mcf_search_parses(monkeypatch):
     from jobscout.sources.postings import sites as sites_mod
 
     class FakeResp:
-        text = '{}'
+        text = '{"results": []}'
 
         def json(self):
+            # the VERIFIED live API shape (v2/jobs, 2026-09-29)
             return {"results": [
                 {"title": "Software Engineer",
                  "postedCompany": {"name": "SG Corp"},
-                 "uuid": "MCF-123",
-                 "jobPostUrl": "https://www.mycareersfuture.gov.sg/sg/job/MCF-123",
-                 "jobDescription": "<p>Build <b>systems</b></p>"},
-                {"title": None, "postedCompany": {}},   # skipped
+                 "uuid": "b31",
+                 "metadata": {"jobPostId": "MCF-123"},
+                 "description": "<p>Build <b>systems</b></p>"},
+                {"title": None, "postedCompany": {}},   # skipped: no title
             ]}
         status_code = 200
 
