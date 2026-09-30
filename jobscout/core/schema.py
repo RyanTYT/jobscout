@@ -254,9 +254,17 @@ class SearchCfg(BaseModel):
     llm_model: str = ""
 
 
+class EmailCfg(BaseModel):
+    """IMAP-linked follow-through tracking. Credentials live in .env
+    (JOBSCOUT_EMAIL_USER/PASS[/HOST]); this block holds the behaviour."""
+    enabled: bool = False
+    poll_minutes: int = 15
+
+
 class Settings(BaseModel):
     discovery: DiscoveryCfg = Field(default_factory=DiscoveryCfg)
     search: SearchCfg = Field(default_factory=SearchCfg)
+    email: EmailCfg = Field(default_factory=EmailCfg)
     dashboard: DashboardCfg = Field(default_factory=DashboardCfg)
     sidecar: SidecarCfg = Field(default_factory=SidecarCfg)
     llm: LlmCfg = Field(default_factory=LlmCfg)

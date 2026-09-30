@@ -428,6 +428,33 @@ def latest_outreach(conn: sqlite3.Connection, company_id: str,
     ).fetchone()
 
 
+# ── email tracking (the follow-through watcher) ────────────────────────────
+
+
+def record_email_event(conn, *, company_id: str | None, packet_id: str | None,
+                       from_addr: str, subject: str, sent_at: str | None,
+                       message_id: str | None, classification: str,
+                       action: str, detail: str | None = None) -> None:
+    conn.execute(
+        "INSERT INTO email_events (company_id, packet_id, from_addr, subject,"
+        " sent_at, message_id, classification, action, detail)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (company_id, packet_id, from_addr, subject, sent_at, message_id,
+         classification, action, detail),
+    )
+    conn.commit()
+
+
+def recent_email_events(conn, limit: int = 30) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT e.*, p2.title AS posting_title FROM email_events e"
+        " LEFT JOIN packets p ON p.id = e.packet_id"
+        " LEFT JOIN postings p2 ON p2.id = p.posting_id"
+        " ORDER BY e.id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+
+
 # ── P2: dashboard aggregates ─────────────────────────────────────────────────
 
 
@@ -522,9 +549,17 @@ def set_state(conn: sqlite3.Connection, key: str, value: str) -> None:
 # ── P6: packets ───────────────────────────────────────────────────────────────
 
 PACKET_STATUSES = (
-    "drafting", "needs_input", "ready", "filled", "applied",
-    "interviewing", "offer", "rejected", "withdrawn",
+    "packet:drafting", "packet:needs_input", "packet:ready", "filled",
+    "applied", "interviewing", "offer", "rejected", "withdrawn",
 )
+# plain pre-application forms alias to the canonical prefixed ones
+_STATUS_ALIASES = {"drafting": "packet:drafting",
+                   "needs_input": "packet:needs_input",
+                   "ready": "packet:ready"}
+
+
+def canon_status(status: str) -> str:
+    return _STATUS_ALIASES.get(status or "", status or "")
 
 
 def upsert_packet(
@@ -569,7 +604,9 @@ def get_packet_for_posting(
     ).fetchone()
 
 
-def set_packet_status(conn: sqlite3.Connection, packet_id: str, status: str) -> bool:
+def set_packet_status(conn: sqlite3.Connection, packet_id: str,
+                      status: str) -> bool:
+    status = canon_status(status)
     if status not in PACKET_STATUSES:
         return False
     cur = conn.execute(

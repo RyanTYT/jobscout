@@ -122,6 +122,69 @@
 </div>
 {% endif %}
 
+{% if error %}
+{{ m.callout(error, "danger") }}
+{% endif %}
+
+{# ── email activity: the follow-through watcher's findings ───────────────
+     classifications + auto state moves + the reply DRAFTS it saved to
+     the linked account's Drafts folder (you send them from your mail
+     client — the app never sends). #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Email activity</h2>
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-secondary small">matched application email → state moves + reply drafts</span>
+      <form method="post" action="/applications/email-check" data-busy-submit>
+        <button class="btn btn-outline-primary btn-sm" type="submit"
+                title="fetch new email now, classify, update states, draft replies (draft-first)">
+          {{ m.icon("pulse", 11) }} check now
+        </button>
+      </form>
+    </div>
+  </div>
+  {% if email_events %}
+  <div class="table-responsive scroll-y">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th scope="col">from</th><th scope="col">subject</th>
+            <th scope="col">classification</th><th scope="col">what happened</th>
+            <th scope="col">draft</th><th scope="col">when</th></tr>
+      </thead>
+      <tbody>
+        {% for e in email_events %}
+        {% set d = (e.detail or "{}") | from_json %}
+        <tr {% if e.packet_id %}data-row-link="/packet/{{ e.packet_id }}"{% endif %}>
+          <td class="small text-truncate" style="max-width: 14rem;">{{ e.from_addr }}</td>
+          <td class="small text-truncate" style="max-width: 20rem;">{{ e.subject }}</td>
+          <td>{{ m.badge((e.classification or "—") | replace("_", " "),
+                         {"interview_invite": "info", "offer": "success",
+                          "rejection": "secondary", "request_more_info": "warning"}
+                         .get(e.classification, "light")) }}</td>
+          <td class="small text-secondary">{{ e.action }}</td>
+          <td class="small">
+            {% if d.draft_subject %}
+            <span title="{{ d.draft_body | truncate(400) }}">{{ d.draft_subject | truncate(40) }}</span>
+            <span class="text-secondary">· in your mail Drafts</span>
+            {% elif d.draft_error %}
+            <span class="text-danger" title="{{ d.draft_error }}">draft failed</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="small text-secondary font-monospace text-nowrap">
+            {{ (e.created_at or "")[:16] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body">{{ m.empty(
+     "No application email seen yet",
+     "Link your email account on the Ops page — matched interview invites, offers, and rejections update application states automatically; replies are drafted to your Drafts folder for you to send.",
+     "news") }}</div>
+  {% endif %}
+</div>
+
 {# ── run log: live statuses, polled while anything is in flight ────────── #}
 <div hx-get="/applications/runs" hx-trigger="every 3s" hx-swap="outerHTML">
   {% include "_runs.html" %}

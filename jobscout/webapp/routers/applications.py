@@ -31,6 +31,7 @@ def register(app):
         try:
             apply_mod.refresh_runs(conn)          # drain sidecar events → statuses
             packets = db.list_packets(conn)
+            email_events = db.recent_email_events(conn, 30)
             ctx = page_ctx("applications", conn)
             runs = db.list_apply_runs(conn)
         finally:
@@ -52,11 +53,24 @@ def register(app):
         return TEMPLATES.TemplateResponse(
             request, "applications.html",
             {**ctx, "packets": manifests, "runs": runs,
+             "email_events": email_events,
              "runs_active": any(r["status"] in ("launched", "running")
                                 for r in runs),
-             "just_applied": applied == "1", "auto_count": auto,
+             "just_applied": applied == "1", "error": error, "auto_count": auto,
              "assist_count": assist, "apply_note": note, "apply_error": error},
         )
+
+    @app.post("/applications/email-check")
+    def applications_email_check():
+        """Manual 'check now' for the email tracker (background thread)."""
+        from jobscout.webapp.runners import email_tracker
+
+        if not email_tracker.enabled():
+            return RedirectResponse(
+                "/applications?error=email+tracking+is+off+—+enable+it+"
+                "on+the+Ops+page", status_code=303)
+        email_tracker.check_now()
+        return RedirectResponse("/applications", status_code=303)
 
     @app.get("/applications/runs", response_class=HTMLResponse)
     def applications_runs(request: Request):

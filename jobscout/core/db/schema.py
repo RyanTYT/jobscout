@@ -21,7 +21,7 @@ def db_path() -> Path:
     return core_paths.db_path()
 
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -129,6 +129,21 @@ CREATE TABLE IF NOT EXISTS apply_runs (
     updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_apply_runs_packet ON apply_runs(packet_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS email_events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id    TEXT,
+    packet_id     TEXT,             -- the packet whose state moved (nullable)
+    from_addr     TEXT,
+    subject       TEXT,
+    sent_at       TEXT,
+    message_id    TEXT,
+    classification TEXT,            -- interview_invite|offer|rejection|request_more_info|auto_reply|other
+    action        TEXT,             -- "state: interviewing" | "draft saved" | "no change"
+    detail        TEXT,             -- JSON: draft subject/body, confidence
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_email_events_company ON email_events(company_id, id DESC);
 
 CREATE TABLE IF NOT EXISTS outreach (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -46,3 +46,7 @@ run:
 search:
   provider: auto
   llm_model: perplexity/sonar
+
+email:                       # IMAP-linked follow-through tracking
+  enabled: false            # creds: JOBSCOUT_EMAIL_USER/PASS[/HOST] in .env
+  poll_minutes: 15          # draft-first: the app appends drafts, never sends

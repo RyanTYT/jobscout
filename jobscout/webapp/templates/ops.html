@@ -202,6 +202,82 @@
   </div>
 </div>
 
+{% if key_saved and email is defined and email %}
+{{ m.callout("Email tracking enabled — a first check is running in the background; results appear on the Applications page.", "success") }}
+{% endif %}
+
+{# ── email tracking: the follow-through watcher ─────────────────────────
+     IMAP + app password. DRAFT-FIRST: the app can only APPEND drafts —
+     replies land in the account's Drafts folder for you to review and
+     send from your own mail client. Nothing is ever sent automatically. #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Email tracking (IMAP)</h2>
+    <span class="text-secondary small">draft-first · never sends</span>
+  </div>
+  <div class="card-body">
+    <form method="post" action="/ops/email-account" class="row g-3 align-items-end" data-busy-submit>
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label" for="f-email-user">email account</label>
+        <input class="form-control" type="text" id="f-email-user" name="email_user"
+               value="{{ email_st.user }}"
+               placeholder="you@gmail.com">
+        <div class="form-text">gmail needs 2FA + an app password</div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label" for="f-email-pass">app password</label>
+        <input class="form-control" type="password" id="f-email-pass" name="email_pass"
+               autocomplete="off" spellcheck="false"
+               placeholder="{% if email_st.configured %}saved — paste to replace{% else %}app-specific password{% endif %}">
+        <div class="form-text">stored in .env · empty keeps the saved one</div>
+      </div>
+      <div class="col-12 col-md-4 col-lg-2">
+        <label class="form-label" for="f-email-host">IMAP host
+          <span class="text-secondary">(optional)</span></label>
+        <input class="form-control" type="text" id="f-email-host" name="email_host"
+               value="{{ email_st.host }}" placeholder="auto-detected">
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <label class="form-label" for="f-poll">poll every (min)</label>
+        <input class="form-control" type="text" id="f-poll" name="poll_minutes"
+               value="{{ email_cfg.poll_minutes }}">
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="f-email-on"
+                 name="enabled" value="1"
+                 {% if email_cfg.enabled %}checked{% endif %}>
+          <label class="form-check-label small" for="f-email-on">enabled</label>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary btn-sm" type="submit">save</button>
+          {% if email_st.configured %}
+          <button class="btn btn-outline-danger btn-sm" type="submit"
+                  formaction="/ops/email-account/clear"
+                  formnovalidate>remove</button>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+    <div class="d-flex flex-wrap gap-2 mt-3 align-items-center">
+      {% if email_cfg.enabled and email_st.configured %}
+      {{ m.badge("tracking on · every " ~ email_cfg.poll_minutes ~ " min", "success") }}
+      {% elif email_st.configured %}
+      {{ m.badge("configured — off", "warning") }}
+      {% else %}
+      {{ m.badge("not configured", "light", "the poller needs an account + app password") }}
+      {% endif %}
+      {% if email_track.last_check %}
+      <span class="small text-secondary">last check {{ email_track.last_check }}
+        — {{ email_track.checked }} emails, {{ email_track.matched }} matched</span>
+      {% endif %}
+      {% if email_track.last_error %}
+      {{ m.badge("error", "danger", email_track.last_error) }}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
 {% if key_saved %}
 {{ m.callout("API key saved to .env — effective on the next LLM run (no restart needed).", "success") }}
 {% endif %}

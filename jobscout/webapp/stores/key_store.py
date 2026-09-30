@@ -70,6 +70,9 @@ def save_key(raw_key: str) -> dict:
 
 CSE_KEY_ENV = "JOBSCOUT_CSE_API_KEY"   # canonical name (tools + .env.example)
 BRAVE_KEY_ENV = "JOBSCOUT_BRAVE_API_KEY"
+EMAIL_USER_ENV = "JOBSCOUT_EMAIL_USER"
+EMAIL_PASS_ENV = "JOBSCOUT_EMAIL_PASS"
+EMAIL_HOST_ENV = "JOBSCOUT_EMAIL_HOST"
 CSE_CX_ENV = "JOBSCOUT_CSE_CX"
 
 
@@ -106,6 +109,44 @@ def clear_cse() -> dict:
 def brave_status() -> dict:
     key = (_current_env().get(BRAVE_KEY_ENV) or "").strip()
     return {"key_set": bool(key), "key_tail": key[-4:] if key else ""}
+
+
+def email_status() -> dict:
+    env = _current_env()
+    user = (env.get(EMAIL_USER_ENV) or "").strip()
+    host = (env.get(EMAIL_HOST_ENV) or "").strip()
+    return {"configured": bool(user and
+                               (env.get(EMAIL_PASS_ENV) or "").strip()),
+            "user": user, "host": host}
+
+
+def save_email_account(*, user: str, password: str, host: str) -> dict:
+    """Write the IMAP credentials into .env. Empty password keeps the
+    saved one (host/user always overwrite when given)."""
+    path = _env_path()
+    user = (user or "").strip()
+    host = (host or "").strip()
+    password = (password or "").strip()
+    if user and "@" not in user:
+        raise KeyStoreError("that doesn't look like an email address")
+    if user:
+        _upsert(path, EMAIL_USER_ENV, user)
+    if host:
+        _upsert(path, EMAIL_HOST_ENV, host)
+    if password:
+        if any(ch.isspace() for ch in password):
+            raise KeyStoreError("the password contains whitespace — "
+                                "paste the app password verbatim")
+        _upsert(path, EMAIL_PASS_ENV, password)
+    return email_status()
+
+
+def clear_email_account() -> dict:
+    path = _env_path()
+    _drop(path, EMAIL_USER_ENV)
+    _drop(path, EMAIL_PASS_ENV)
+    _drop(path, EMAIL_HOST_ENV)
+    return email_status()
 
 
 def save_brave(raw_key: str) -> dict:

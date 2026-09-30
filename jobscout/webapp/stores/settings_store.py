@@ -20,6 +20,10 @@ SCHEDULES = ("daily", "weekdays", "mon-wed-fri", "manual")
 SEARCH_PROVIDERS = ("auto", "cse", "brave", "llm", "ddg")
 
 
+def current_email():
+    return core_config.load_settings().email
+
+
 class SettingsStoreError(Exception):
     pass
 
@@ -37,6 +41,47 @@ def current():
 
 def current_search():
     return core_config.load_settings().search
+
+
+def save_email(*, enabled: bool, poll_minutes: str) -> dict:
+    """Write the email: block (appended when the file predates it)."""
+    try:
+        minutes = int(poll_minutes)
+    except (TypeError, ValueError):
+        raise SettingsStoreError("poll interval must be a whole number") from None
+    if minutes < 1 or minutes > 1440:
+        raise SettingsStoreError("poll interval must be 1-1440 minutes")
+    path = _path()
+    block = ["email:",
+             f"  enabled: {str(enabled).lower()}",
+             f"  poll_minutes: {minutes}"]
+    original = path.read_text(encoding="utf-8")
+    lines = original.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if re.match(r"^email:\s*$", line):
+            start = i
+            break
+    if start is not None:
+        end = start + 1
+        while end < len(lines) and (not lines[end] or lines[end][0] in " \t"
+                                    or lines[end].startswith("#")):
+            end += 1
+        lines[start:end] = block
+    else:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines += block
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        cfg = core_config.load_settings().email
+        if cfg.enabled != enabled or cfg.poll_minutes != minutes:
+            raise core_config.ConfigError("round-trip mismatch")
+        return {"email": cfg}
+    except Exception as e:
+        path.write_text(original, encoding="utf-8")
+        raise SettingsStoreError(
+            f"rejected by validation — file restored: {e}") from e
 
 
 def save_search(*, provider: str, llm_model: str) -> dict:

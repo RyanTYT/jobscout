@@ -25,4 +25,7 @@ def create_app() -> FastAPI:
               name="static")
     db.init_db()  # idempotent; also migrates schema
     register_all(app)
+    from jobscout.webapp.runners import email_tracker
+
+    email_tracker.maybe_start()
     return app

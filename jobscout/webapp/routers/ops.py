@@ -145,6 +145,41 @@ def register(app):
         key_store.clear_cse()
         return RedirectResponse("/ops?key_saved=1", status_code=303)
 
+    @app.post("/ops/email-account")
+    async def ops_email_account(request: Request):
+        """Save the IMAP credentials + tracking settings; a first check
+        runs immediately. Draft-first: the app can only append drafts —
+        replies land in the account's Drafts for you to send."""
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp.runners import email_tracker
+        from jobscout.webapp.stores import key_store, settings_store
+
+        form = await request.form()
+        try:
+            key_store.save_email_account(
+                user=form.get("email_user", ""),
+                password=form.get("email_pass", ""),
+                host=form.get("email_host", ""))
+            settings_store.save_email(
+                enabled=form.get("enabled") == "1",
+                poll_minutes=form.get("poll_minutes", "15"))
+        except (key_store.KeyStoreError,
+                settings_store.SettingsStoreError) as e:
+            return RedirectResponse(
+                f"/ops?key_error={_q(str(e))}", status_code=303)
+        if email_tracker.enabled():
+            email_tracker.maybe_start()
+            email_tracker.check_now()
+        return RedirectResponse("/ops?key_saved=1&email=1", status_code=303)
+
+    @app.post("/ops/email-account/clear")
+    def ops_email_clear():
+        from jobscout.webapp.stores import key_store
+
+        key_store.clear_email_account()
+        return RedirectResponse("/ops?key_saved=1&email=1", status_code=303)
+
     @app.post("/ops/brave-key")
     async def ops_brave_save(request: Request):
         from urllib.parse import quote as _q
@@ -196,8 +231,10 @@ def register(app):
             models_refreshed: str = Query(""),
             search_saved: str = Query("")):
         from jobscout.core import config as core_config
+        from jobscout.webapp.runners import email_tracker
         from jobscout.webapp.stores import key_store, models_store
 
+        email_track = email_tracker.state()
         try:
             cse_status = key_store.cse_status()
         except Exception:                       # noqa: BLE001
@@ -206,6 +243,14 @@ def register(app):
             brave_status = key_store.brave_status()
         except Exception:                       # noqa: BLE001
             brave_status = {"key_set": False, "key_tail": ""}
+        try:
+            email_st = key_store.email_status()
+            email_cfg = core_config.load_settings().email
+        except Exception:                       # noqa: BLE001
+            email_st = {"configured": False, "user": "", "host": ""}
+            from jobscout.core.schema import EmailCfg
+
+            email_cfg = EmailCfg()
         try:
             models_cfg = models_store.current()
         except Exception:                       # noqa: BLE001
@@ -251,6 +296,9 @@ def register(app):
                 "llm_status": llm_status,
                 "cse_status": cse_status,
                 "brave_status": brave_status,
+                "email_st": email_st,
+                "email_cfg": email_cfg,
+                "email_track": email_track,
                 "search_cfg": (core_config.load_settings().search
                                if True else None),
                 "search_saved": search_saved == "1",
