@@ -210,6 +210,49 @@ class SidecarClient:
                             {"jobs": jobs, "profile": profile,
                              "settings": settings}, timeout=timeout)
 
+    def scrape_sites(self, scraper_ids: list[str], *, keywords: str,
+                     location: str = "", top_n: int | None = None,
+                     timeout: float = 300.0) -> list[dict]:
+        """Scrape job boards via the Playwright sidecar (bot-walled sites:
+        LinkedIn, Wellfound, YC — the boards plain HTTP cannot touch).
+
+        Blocking: requests scrapeJobs, then drains events until the
+        sidecar's scrape:all-done (EndMsg) or the timeout. Returns the
+        merged jobs (JobDetails dicts) from all requested scrapers.
+        """
+        filters = {
+            "mode": "jobs", "seniorityLevels": [], "jobTypes": [],
+            "remoteOnly": False, "sectors": [], "companyIds": [],
+            "keywords": [keywords] if keywords else [],
+            "location": location or "",
+        }
+        if top_n:
+            filters["topN"] = top_n
+        resp = self.request("scrapeJobs",
+                            {"scraper_ids": scraper_ids, "filters": filters},
+                            timeout=60.0)
+        req_id = resp.get("id")
+        if not req_id:
+            return []
+        jobs: list[dict] = []
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            events = self.drain_events(req_id)
+            finished = False
+            for ev in events:
+                if ev.get("event_type") == "EndMsg":
+                    finished = True
+                # each scraper emits its OWN scrape:done result — MERGE
+                # them (keeping only the last would drop every board but
+                # the final one)
+                result = ev.get("result") or {}
+                if isinstance(result.get("jobs"), list):
+                    jobs.extend(result["jobs"])
+            if finished:
+                return jobs
+            time.sleep(2)
+        return jobs
+
     def drain_events(self, req_id: str) -> list[dict]:
         """Pop all sidecar events accumulated for a request id so far.
 

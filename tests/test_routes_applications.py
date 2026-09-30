@@ -345,3 +345,118 @@ def test_mcf_search_parses(monkeypatch):
     assert out[0].url.endswith("MCF-123")
     assert "Build systems" in out[0].description
     assert out[0].source == 'site:mycareersfuture'
+
+
+# ── sidecar site scraping: conversion + batch wiring (fakes, no browser) ──
+
+
+def test_sidecar_scrape_converts_job_details(monkeypatch):
+    from jobscout.sources.postings import sites as sites_mod
+
+    class FakeSidecar:
+        def scrape_sites(self, ids, *, keywords, location, top_n=None,
+                         timeout=300.0):
+            assert ids == ["linkedin", "wellfound"]
+            assert keywords == "backend engineer"
+            return [
+                {"title": "Backend Engineer", "company": "Grab",
+                 "applyUrl": "https://www.linkedin.com/jobs/x1",
+                 "applyHostname": "linkedin.com", "location": "Singapore",
+                 "remote": False, "seniority": "mid",
+                 "description": "<p>Build systems</p>",
+                 "postedAt": "2026-09-28T10:00:00Z"},
+                {"title": "", "applyUrl": "https://x/2"},          # skipped
+                {"title": "No URL", "applyUrl": ""},               # skipped
+                {"title": "Staff Eng", "company": "X",
+                 "applyUrl": "https://x/3", "applyHostname": "linkedin.com",
+                 "seniority": "staff"},
+            ]
+
+    monkeypatch.setattr(sites_mod, "_get_sidecar", lambda: FakeSidecar())
+    out = sites_mod.sidecar_scrape(
+        "backend engineer", "Singapore", ("linkedin", "wellfound"))
+    assert len(out) == 2
+    p = out[0]
+    assert p.source == "site:linkedin.com"
+    assert p.company == "Grab" and p.company_slug == "grab"
+    assert p.url.endswith("/x1")
+    assert p.seniority is None                # 'mid' → unlabeled → passes gate
+    assert p.remote is None or p.remote is False
+    assert p.posted_at == "2026-09-28"
+    assert out[1].seniority == "staff"        # mapped token kept
+
+
+def test_sidecar_scrape_degrades_when_unavailable(monkeypatch):
+    from jobscout.clients.sidecar import SidecarError
+    from jobscout.sources.postings import sites as sites_mod
+
+    def boom():
+        raise SidecarError("not built")
+
+    monkeypatch.setattr(sites_mod, "_get_sidecar", boom)
+    out = sites_mod.sidecar_scrape("x", "y", ("linkedin",))
+    assert out == []
+
+
+def test_sweep_batches_sidecar_once_per_role(monkeypatch):
+    from jobscout.core.schema import ProfileCfg, TargetCfg
+    from jobscout.sources.postings import sites as sites_mod
+
+    calls = []
+
+    class FakeSidecar:
+        def scrape_sites(self, ids, *, keywords, location, top_n=None,
+                         timeout=300.0):
+            calls.append((tuple(ids), keywords, location, top_n))
+            # two boards' results — the client MERGES per-scraper events
+            return [{"title": f"Job {keywords}", "company": "C",
+                     "applyUrl": f"https://x/{keywords}",
+                     "applyHostname": "linkedin.com",
+                     "seniority": "mid"},
+                    {"title": f"YC {keywords}", "company": "Y",
+                     "applyUrl": f"https://y/{keywords}",
+                     "applyHostname": "ycombinator.com",
+                     "seniority": "junior"}]
+
+    monkeypatch.setattr(sites_mod, "_get_sidecar", lambda: FakeSidecar())
+    monkeypatch.setattr(sites_mod, "_stop_sidecar", lambda: None)
+    monkeypatch.setattr(
+        sites_mod, "SITES",
+        {})  # HTTP sites off — isolate the sidecar path
+    profile = ProfileCfg(target=TargetCfg(
+        roles=["backend engineer", "quant developer"],
+        locations=["Singapore"]))
+    out = sites_mod.sweep_sites(None, profile)
+    # 2 roles → 2 batched scrapes (all three boards per batch)
+    assert len(calls) == 2
+    assert calls[0][0] == ("linkedin", "wellfound", "ycombinator")
+    assert calls[0][1] == "backend engineer"
+    assert calls[0][2] == "Singapore"
+    sources = {p.source for p in out}
+    assert sources == {"site:linkedin.com", "site:ycombinator.com"}
+    assert len(out) == 4      # 2 roles x 2 boards, deduped by url
+
+
+def test_sweep_skips_sidecar_when_not_built(monkeypatch):
+    from jobscout.core.schema import ProfileCfg, TargetCfg
+    from jobscout.sources.postings import sites as sites_mod
+
+    monkeypatch.setattr(sites_mod, "SITES", {})
+    monkeypatch.setattr(
+        "jobscout.clients.sidecar.SidecarClient.available",
+        staticmethod(lambda path=None: False))
+    profile = ProfileCfg(target=TargetCfg(roles=["engineer"],
+                                          locations=["Singapore"]))
+    out = sites_mod.sweep_sites(None, profile)
+    assert out == []                           # graceful: HTTP-only mode
+
+
+def test_seniority_map_covers_sidecar_tokens():
+    from jobscout.sources.postings.sites import _SENIORITY_MAP
+
+    # every JobPilot SeniorityLevel either maps to a gate token or None
+    for level in ("intern", "junior", "mid", "senior", "staff",
+                  "principal", "lead", "manager"):
+        assert _SENIORITY_MAP.get(level) is not None or level == "mid"
+    # unknown levels → None (unlabeled, passes to LLM)
+    assert _SENIORITY_MAP.get("director") is None
