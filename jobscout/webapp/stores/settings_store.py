@@ -20,6 +20,56 @@ SCHEDULES = ("daily", "weekdays", "mon-wed-fri", "manual")
 SEARCH_PROVIDERS = ("auto", "cse", "brave", "llm", "ddg")
 
 
+def current_pipeline():
+    return core_config.load_settings().discovery.pipeline
+
+
+def save_pipeline(*, ats_boards: bool, careers_crawl: bool, rss: bool,
+                  job_sites: bool, cse_queries: str) -> dict:
+    """Write the discovery.pipeline block (the daily-sweep knob)."""
+    try:
+        cse = int(cse_queries)
+    except (TypeError, ValueError):
+        raise SettingsStoreError("CSE queries must be a whole number") from None
+    if cse < 0 or cse > 100:
+        raise SettingsStoreError("CSE queries must be 0-100 per day")
+
+    path = _path()
+    original = path.read_text(encoding="utf-8")
+    lines = original.splitlines()
+    # find the pipeline: block under discovery: (4-space pipeline keys)
+    start = None
+    for i, line in enumerate(lines):
+        if re.match(r"^  pipeline:\s*$", line):
+            start = i
+            break
+    if start is None:
+        raise SettingsStoreError("no discovery.pipeline block found")
+    end = start + 1
+    while end < len(lines) and (not lines[end] or lines[end][0] in " \t"
+                                 or lines[end].startswith("#")):
+        end += 1
+    block = [
+        "  pipeline:",
+        f"    ats_boards: {str(ats_boards).lower()}",
+        f"    careers_crawl: {str(careers_crawl).lower()}",
+        f"    cse_queries_per_day: {cse}",
+        f"    rss: {str(rss).lower()}",
+        f"    job_sites: {str(job_sites).lower()}",
+    ]
+    lines[start:end] = block
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        cfg = core_config.load_settings().discovery.pipeline
+        if cfg.job_sites != job_sites or cfg.ats_boards != ats_boards:
+            raise core_config.ConfigError("round-trip mismatch")
+        return {"pipeline": cfg}
+    except Exception as e:
+        path.write_text(original, encoding="utf-8")
+        raise SettingsStoreError(
+            f"rejected by validation — file restored: {e}") from e
+
+
 def current_email():
     return core_config.load_settings().email
 

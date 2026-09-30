@@ -25,6 +25,41 @@
 {{ m.callout("Generating " ~ (outreach_started | replace("_", " ")) ~ " — the panel below refreshes itself until the draft lands.", "success") }}
 {% endif %}
 
+{# ── application history: every packet for this company ──────────────── #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Application history</h2>
+    <span class="text-secondary small">
+      every packet — incl. rejections — the re-apply record
+    </span>
+  </div>
+  {% if history %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th scope="col">posting</th><th scope="col">state</th>
+            <th scope="col">applied</th><th scope="col">decided</th></tr>
+      </thead>
+      <tbody>
+        {% for pk in history %}
+        <tr data-row-link="/packet/{{ pk.id }}">
+          <td class="text-truncate small" style="max-width: 20rem;">
+            {{ pk.posting_title or pk.id }}</td>
+          <td>{{ m.status(pk.status) }}</td>
+          <td class="small font-monospace">{{ pk.applied_at or "—" }}</td>
+          <td class="small font-monospace">{{ pk.decided_at or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body py-2 small text-secondary">
+    no applications recorded for this company yet
+  </div>
+  {% endif %}
+</div>
+
 {# ── outreach: the way in when no postings match — cold email + LinkedIn ── #}
 <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center">

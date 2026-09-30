@@ -86,6 +86,46 @@
   </div>
 </div>
 
+{% if sweep_saved %}
+{{ m.callout("Daily sweep saved — the next run uses the new source mix.", "success") }}
+{% endif %}
+
+{# ── the daily-sweep knob: which deterministic sources run ──────────────── #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Daily sweep</h2>
+    <span class="text-secondary small">settings.yaml · discovery.pipeline</span>
+  </div>
+  <div class="card-body">
+    <form method="post" action="/discovery/pipeline" class="row g-3 align-items-end" data-busy-submit>
+      <div class="col-6 col-md-4 col-xl-3 d-flex align-items-end">
+        {{ m.check("ats_boards", "ATS boards", pipeline.ats_boards) }}
+      </div>
+      <div class="col-6 col-md-4 col-xl-3 d-flex align-items-end">
+        {{ m.check("careers_crawl", "careers crawl", pipeline.careers_crawl) }}
+      </div>
+      <div class="col-6 col-md-4 col-xl-3 d-flex align-items-end">
+        {{ m.check("rss", "news RSS", pipeline.rss) }}
+      </div>
+      <div class="col-6 col-md-4 col-xl-3 d-flex align-items-end">
+        {{ m.check("job_sites", "job sites (MCF)", pipeline.job_sites) }}
+        <div class="form-text">keyword search on public job-site APIs —
+          market-wide postings from your profile's roles × locations</div>
+      </div>
+      <div class="col-6 col-md-4 col-xl-2">
+        <label class="form-label" for="f-cse">CSE queries/day</label>
+        <input class="form-control" type="text" id="f-cse" name="cse_queries"
+               value="{{ pipeline.cse_queries_per_day }}">
+      </div>
+      <div class="col-12 col-md-4 col-xl-3 d-flex justify-content-end">
+        <button class="btn btn-primary btn-sm" type="submit">
+          {{ m.icon("check", 12) }} save sweep
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% if caps_saved %}
 {{ m.callout("Agent caps saved — the next run uses the new budget.", "success") }}
 {% endif %}

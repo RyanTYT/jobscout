@@ -22,7 +22,8 @@ def register(app):
     def discovery_page(request: Request, ran: str = Query(""),
                        started: str = Query(""),
                        saved: str = Query(""), error: str = Query(""),
-                       caps_saved: str = Query("")):
+                       caps_saved: str = Query(""),
+                       sweep_saved: str = Query("")):
         from jobscout.core.config import load_settings
         from jobscout.webapp.stores import targeting_store
 
@@ -87,6 +88,8 @@ def register(app):
                 "recent_runs": recent_runs,
                 "just_started": started == "1",
                 "caps_saved": caps_saved == "1",
+                "sweep_saved": sweep_saved == "1",
+                "pipeline": settings.discovery.pipeline,
                 "running": agent_runner.running(),
                 "run_out": agent_runner.state()["out"],
                 "run_error": agent_runner.state()["error"],
@@ -143,6 +146,29 @@ def register(app):
              "run_error": st["error"], "focus": st["focus"],
              "agent_spend": agent_spend},
         )
+
+    @app.post("/discovery/pipeline")
+    async def discovery_pipeline_save(request: Request):
+        """The daily-sweep knob: which deterministic sources run, how
+        many CSE queries, whether job-site searches (MCF...) run."""
+        from urllib.parse import quote as _q
+
+        from jobscout.webapp.stores import settings_store
+
+        form = await request.form()
+        try:
+            settings_store.save_pipeline(
+                ats_boards=form.get("ats_boards") == "1",
+                careers_crawl=form.get("careers_crawl") == "1",
+                rss=form.get("rss") == "1",
+                job_sites=form.get("job_sites") == "1",
+                cse_queries=form.get("cse_queries", "10"),
+            )
+            return RedirectResponse("/discovery?sweep_saved=1",
+                                    status_code=303)
+        except settings_store.SettingsStoreError as e:
+            return RedirectResponse(
+                f"/discovery?error={_q(str(e))}", status_code=303)
 
     @app.post("/discovery/agent-caps")
     async def discovery_agent_caps(request: Request):

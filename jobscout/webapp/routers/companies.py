@@ -144,6 +144,7 @@ def register(app):
         conn = db.connect()
         try:
             ctx = page_ctx("companies", conn)
+            history = db.packets_for_company(conn, cid)
         finally:
             conn.close()
         try:
@@ -183,6 +184,7 @@ def register(app):
         return TEMPLATES.TemplateResponse(
             request, "company_detail.html",
             {**ctx, "cid": cid, "tier": tier, "entry": entry,
+             "history": history,
              "tiers": watchlist_store.TIERS, "error": error,
              "outreach_started": outreach_started, "st": st,
              "contact_email": contact_email},

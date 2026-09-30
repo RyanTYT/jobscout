@@ -209,6 +209,7 @@ class PipelineCfg(BaseModel):
     careers_crawl: bool = True
     cse_queries_per_day: int = 10
     rss: bool = True
+    job_sites: bool = True        # keyword search on public job-site APIs
     rss_feeds: list[str] = Field(default_factory=list)  # empty -> rss.DEFAULT_FEEDS
 
 

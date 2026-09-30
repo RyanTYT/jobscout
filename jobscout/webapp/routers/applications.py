@@ -48,7 +48,8 @@ def register(app):
     @app.get("/applications", response_class=HTMLResponse)
     def applications(request: Request, applied: str = Query(""),
                      auto: int = Query(0), assist: int = Query(0),
-                     note: str = Query(""), error: str = Query("")):
+                     note: str = Query(""), error: str = Query(""),
+                     q: str = Query("")):
         from jobscout.webapp.runners import apply as apply_mod
 
         conn = db.connect()
@@ -56,6 +57,8 @@ def register(app):
             apply_mod.refresh_runs(conn)          # drain sidecar events → statuses
             packets = db.list_packets(conn)
             email_events = db.recent_email_events(conn, 30)
+            event_hits = (db.search_app_events(conn, q)
+                          if q.strip() else [])
             ctx = page_ctx("applications", conn)
             runs = db.list_apply_runs(conn)
         finally:
@@ -77,7 +80,8 @@ def register(app):
         return TEMPLATES.TemplateResponse(
             request, "applications.html",
             {**ctx, "packets": manifests, "runs": runs,
-             "email_events": email_events,
+             "email_events": email_events, "event_hits": event_hits,
+             "q": q,
              "runs_active": any(r["status"] in ("launched", "running")
                                 for r in runs),
              "just_applied": applied == "1", "error": error, "auto_count": auto,

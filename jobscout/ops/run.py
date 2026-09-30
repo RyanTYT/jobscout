@@ -155,6 +155,25 @@ def run_daily(force: bool = False) -> int:
             except Exception as e:  # noqa: BLE001 — discovery must never break the run
                 errors.append(f"discovery: {e}")
 
+        # ── job sites (keyword search: MyCareersFuture, ...) ───────────
+        # role × location queries from the hunting profile — market-wide
+        # postings, not just watchlist companies
+        if settings.discovery.pipeline.job_sites:
+            try:
+                from jobscout.sources.postings.sites import sweep_sites
+
+                site_postings = sweep_sites(client, profile)
+                for p in site_postings:
+                    if not p.seniority:
+                        p.seniority = guess_seniority(p.title)
+                if site_postings:
+                    counts = db.upsert_postings(conn, site_postings)
+                    postings_seen += len(site_postings)
+                    print(f"job sites: {len(site_postings)} seen, "
+                          f"{counts['new']} new")
+            except Exception as e:  # noqa: BLE001 — sites must never break the run
+                errors.append(f"job-sites: {e}")
+
         # ── monitoring (P8): careers page changes + sitemap diffs ──────────
         try:
             from jobscout.sources.discovery.monitoring import run_monitoring

@@ -235,3 +235,112 @@ def test_follow_up_route_starts_draft(client, db_file, tmp_path,
     assert r2.status_code == 200
 
 
+
+
+# ── OA/interview search + per-company history ─────────────────────────────
+
+
+def test_event_search_finds_oa_notes(client, db_file, tmp_path):
+    _seed_packet(db_file, tmp_path)
+    import sqlite3
+
+    c = sqlite3.connect(db_file)
+    c.execute("UPDATE packets SET status = 'applied',"
+              " applied_at = '2026-09-01' WHERE id = 'pk_w1'")
+    c.execute("UPDATE postings SET company_id = 'acme', title = 'Engineer II'"
+              " WHERE id = 'p_int_1'")
+    db.record_app_event(c, packet_id="pk_w1", kind="oa",
+                        event_date="2026-09-15", title="CodeSignal",
+                        notes="SQL join question + two mediums")
+    c.commit()
+    c.close()
+    r = client.get("/applications?q=SQL")
+    assert "CodeSignal" in r.text
+    assert "SQL join question" in r.text
+    assert "acme" in r.text.lower()
+    r2 = client.get("/applications?q=nomatchterm")
+    assert "no timeline entries match" in r2.text
+
+
+def test_company_history_card(client):
+
+
+    # company detail needs a real watchlist entry (jane-street in seed)
+    r = client.get("/companies/jane-street")
+    assert r.status_code == 200
+    assert "Application history" in r.text
+    assert "no applications recorded" in r.text or "packet" in r.text.lower()
+
+
+def test_company_history_lists_packets(client, db_file):
+    import sqlite3
+
+    c = sqlite3.connect(db_file)
+    c.execute("INSERT INTO packets (id, posting_id, status, applied_at,"
+              " decided_at) VALUES ('pk_w2', 'p_int_1', 'rejected',"
+              " '2026-09-01', '2026-09-20')")
+    c.execute("UPDATE postings SET company_id = 'jane-street'"
+              " WHERE id = 'p_int_1'")
+    c.commit()
+    c.close()
+    r = client.get("/companies/jane-street")
+    assert "rejected" in r.text
+    assert "2026-09-01" in r.text and "2026-09-20" in r.text
+
+
+def test_pipeline_knob_saves_and_flashes(client):
+    r = client.post("/discovery/pipeline", data={
+        "ats_boards": "1", "careers_crawl": "1", "rss": "1",
+        "job_sites": "1", "cse_queries": "10",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert "sweep_saved=1" in r.headers["location"]
+    page = client.get("/discovery")
+    assert "Daily sweep" in page.text
+    assert 'name="job_sites"' in page.text
+
+
+def test_pipeline_knob_rejects_bad_cse(client):
+    r = client.post("/discovery/pipeline", data={
+        "ats_boards": "1", "careers_crawl": "1", "rss": "1",
+        "job_sites": "1", "cse_queries": "abc",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert "error=" in r.headers["location"]
+
+
+def test_sweep_sites_registered():
+    from jobscout.sources.postings.sites import SITES
+
+    assert "mycareersfuture" in SITES
+
+
+def test_mcf_search_parses(monkeypatch):
+    from jobscout.sources.postings import sites as sites_mod
+
+    class FakeResp:
+        text = '{}'
+
+        def json(self):
+            return {"results": [
+                {"title": "Software Engineer",
+                 "postedCompany": {"name": "SG Corp"},
+                 "uuid": "MCF-123",
+                 "jobPostUrl": "https://www.mycareersfuture.gov.sg/sg/job/MCF-123",
+                 "jobDescription": "<p>Build <b>systems</b></p>"},
+                {"title": None, "postedCompany": {}},   # skipped
+            ]}
+        status_code = 200
+
+    class FakeClient:
+        def get(self, url, params=None):
+            class R(FakeResp):
+                pass
+            return R()
+
+    out = sites_mod.mcf_search("engineer", "Singapore", FakeClient())
+    assert len(out) == 1
+    assert out[0].company == "SG Corp"
+    assert out[0].url.endswith("MCF-123")
+    assert "Build systems" in out[0].description
+    assert out[0].source == 'site:mycareersfuture'

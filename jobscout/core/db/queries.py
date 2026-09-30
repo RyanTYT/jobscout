@@ -452,6 +452,31 @@ def record_app_event(conn, *, packet_id: str, kind: str, event_date: str,
     return cur.lastrowid
 
 
+def search_app_events(conn, q: str, limit: int = 50) -> list[sqlite3.Row]:
+    """Search timeline entries (OA questions, interview notes) across ALL
+    packets — title + notes, linked to their packets and companies."""
+    like = f"%{(q or '').strip()}%"
+    return conn.execute(
+        "SELECT e.*, p2.title AS posting_title, c.name AS company_name"
+        " FROM application_events e"
+        " JOIN packets p ON p.id = e.packet_id"
+        " JOIN postings p2 ON p2.id = p.posting_id"
+        " JOIN companies c ON c.id = p2.company_id"
+        " WHERE e.title LIKE ? OR e.notes LIKE ?"
+        " ORDER BY e.event_date DESC, e.id DESC LIMIT ?",
+        (like, like, limit)).fetchall()
+
+
+def packets_for_company(conn, company_id: str) -> list[sqlite3.Row]:
+    """EVERY packet for a company — the application history incl.
+    rejected/withdrawn (per-company record for re-apply decisions)."""
+    return conn.execute(
+        "SELECT pk.*, p.title AS posting_title FROM packets pk"
+        " JOIN postings p ON p.id = pk.posting_id"
+        " WHERE p.company_id = ?"
+        " ORDER BY pk.created_at DESC", (company_id,)).fetchall()
+
+
 def list_app_events(conn, packet_id: str) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM application_events WHERE packet_id = ?"
