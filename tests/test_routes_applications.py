@@ -427,14 +427,18 @@ def test_sweep_batches_sidecar_once_per_role(monkeypatch):
         roles=["backend engineer", "quant developer"],
         locations=["Singapore"]))
     out = sites_mod.sweep_sites(None, profile)
-    # 2 roles → 2 batched scrapes (all three boards per batch)
-    assert len(calls) == 2
-    assert calls[0][0] == ("linkedin", "wellfound", "ycombinator")
+    # 2 keyword batches (one per role) + 1 keyword-less browse batch (YC)
+    assert len(calls) == 3
+    assert calls[0][0] == ("linkedin", "indeed", "wellfound")
     assert calls[0][1] == "backend engineer"
     assert calls[0][2] == "Singapore"
+    # the browse batch: no keywords, full role pages
+    assert calls[2][0] == ("ycombinator",)
+    assert calls[2][1] == ""
+    assert calls[2][3] == 100
     sources = {p.source for p in out}
     assert sources == {"site:linkedin.com", "site:ycombinator.com"}
-    assert len(out) == 4      # 2 roles x 2 boards, deduped by url
+    assert len(out) == 6      # 2 roles x 2 boards + 2 browse, deduped
 
 
 def test_sweep_skips_sidecar_when_not_built(monkeypatch):

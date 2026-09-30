@@ -81,7 +81,18 @@ def mcf_search(query: str, location: str, client: httpx.Client,
 # SITES (above) is the seam for plain-API sites; this is the seam for
 # Playwright sites. Both feed the same sweep.
 
-SIDECAR_SCRAPER_IDS = ("linkedin", "wellfound", "ycombinator")
+# keyword-search boards: scraped per role WITH keywords (their own search
+# does the narrowing)
+SIDECAR_KEYWORD_SITES = ("linkedin", "indeed", "wellfound")
+
+# browse boards: YC's guest mode has NO keyword search (login-walled) —
+# its role pages ARE the search surface. Scraped ONCE per sweep WITHOUT
+# keywords: the orchestrator's phrase-substring keyword filter would
+# otherwise gut the role pages (85 listings → 7 for 'software engineer')
+SIDECAR_BROWSE_SITES = ("ycombinator",)
+
+# every sidecar site
+SIDECAR_SCRAPER_IDS = SIDECAR_KEYWORD_SITES + SIDECAR_BROWSE_SITES
 
 # sidecar SeniorityLevel → jobscout rule-gate tokens. "mid" maps to None
 # (treated as unlabeled — it passes the gate to LLM scoring; the user's
@@ -186,16 +197,23 @@ def sweep_sites(client: httpx.Client, profile) -> list[RawPosting]:
                 except Exception:               # noqa: BLE001 — degrade
                     continue
 
-    # the sidecar batch (LinkedIn + Wellfound + YC) — only when built
+    # the sidecar batches — only when the sidecar is built
     from jobscout.clients.sidecar import SidecarClient
 
     if SIDECAR_SCRAPER_IDS and SidecarClient.available():
         primary = locations[0] if locations else ""
         try:
-            for role in roles[:2]:            # 2 browser batches per sweep
-                for p in sidecar_scrape(role, primary, SIDECAR_SCRAPER_IDS,
-                                        top_n=50):
+            # keyword boards: one batched scrape per role (all boards in
+            # parallel through the shared browser pool)
+            for role in roles[:2]:
+                for p in sidecar_scrape(role, primary,
+                                        SIDECAR_KEYWORD_SITES, top_n=50):
                     _add(p)
+            # browse boards: one keyword-less scrape of their full role
+            # pages (all guest-visible listings)
+            for p in sidecar_scrape("", primary, SIDECAR_BROWSE_SITES,
+                                    top_n=100):
+                _add(p)
         finally:
             _stop_sidecar()                    # never leave a browser running
     return out
