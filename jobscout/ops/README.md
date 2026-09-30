@@ -14,8 +14,13 @@ One pass, in order:
    LLM bulk scoring (`scoring/llm_bulk`) if a key is set.
 3. **Discovery sweep** (`sources/discovery.run_sweep`): signals + candidate
    companies (news, HN, github, funding, CSE, monitoring).
-4. **Monitoring**: page-hash + sitemap change detection → signals.
-5. Records the run in the `runs` table; idempotency: skips if the last
+4. **Job-site search** (`sources/postings.sites.sweep_sites`, behind
+   `settings.discovery.pipeline.job_sites`): MyCareersFuture's public API
+   (per role × location) + the sidecar boards — keyword batch (LinkedIn,
+   Indeed, Wellfound) per role, plus one keyword-less YC browse batch.
+   ~220 postings/sweep when the sidecar is built; HTTP-only otherwise.
+5. **Monitoring**: page-hash + sitemap change detection → signals.
+6. Records the run in the `runs` table; idempotency: skips if the last
    good run is < `skip_if_run_within_hours` old (unless `--force`).
 
 This is what "full hunt" on the Discovery page chains, followed by the

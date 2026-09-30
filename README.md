@@ -14,7 +14,10 @@ Each package directory carries its own `README.md` explaining how it works.
 watchlist (companies you care about, with ATS board tokens)
    │
    ▼
-sources/postings  ── polls ATS boards + crawls dark-pool careers pages ──▶ postings
+sources/postings  ── polls ATS boards + crawls dark-pool careers pages,
+                    searches job sites (MyCareersFuture public API +
+                    the JobPilot sidecar: LinkedIn, Indeed, YC, Wellfound)
+                                                          ──▶ postings
 sources/discovery ── signals + new-company discovery (news, HN, github,
                     funding, page changes, CSE searches)      ──▶ signals + candidates
    │
@@ -45,7 +48,7 @@ records signals, and writes research notes + the morning report.
 ```
 jobscout/                 the pipeline package (cli.py is the only root module)
   core/                   kernel: paths · config · schema · db · resume · watchlist
-  sources/postings/       ATS boards + dark-pool careers pages → postings
+  sources/postings/       ATS boards + dark-pool careers + job-site search → postings
   sources/discovery/      signal + company discovery (cse, github, hn, news, rss, monitoring)
   scoring/                gates: rules (deterministic) + llm_bulk (cheap tier)
   agent/                  judgment: brief · harness (tool loop) · tools
@@ -77,7 +80,7 @@ The package map in `jobscout/__init__.py` carries the same story inline.
 
 | Tier | What | Cost |
 |---|---|---|
-| 0 | deterministic collectors (ATS JSON APIs, crawls, RSS) | $0 |
+| 0 | deterministic collectors (ATS JSON APIs, crawls, RSS, job-site search — MCF's public API + the Playwright sidecar for the bot-walled boards) | $0 |
 | 1 | cheap LLM bulk scoring (cached by content hash) | pennies/day |
 | 2 | full agent morning discovery (behind the mode switch) | dimes/day, capped |
 | 3 | quality LLM packet tailoring (only postings you select) | ~$0.05–0.15 each |
@@ -86,7 +89,10 @@ The package map in `jobscout/__init__.py` carries the same story inline.
 
 Requirements: Python ≥ 3.11, Node ≥ 18 (desktop + JobPilot), Rust
 (`rustup`, for the Tauri shell), optionally `typst` for PDFs
-(`brew install typst`).
+(`brew install typst`). For the bot-walled job sites (LinkedIn, Indeed,
+YC, Wellfound) the JobPilot sidecar also needs the sibling repo built
+(see below) — without it the sweep degrades to the plain-API sites
+(MyCareersFuture).
 
 ```bash
 python3 -m venv .venv
@@ -97,7 +103,7 @@ python3 -m venv .venv
 .venv/bin/jobscout serve --port 8799       # dashboard at http://127.0.0.1:8799
 ```
 
-Tests: `.venv/bin/pytest tests/` (183 tests; fakes only — no network, no
+Tests: `.venv/bin/pytest tests/` (228 tests; fakes only — no network, no
 browser launches, no LLM calls).
 
 ## Build the desktop app (release)
@@ -150,5 +156,10 @@ jobscout doctor                    whole-stack health check
 | `JOBSCOUT_AGENT_FOCUS` | `profile` = agent spends its whole budget on profile-driven employer discovery |
 
 Sibling repo `../JobPilot` (Node/Playwright sidecar) is the "hands" — spawned as
-a subprocess, no rewrite. Optional: without it the automated apply path
-degrades to assisted (browser opened at the form).
+a subprocess, no rewrite. It powers two optional paths: the automated apply
+fillers (without it: assisted mode, browser opened at the form) and the
+bot-walled job-site scrapers — LinkedIn/Indeed/YC/Wellfound via Playwright
+(Indeed launches your real Chrome; YC is a plain fetch). Without it the daily
+sweep still runs: MyCareersFuture's public API + the ATS boards + the
+discovery sources. Build it once: `cd ../JobPilot/scraper && npm install &&
+npm run build-internal` (plus `npx playwright install chromium`).

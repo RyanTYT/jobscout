@@ -62,17 +62,17 @@ machines you'd add a Developer ID + notarization.
 
 ## Copying to another Mac + building from source there
 
-The complete source is the git-tracked tree — 188 files, ~2.3 MB:
+The complete source is the git-tracked tree — 249 files, ~2.5 MB:
 
 | area | files | what it is |
 |---|---|---|
-| `jobscout/` | 73 | the Python application (core, sources, scoring, packets, agent, webapp, defaults) |
+| `jobscout/` | 112 | the Python application (core, sources, scoring, packets, agent, clients, ops, webapp, defaults) |
 | `desktop/` | 68 | the Tauri shell (Rust, config, icons, freeze entry, build script) |
-| `tests/` | 9 | pytest suite |
+| `var/` | 30 | runtime outputs kept as sample/history (application packets; the DB is untracked) |
+| `tests/` | 21 | pytest suite (228 tests, fakes only) |
 | `config/` | 4 | settings.yaml, profile.yaml (hunting profile), watchlist.yaml, models.yaml |
 | `master_resume/` | 3 | the single source of truth |
-| `applications/` | 12 | generated packets |
-| `pyproject.toml`, `bootstrap.sh`, … | rest | packaging + docs |
+| `scripts/`, docs, packaging | rest | retro scripts, PLAN/README, pyproject, bootstrap |
 
 The one-command export (exactly those files, nothing generated):
 
@@ -81,8 +81,10 @@ git archive --format=tar.gz -o /tmp/jobscout-source.tar.gz HEAD
 ```
 
 Copy `jobscout-source.tar.gz` over (AirDrop/rsync/scp), plus — only if
-you want continuity — the untracked runtime state: `data/jobscout.db`
-(your postings/signals), and `.env` (LLM key; NEVER commit it).
+you want continuity — the untracked runtime state: `var/data/jobscout.db`
+(your postings/signals/packets), and `.env` (LLM + search keys; NEVER
+commit it). The sibling `../JobPilot` repo is separate — clone/copy it
+too if you want the bot-walled job sites + automated apply.
 
 On the other Mac (toolchain: [rustup], Node ≥ 18, Python ≥ 3.11):
 
@@ -103,9 +105,19 @@ Quickest alternative — skip all of the above: just AirDrop the built
 
 ## JobPilot (optional, not bundled yet)
 
-The automated apply path needs the JobPilot sidecar. In dev it resolves
-`../JobPilot/scraper/dist/index.js` automatically. To bundle it later:
-ship `scraper/dist/` (+ node + playwright browsers) as another resource
-and set `JOBSCOUT_SIDECAR_BIN` in backend.rs's frozen branch — the
-Python side already honors that env var. Until then the packaged app
-degrades gracefully: every apply URL opens assisted (tiled browser).
+The sidecar powers two paths — both degrade gracefully without it:
+
+1. **Automated apply** (JobPilot fillers, greenhouse/lever/ashby/linkedin):
+   without it every apply URL opens assisted (tiled browser).
+2. **Job-site scraping** (LinkedIn, Indeed, YC, Wellfound — the bot-walled
+   boards): without it the daily sweep runs HTTP-only (MyCareersFuture's
+   public API + the ATS boards + discovery sources). ~220 postings/sweep
+   with the sidecar, ~130 without.
+
+In dev it resolves `../JobPilot/scraper/dist/index.js` automatically
+(build once: `cd ../JobPilot/scraper && npm install && npm run
+build-internal`; Indeed also uses your real installed Chrome —
+Cloudflare's wall fingerprints bundled Chromium and challenges it).
+To bundle it later: ship `scraper/dist/` (+ node + playwright browsers)
+as another resource and set `JOBSCOUT_SIDECAR_BIN` in backend.rs's
+frozen branch — the Python side already honors that env var.

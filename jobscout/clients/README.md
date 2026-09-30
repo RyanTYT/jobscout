@@ -25,12 +25,19 @@ direct, ...). Key facts:
 `SidecarClient` spawns the Node sidecar (`../JobPilot/scraper/dist/index.js`)
 and speaks its line protocol (JSON per line, keyed by request id):
 
-- Actions: `ping`, `getAllScrapers/Fillers`, `scanForm`, `applyJobsByPayload`,
-  `cancelApplyJobs`, `killServer`.
+- Actions: `ping`, `getAllScrapers/Fillers`, `scrapeJobs`, `scanForm`,
+  `applyJobsByPayload`, `cancelApplyJobs`, `killServer`.
 - `apply_jobs_by_payload(jobs, profile, settings)` — enqueue a headed apply
   run; the response id keys all later events.
+- `scrape_sites(scraper_ids, keywords, location, top_n, timeout)` — scrape
+  job boards: one `scrapeJobs` request, then drains events until the
+  sidecar's `scrape:all-done` (EndMsg). Per-scraper `scrape:done` results
+  are **merged** (each board emits its own result — a replace would drop
+  every board but the last; pinned by test). Returns JobDetails dicts;
+  `sources/postings/sites.py` converts them to `RawPosting`s.
 - `drain_events(req_id)` — pops accumulated `apply:update` events
-  (`record.job.id` = the packet id) for the run tracker.
+  (`record.job.id` = the packet id) for the run tracker; also how
+  `scrape_sites` watches the scrape stream.
 - Binary resolution: `JOBSCOUT_BIN`/`JOBSCOUT_SIDECAR_BIN`/`JOBSCOUT_NODE_BIN`
   env overrides; absent → degraded gracefully by callers (assisted mode).
 
