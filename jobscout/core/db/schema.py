@@ -21,7 +21,7 @@ def db_path() -> Path:
     return core_paths.db_path()
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -281,6 +281,20 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE packets ADD COLUMN applied_at TEXT")
     if "decided_at" not in pcols:
         conn.execute("ALTER TABLE packets ADD COLUMN decided_at TEXT")
+
+    # v9: packets.dir → the portable form (relative to var/). Absolute
+    # rows from pre-v9 DBs rebase via the /var/applications/ marker —
+    # unknown-layout absolutes are left alone (read-time resolution in
+    # paths.resolve_packet_dir still handles them).
+    for pid, d in conn.execute(
+            "SELECT id, dir FROM packets WHERE dir IS NOT NULL"
+    ).fetchall():
+        if d and d.startswith("/"):
+            marker = "/var/applications/"
+            if marker in d:
+                rel = "applications/" + d.split(marker, 1)[1]
+                conn.execute("UPDATE packets SET dir = ? WHERE id = ?",
+                             (rel, pid))
 
 
 # ── P2: rule verdicts, scores, statuses ──────────────────────────────────────

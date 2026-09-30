@@ -117,7 +117,8 @@ def _sheet_values(conn, packet: dict) -> dict[str, str]:
     """Flat canonical_key → value map from the packet's fill sheet."""
     import yaml
 
-    fp = Path(packet["dir"] or "") / "fill_sheet.yaml"
+    fp = (core_paths.resolve_packet_dir(packet["dir"])
+          or Path()) / "fill_sheet.yaml"
     if not fp.is_file():
         return {}
     try:
@@ -133,7 +134,8 @@ def sheet_missing_count(packet: dict) -> int | None:
     """Required-but-missing fields for a packet; None = no fill sheet."""
     import yaml
 
-    fp = Path(packet["dir"] or "") / "fill_sheet.yaml"
+    fp = (core_paths.resolve_packet_dir(packet["dir"])
+          or Path()) / "fill_sheet.yaml"
     if not fp.is_file():
         return None
     try:
@@ -156,7 +158,8 @@ def _build_profile(conn, packets: list[dict]) -> dict:
     parts = full.split(maxsplit=1) if full else []
     resume_path = ""
     for p in packets:                      # first packet's tailored resume
-        rp = Path(p["row"]["dir"] or "") / "resume.md"
+        rp = (core_paths.resolve_packet_dir(p["row"]["dir"])
+              or Path()) / "resume.md"
         if rp.is_file():
             resume_path = str(rp)
             break

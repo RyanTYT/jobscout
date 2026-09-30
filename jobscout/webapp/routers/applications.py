@@ -9,6 +9,7 @@ from fastapi import Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from jobscout.core import db
+from jobscout.core import paths as core_paths
 from jobscout.webapp.common import (
     TEMPLATES,
 )
@@ -66,8 +67,9 @@ def register(app):
         manifests = []
         for pk in packets:
             manifest = {}
-            if pk["dir"]:
-                mp = Path(pk["dir"]) / "packet.yaml"
+            pd = core_paths.resolve_packet_dir(pk["dir"])
+            if pd:
+                mp = pd / "packet.yaml"
                 if mp.is_file():
                     try:
                         import yaml as _yaml
@@ -233,7 +235,8 @@ def register(app):
         import yaml as _yaml
 
         def _load(name):
-            fp = Path(pk["dir"] or "") / name
+            fp = (core_paths.resolve_packet_dir(pk["dir"])
+                  or Path()) / name
             if not fp.is_file():
                 return None
             try:
@@ -282,8 +285,9 @@ def register(app):
             k.lower().startswith("hx-") for k in request.headers)
         if is_htmx and row is not None:
             manifest = {}
-            if row["dir"]:
-                mp = Path(row["dir"]) / "packet.yaml"
+            pd = core_paths.resolve_packet_dir(row["dir"])
+            if pd:
+                mp = pd / "packet.yaml"
                 if mp.is_file():
                     try:
                         import yaml as _yaml

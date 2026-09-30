@@ -180,3 +180,101 @@ def test_render_typst_pdf_end_to_end(tmp_path, monkeypatch):
     # the template is copied beside the data (typst path resolution)
     assert (tmp_path / "resume.typ").is_file()
     assert (tmp_path / "packet-data.json").is_file()
+
+
+# ── portable packets.dir: relative store form + install-path resolution ────
+
+
+def test_packet_dir_rel_and_resolve_round_trip(tmp_path, monkeypatch):
+    from jobscout.core import paths as core_paths
+
+    var = tmp_path / "var"
+    (var / "applications" / "acme-2026-09-30").mkdir(parents=True)
+    monkeypatch.setattr(core_paths, "var_root", lambda: var)
+
+    out_dir = var / "applications" / "acme-2026-09-30"
+    rel = core_paths.packet_dir_rel(out_dir)
+    assert rel == "applications/acme-2026-09-30"
+
+    resolved = core_paths.resolve_packet_dir(rel)
+    assert resolved == out_dir
+    # None / empty → None
+    assert core_paths.resolve_packet_dir(None) is None
+    assert core_paths.resolve_packet_dir("") is None
+    # a dir OUTSIDE var/ stores absolute and resolves as-is
+    outside = core_paths.packet_dir_rel(tmp_path / "elsewhere" / "x")
+    assert outside.startswith("/")
+    assert core_paths.resolve_packet_dir(outside) == tmp_path / "elsewhere" / "x"
+
+
+def test_resolve_rebases_legacy_absolute_from_foreign_machine(tmp_path,
+                                                               monkeypatch):
+    """The DB copied from another machine: absolute rows carry that
+    machine's path — resolution lands under THIS install's var/."""
+    from jobscout.core import paths as core_paths
+
+    var = tmp_path / "var"
+    (var / "applications" / "acme-2026-09-30").mkdir(parents=True)
+    monkeypatch.setattr(core_paths, "var_root", lambda: var)
+
+    foreign = "/Users/somebodyelse/Personal Project/jobscout/var/applications/acme-2026-09-30"
+    resolved = core_paths.resolve_packet_dir(foreign)
+    assert resolved == var / "applications" / "acme-2026-09-30"
+
+
+def test_v9_migration_rewrites_absolute_rows(tmp_path, monkeypatch):
+    """init_db on a pre-v9 DB: absolute /var/applications/ rows are
+    rewritten to the portable relative form."""
+    from jobscout.core.db import schema as core_schema
+
+    db_file = tmp_path / "jobscout.db"
+    conn = sqlite3.connect(db_file)
+    conn.executescript(core_schema.SCHEMA)
+    conn.execute("PRAGMA user_version = 8")
+    conn.execute(
+        "INSERT INTO packets (id, posting_id, status, dir) VALUES "
+        "('p1', 1, 'drafting', "
+        "'/Users/old/Personal Project/jobscout/var/applications/acme-x')"
+    )
+    conn.execute(
+        "INSERT INTO packets (id, posting_id, status, dir) VALUES "
+        "('p2', 2, 'drafting', 'applications/already-rel')"
+    )
+    conn.commit()
+    conn.close()
+
+    # init_db re-runs migrate on the existing file
+    monkeypatch.setattr(core_schema, "db_path", lambda: db_file)
+    core_schema.init_db()
+
+    conn = sqlite3.connect(db_file)
+    rows = dict(conn.execute("SELECT id, dir FROM packets").fetchall())
+    conn.close()
+    assert rows["p1"] == "applications/acme-x"        # rebased
+    assert rows["p2"] == "applications/already-rel"   # untouched
+
+
+def test_orchestrator_stores_portable_dir(conn, tmp_path, monkeypatch):
+    """prepare() writes the portable store form into packets.dir —
+    relative to var/, resolvable from any install path."""
+    from jobscout.core import paths as core_paths
+    from jobscout.packets.orchestrator import prepare_packet
+
+    # var/ isolated into the test tmp; applications live under it
+    monkeypatch.setattr(core_paths, "var_root", lambda: tmp_path)
+    monkeypatch.setattr(core_paths, "applications_dir",
+                        lambda: tmp_path / "applications")
+
+    result = prepare_packet(conn, "p1", dry_run=True)
+
+    row = conn.execute(
+        "SELECT dir FROM packets WHERE id = ?",
+        (result["packet_id"],),
+    ).fetchone()
+    # the stored form is RELATIVE — portable across machines
+    assert not row["dir"].startswith("/")
+    assert row["dir"].startswith("applications/")
+    # and it resolves to the real files under THIS var root
+    pd = core_paths.resolve_packet_dir(row["dir"])
+    assert pd is not None and pd.is_dir()
+    assert (pd / "packet.yaml").is_file()

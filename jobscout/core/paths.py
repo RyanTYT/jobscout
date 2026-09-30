@@ -46,6 +46,40 @@ _RUNTIME_DIRS = ("data", "digest", "logs", "morning_reports",
                  "research", "applications")
 
 
+def packet_dir_rel(out_dir: Path | str) -> str:
+    """Portable STORE form for packets.dir: relative to var/.
+
+    Absolute paths baked into DB rows break the moment the install is
+    copied to another machine — the relative form resolves against
+    whatever var_root() says at read time (see resolve_packet_dir)."""
+    var = var_root().resolve()
+    try:
+        return str(Path(out_dir).resolve().relative_to(var))
+    except ValueError:
+        return str(out_dir)          # outside var/ — store as-is
+
+
+def resolve_packet_dir(dir_value: str | None) -> Path | None:
+    """READ form: resolve a packets.dir value against the CURRENT install.
+
+    - relative values (the portable form) land under var/
+    - absolute legacy values (pre-v9 rows, or a DB copied from another
+      machine) rebase onto the current var/ when they carry the
+      /var/applications/ marker — they resolve HERE, not where they
+      were created
+    - anything else: as-is (best effort); None for empty
+    """
+    if not dir_value:
+        return None
+    p = Path(dir_value)
+    if not p.is_absolute():
+        return var_root() / p
+    marker = "/var/applications/"
+    if marker in dir_value:
+        return var_root() / "applications" / dir_value.split(marker, 1)[1]
+    return p
+
+
 def var_root() -> Path:
     root = repo_root() / "var"
     _migrate_legacy_layout(root)

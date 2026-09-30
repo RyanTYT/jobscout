@@ -143,10 +143,12 @@ def prepare_packet(conn, posting_id: str, *, dry_run: bool = False,
         encoding="utf-8",
     )
 
-    # 7. DB state
+    # 7. DB state — dir stored PORTABLE (relative to var/), resolved
+    # against the install path at read time (paths.resolve_packet_dir)
     db.upsert_packet(conn, packet_id=packet_id, posting_id=posting_id,
-                     status=status, dir_path=str(out_dir), model=model,
-                     cost_usd=cost)
+                     status=status,
+                     dir_path=core_paths.packet_dir_rel(out_dir),
+                     model=model, cost_usd=cost)
     db.set_posting_status(conn, posting_id, f"packet:{status}")
     return {"packet_id": packet_id, "status": status, "reasons": reasons,
             "dir": str(out_dir), "cost": cost, "unsupported": unsupported,
@@ -154,7 +156,7 @@ def prepare_packet(conn, posting_id: str, *, dry_run: bool = False,
 
 
 def read_packet_files(dir_path: str) -> dict[str, str]:
-    d = Path(dir_path)
+    d = core_paths.resolve_packet_dir(dir_path) or Path(dir_path)
     out: dict[str, str] = {}
     for name in ("packet.yaml", "fill_sheet.yaml", "claim_check.yaml",
                  "tailor.yaml", "resume.md", "cover_letter.md"):
