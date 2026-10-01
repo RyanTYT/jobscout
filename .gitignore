@@ -1,6 +1,7 @@
 # --- secrets & state (NEVER commit) ---
 .env
 data/
+var/
 logs/
 *.sqlite3
 *.db
