@@ -1,0 +1,45 @@
+{# _log_viewer.html — real-time log viewer for pipeline/agent runs.
+    Collapsible panel with fixed-height scrollable log display and a
+    bottom-right stats overlay showing agent calls and spend in real time.
+    Used inside _run_status.html when a run is active. #}
+
+<div id="log-viewer" class="log-viewer mt-3" data-run-active="{{ 'true' if running else 'false' }}">
+  <div class="card">
+    <div class="card-header d-flex align-items-center gap-2 py-2">
+      <button class="btn btn-link btn-sm p-0 text-decoration-none d-flex align-items-center gap-2"
+              type="button" onclick="toggleLogViewer()" aria-expanded="false"
+              id="log-viewer-toggle">
+        <svg class="icon log-chevron" width="12" height="12" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6 4l4 4-4 4"/>
+        </svg>
+        <span class="fw-semibold">Logs</span>
+        <span class="badge bg-secondary" id="log-count-badge">0</span>
+      </button>
+      <div class="flex-grow-1"></div>
+      <span class="text-secondary small" id="log-status-text">connecting…</span>
+    </div>
+    <div class="card-body p-0 d-none" id="log-viewer-body">
+      <div class="log-entries" id="log-entries"></div>
+      <div class="log-stats-overlay">
+        <span class="log-stat">
+          <svg class="icon" width="10" height="10" viewBox="0 0 16 16"
+               fill="none" stroke="currentColor" stroke-width="1.5"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 8.5 3 3h10l1 5.5M2 8.5V13h12V8.5M2 8.5h3.5L6 10h4l.5-1.5H14"/>
+          </svg>
+          Calls: <span id="log-agent-calls">0</span>
+        </span>
+        <span class="log-stat">
+          <svg class="icon" width="10" height="10" viewBox="0 0 16 16"
+               fill="none" stroke="currentColor" stroke-width="1.5"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="6"/><path d="M8 5v6M6.5 6.5h3"/>
+          </svg>
+          Spend: $<span id="log-agent-spend">0.00</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
