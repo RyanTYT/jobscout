@@ -1,0 +1,17 @@
+{# _report_not_found.html — report content for #report-content when a report is missing #}
+{% import "components/macros.html" as m %}
+
+<div class="text-center py-5">
+  {{ m.icon("alert-triangle", 24) }}
+  <h3 class="mt-3 h6">Report not found</h3>
+  <p class="text-secondary small">No {{ kind }} report for <code>{{ date }}</code> exists on disk.</p>
+  {% if error %}
+  <div class="alert alert-warning mt-2">
+    <small>{{ error }}</small>
+  </div>
+  {% endif %}
+  <button class="btn btn-outline-primary btn-sm mt-2"
+          hx-get="/discovery/reports" hx-target="#report-tabs" hx-swap="outerHTML">
+    {{ m.icon("arrow-left", 12) }} Back to report list
+  </button>
+</div>

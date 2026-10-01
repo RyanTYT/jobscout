@@ -1,0 +1,103 @@
+{# _report_tabs.html — split-panel report browser.
+   Left sidebar: tree hierarchy (Daily / Morning headings → dates indented below).
+   Right panel: report viewer loaded by HTMX. #}
+{% import "components/macros.html" as m %}
+
+<div id="report-tabs">
+  <div class="card" id="report-tabs-card">
+    <div class="card-header d-flex justify-content-between align-items-center gap-2">
+      <h2 class="card-title mb-0 h6">Run Reports</h2>
+      <button class="btn btn-outline-secondary btn-sm"
+              hx-get="/discovery/reports" hx-target="#report-tabs" hx-swap="outerHTML"
+              title="Refresh report list">
+        {{ m.icon("refresh", 12) }}
+      </button>
+    </div>
+
+    <div class="card-body p-2" style="height: 70vh; overflow: hidden;">
+      <div class="d-flex gap-4" style="height: 100%; align-items: flex-start;">
+        {# ── Left sidebar: tree hierarchy ── #}
+        <div style="min-width: 160px; max-width: 240px; flex-shrink: 0; overflow-y: auto; height: 100%;">
+          {# Daily heading ── #}
+          <div class="small fw-semibold text-uppercase text-secondary mb-2"
+               style="letter-spacing: var(--tracking-caps); font-size: var(--fs-2xs);">
+            {{ m.icon("database", 10) }} Daily
+            <span class="badge text-bg-light text-dark ms-1" style="font-size: var(--fs-2xs);">{{ daily_reports|length }}</span>
+          </div>
+          {% if daily_reports %}
+          <div class="list-group list-group-flush mb-4" style="padding-left: 1rem;">
+            {% for r in daily_reports %}
+            <a class="list-group-item list-group-item-action small px-2 py-1 border-0 report-link"
+               hx-get="/discovery/reports/daily/{{ r.date }}"
+               hx-target="#report-content"
+               hx-swap="innerHTML"
+               style="cursor:pointer;">
+              <strong class="font-monospace" style="font-size: var(--fs-xs);">{{ r.date }}</strong>
+            </a>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="small text-secondary px-2 mb-4" style="padding-left: 1rem;">No daily digests yet.</div>
+          {% endif %}
+
+          {# Morning heading ── #}
+          <div class="small fw-semibold text-uppercase text-secondary mb-2"
+               style="letter-spacing: var(--tracking-caps); font-size: var(--fs-2xs);">
+            {{ m.icon("magic", 10) }} Morning
+            <span class="badge text-bg-light text-dark ms-1" style="font-size: var(--fs-2xs);">{{ morning_reports|length }}</span>
+          </div>
+          {% if morning_reports %}
+          <div class="list-group list-group-flush" style="padding-left: 1rem;">
+            {% for r in morning_reports %}
+            <a class="list-group-item list-group-item-action small d-flex justify-content-between align-items-center px-2 py-1 border-0 report-link
+                       {% if r.has_unpromoted %}list-group-item-warning{% endif %}"
+               hx-get="/discovery/reports/morning/{{ r.date }}"
+               hx-target="#report-content"
+               hx-swap="innerHTML"
+               style="cursor:pointer;">
+              <span class="font-monospace" style="font-size: var(--fs-xs);"><strong>{{ r.date }}</strong></span>
+              {% if r.has_unpromoted %}
+              <span class="badge text-bg-warning text-dark" style="font-size: var(--fs-2xs);">{{ m.icon("flag", 8) }}</span>
+              {% endif %}
+            </a>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="small text-secondary px-2" style="padding-left: 1rem;">No morning briefs yet.</div>
+          {% endif %}
+        </div>
+
+        {# ── Right panel: report viewer ── #}
+        <div id="report-content" class="flex-grow-1" style="min-width: 0; height: 100%; overflow-y: auto; border-left: 1px solid var(--bs-border-color); padding-left: 1rem;">
+          <div class="text-center text-secondary py-5">
+            {{ m.icon("mouse", 24) }}
+            <div class="small mt-2">Select a report to view</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .report-link.active-report {
+    background: var(--accent-soft) !important;
+    color: var(--accent-text) !important;
+    border-radius: var(--r-sm);
+  }
+  .report-link.active-report strong {
+    color: var(--accent-text) !important;
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    function highlight(el) {
+      document.querySelectorAll('.report-link').forEach(function(l) { l.classList.remove('active-report'); });
+      if (el) el.classList.add('active-report');
+    }
+    document.querySelectorAll('.report-link').forEach(function(link) {
+      link.addEventListener('htmx:beforeRequest', function() { highlight(this); });
+    });
+  });
+</script>

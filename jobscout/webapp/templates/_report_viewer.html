@@ -1,0 +1,108 @@
+{# _report_viewer.html — report content for the right panel (#report-content).
+   Loaded via HTMX into the split-panel layout. #}
+{% import "components/macros.html" as m %}
+
+{% set report_kind = report.kind %}
+{% set report_date = report.date %}
+
+{# ── Back button at top ── #}
+<div class="mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <button class="btn btn-outline-primary btn-sm"
+          hx-get="/discovery/reports" hx-target="#report-tabs" hx-swap="outerHTML">
+    {{ m.icon("arrow-left", 12) }} Back to list
+  </button>
+  <span class="badge text-bg-{{ 'primary' if report_kind == 'daily' else 'success' }}">
+    {{ 'Scrape Run' if report_kind == 'daily' else 'Agent Run' }}
+  </span>
+</div>
+
+{% set companies = report.companies_added if report_kind == "morning" else report.candidates %}
+{% if companies %}
+{# ── Promotion table for companies discovered (agent or daily sweep) ── #}
+<div class="border rounded p-3 bg-light mb-4">
+  <h3 class="h6 mb-2">{{ m.icon("spark", 12) }} {% if report_kind == "morning" %}Companies discovered by agent{% else %}Companies found during scrape{% endif %}</h3>
+  <form hx-post="/discovery/reports/{{ report_kind }}/{{ report_date }}/promote"
+        hx-target="#promote-result"
+        hx-swap="innerHTML"
+        class="mb-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 40px;">
+              <input type="checkbox" id="select-all-companies"
+                     onclick="document.querySelectorAll('input[name=company]').forEach(function(c) { c.checked = document.getElementById('select-all-companies').checked; })">
+            </th>
+            <th>Company</th>
+            <th>Domain</th>
+            <th>Suggested Tier</th>
+            <th style="width: 160px;">Promote To</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in companies %}
+          <tr>
+            <td>
+              <input type="checkbox" name="company" value="{{ c.name | slugify }}"
+                     class="form-check-input">
+            </td>
+            <td class="fw-medium">{{ c.name }}</td>
+            <td class="text-secondary small">{{ c.domain or '—' }}</td>
+            <td>
+              {% if c.suggested_tier %}
+              <span class="badge text-bg-info">{{ m.icon("magic", 8) }} {{ c.suggested_tier }}</span>
+              {% else %}
+              <span class="text-secondary">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <select name="tier_{{ c.name | slugify }}" class="form-select form-select-sm">
+                <option value="">— select —</option>
+                <option value="A" {% if c.suggested_tier == 'A' %}selected{% endif %}>A (top priority)</option>
+                <option value="B" {% if c.suggested_tier == 'B' %}selected{% endif %}>B (strong match)</option>
+                <option value="C" {% if c.suggested_tier == 'C' %}selected{% endif %}>C (watch)</option>
+              </select>
+            </td>
+            <td class="text-secondary small">{{ c.note or 'discovered during run' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="d-flex gap-2 flex-wrap align-items-center mt-3">
+      <button type="submit" class="btn btn-primary btn-sm">
+        {{ m.icon("arrow-up", 12) }} Promote Selected
+      </button>
+      <span id="promote-result" class="align-self-center"></span>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% if report_kind == "morning" and report.signals_added %}
+<div class="mb-4">
+  <h3 class="h6 mb-2">{{ m.icon("radar", 12) }} Signals recorded</h3>
+  <ul class="list-group list-group-flush">
+    {% for s in report.signals_added %}
+    <li class="list-group-item small">{{ s.company_name }}: {{ s.note }} <span class="badge text-bg-light border ms-2">{{ s.kind }}</span></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if report_kind == "morning" and report.db_changes %}
+<div class="mb-4">
+  <h3 class="h6 mb-2">{{ m.icon("database", 12) }} DB changes</h3>
+  <ul class="list-group list-group-flush">
+    {% for d in report.db_changes %}
+    <li class="list-group-item small text-success">{{ d }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="scroll-y" style="max-height: 50vh; border-top: 1px solid var(--bs-border-color); padding-top: 1rem;">
+  <h3 class="h6 mb-2">{{ m.icon("align-left", 12) }} Full report</h3>
+  <pre class="mb-0 small" style="white-space: pre-wrap;">{{ report.raw }}</pre>
+</div>
