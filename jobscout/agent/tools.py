@@ -29,7 +29,21 @@ SYSTEM_PROMPT = (
     "You act ONLY through the provided tools. Be decisive and frugal with steps: "
     "each search and fetch costs budget. When you finish, produce a concise "
     "final summary. Never invent domains or facts — if a tool errors, say so "
-    "in your summary."
+    "in your summary.\n\n"
+    "Every company you add MUST carry a suggested_tier (A, B, C, or candidate), "
+    "reasoned against the candidate profile in the brief — its target roles, "
+    "stack, domains, seniorities, and locations. The rubric:\n"
+    "  A        does exactly the target work and is a firm worth working at.\n"
+    "  B        strong overlap, or clearly adjacent market — keep it.\n"
+    "  C        thin overlap: right industry but wrong role, or right role but "
+    "unproven fit.\n"
+    "  candidate the evidence is too weak to judge, or the profile simply does "
+    "not apply to this company. Using it is honest, not lazy — but do not use "
+    "it as a default for every find.\n"
+    "Judge the company against the profile, not against how exciting it sounds. "
+    "A well-known firm doing unrelated work is a C, not an A. State the reason "
+    "for the tier in the `note`, and summarise your tier reasoning in the final "
+    "report so the owner can see why."
 )
 
 _ALLOWED_TABLES = {"companies", "postings", "signals", "packets", "runs", "llm_cache", "llm_calls", "state"}
@@ -87,16 +101,39 @@ TOOLS_SPEC = [
         "type": "function",
         "function": {
             "name": "add_company",
-            "description": "Add a discovered company to the watchlist (tier 'candidate', ATS boards probed automatically). Requires a real domain.",
+            "description": (
+                "Add a discovered company to the watchlist (always enters as "
+                "'candidate', ATS boards probed automatically). Requires a real "
+                "domain. ALSO REQUIRED: suggested_tier — your recommendation "
+                "of which watchlist tier this company belongs in, judged "
+                "against the candidate profile in the brief. The owner decides, "
+                "but your reasoning pre-selects the dropdown for them."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "name": {"type": "string"},
                     "domain": {"type": "string", "description": "e.g. acme.com — must come from evidence, never invented"},
                     "note": {"type": "string", "description": "One-line reason + source"},
+                    "suggested_tier": {
+                        "type": "string",
+                        "enum": ["A", "B", "C", "candidate"],
+                        "description": (
+                            "Your recommended tier against the profile: "
+                            "A = does exactly the target work (roles × stack × "
+                            "domains) and is a firm worth working at — prioritise "
+                            "these; B = strong overlap or clearly adjacent "
+                            "market, worth keeping on the list; C = weak or "
+                            "single-dimension overlap (right industry, wrong "
+                            "role — or right role, unproven fit); candidate = "
+                            "too thin to judge from the evidence you have, or "
+                            "the profile does not apply. Be honest: "
+                            "'candidate' is a legitimate answer."
+                        ),
+                    },
                     "contact_email": {"type": "string", "description": "careers/contact inbox found on their careers page (a mailto: or jobs@/careers@/hiring@ address) — the interest-email route when no board exists"},
                 },
-                "required": ["name", "domain", "note"],
+                "required": ["name", "domain", "note", "suggested_tier"],
             },
         },
     },
@@ -350,20 +387,37 @@ def _db_query(sql: str, ctx: AgentCtx) -> str:
     return f"{len(rows)} rows (showing up to 40)\n" + "\n".join(lines)
 
 
-def _add_company(name: str, domain: str, note: str, ctx: AgentCtx) -> str:
+SUGGESTED_TIERS = ("A", "B", "C", "candidate")
+
+
+def _add_company(name: str, domain: str, note: str, ctx: AgentCtx,
+                 suggested_tier: str | None = None,
+                 contact_email: str | None = None) -> str:
     from jobscout.sources.discovery import add_candidate
 
     domain = (domain or "").lower().strip().removeprefix("https://").removeprefix("http://")
     domain = domain.split("/")[0].removeprefix("www.").rstrip(".")
     if "." not in domain:
         return f"rejected: {domain!r} is not a domain — never invent one"
+
+    # a missing or nonsense suggestion is dropped, never guessed on its behalf —
+    # but tell the agent, so the next call carries one
+    want = (suggested_tier or "").strip()
+    if want and want not in SUGGESTED_TIERS:
+        return (f"rejected: suggested_tier must be one of "
+                f"{'/'.join(SUGGESTED_TIERS)} — got {want!r}")
+    if not want:
+        want = None
+
     added, tokens = add_candidate(
         ctx.conn, ctx.wl, name, domain, "agent-morning",
-        note or "discovered by agent", ctx.client,
+        note or "discovered by agent", ctx.client, suggested_tier=want,
     )
     if added:
         toks = ", ".join(f"{p}:{t}" for p, t in tokens.items()) or "none (dark-pool entry)"
-        return f"added {name} ({domain}) to watchlist candidates; ATS boards: {toks}"
+        advice = (f"; suggested tier {want}" if want
+                  else "; NO suggested tier given — the report will show none")
+        return f"added {name} ({domain}) to watchlist candidates{advice}; ATS boards: {toks}"
     return f"{name} ({domain}) already on the watchlist — not added"
 
 

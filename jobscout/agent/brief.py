@@ -54,17 +54,33 @@ Steps:
        hiring.
    Do not repeat what's already known.
 3. For each promising company found: add_company with a REAL domain (never
-   invent) and a one-line reason citing your source.
+   invent), a one-line reason citing your source, AND a suggested_tier.
 4. Record observations on known companies with add_signal (one-line, sourced).
 5. Pick the 1-3 most promising dark-pool leads (companies with hiring
    signals but no postings). Fetch their careers pages / news, then
    write_note a short research note (with sources and dates).
-6. End with a final summary: what you added, what you'd promote, what you
-   discarded and why.
+6. End with a final summary: what you added (with the tier you suggested and
+   why), what you'd promote, what you discarded and why.
+
+Tier suggestions — judge each company against the target above:
+  A         the company's actual business matches the target roles AND stack
+            (and is a firm worth working at). This is the strongest signal
+            you can give the owner.
+  B         strong overlap, or clearly adjacent market the candidate would
+            want kept on the list.
+  C         thin overlap — right industry but wrong role, or right role but
+            the fit is unproven.
+  candidate the evidence is too thin to judge, or the profile does not apply
+            to this company at all.
+Weigh the whole profile, not one keyword: a famous firm doing unrelated work
+is a C, not an A. Use `candidate` when you genuinely cannot tell — but do not
+default to it.
 
 Rules:
-- Every add needs a one-line rationale. No invented domains or facts.
+- Every add needs a one-line rationale AND a suggested_tier. No invented
+  domains or facts.
 - Promotion to tiers A/B/C stays with the owner — propose, don't promote.
+  Your suggested_tier pre-selects their dropdown; it does not move anything.
 - Frugal with steps: caps are {agent_cfg.max_steps} steps and
   ${agent_cfg.max_cost_usd:.2f} for this run.
 - If web_search reports no provider configured, rely on fetch() with known

@@ -21,7 +21,7 @@ def db_path() -> Path:
     return core_paths.db_path()
 
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -29,6 +29,11 @@ CREATE TABLE IF NOT EXISTS companies (
     name        TEXT NOT NULL,
     domain      TEXT,
     tier        TEXT CHECK (tier IN ('A','B','C','candidate','dark')),
+    suggested_tier TEXT CHECK (suggested_tier IS NULL OR
+                               suggested_tier IN ('A','B','C','candidate')),
+                             -- the agent's recommendation, NOT the tier.
+                             -- separate so an unpromoted find keeps its advice;
+                             -- promotion writes `tier`.
     ats_tokens  TEXT,                      -- JSON: {greenhouse: token, lever: token, ...}
     career_url  TEXT,
     contact_email TEXT,                   -- careers/contact inbox (crawl or agent)
@@ -296,6 +301,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE packets ADD COLUMN applied_at TEXT")
     if "decided_at" not in pcols:
         conn.execute("ALTER TABLE packets ADD COLUMN decided_at TEXT")
+
+    # v11: the agent's tier recommendation, kept apart from the tier itself so
+    # an unpromoted candidate still shows what the agent thought of it.
+    if "suggested_tier" not in ccols:
+        conn.execute(
+            "ALTER TABLE companies ADD COLUMN suggested_tier TEXT")
 
     # v9: packets.dir → the portable form (relative to var/). Absolute
     # rows from pre-v9 DBs rebase via the /var/applications/ marker —

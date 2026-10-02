@@ -96,6 +96,91 @@ def test_add_company_rejects_fake_domain(conn, wl):
     assert "rejected" in result
 
 
+# ── suggested_tier: the agent's recommendation, recorded separately ───────────
+
+
+def _add(ctx, **kw):
+    args = {"name": "Newco", "domain": "newco.com", "note": "hiring rust devs",
+            "suggested_tier": "B"}
+    args.update(kw)
+    return agent_tools.execute("add_company", args, ctx)
+
+
+def _ctx(conn, wl):
+    return agent_tools.AgentCtx(conn=conn, wl=wl, profile=PROFILE,
+                               settings=SETTINGS, env={}, client=None)
+
+
+def test_add_company_records_the_suggested_tier(conn, wl):
+    result = _add(_ctx(conn, wl), suggested_tier="A")
+    assert "suggested tier A" in result
+
+    row = conn.execute(
+        "SELECT tier, suggested_tier FROM companies WHERE id = 'newco'").fetchone()
+    # the suggestion is advice only — the company still enters as a candidate
+    assert row["tier"] == "candidate"
+    assert row["suggested_tier"] == "A"
+
+
+def test_suggested_tier_does_not_promote(conn, wl):
+    _add(_ctx(conn, wl), suggested_tier="A")
+    from jobscout.core import watchlist as wlmod
+
+    assert wlmod.find(wl, "Newco")[0] == "candidates", (
+        "suggesting A must not move the company into tier A")
+
+
+@pytest.mark.parametrize("tier", ["A", "B", "C", "candidate"])
+def test_every_valid_suggested_tier_is_accepted(conn, wl, tier):
+    assert "rejected" not in _add(_ctx(conn, wl), suggested_tier=tier)
+    row = conn.execute(
+        "SELECT suggested_tier FROM companies WHERE id = 'newco'").fetchone()
+    assert row["suggested_tier"] == tier
+
+
+def test_invalid_suggested_tier_is_refused(conn, wl):
+    result = _add(_ctx(conn, wl), suggested_tier="S")
+    assert "rejected" in result
+    assert "suggested_tier must be one of" in result
+    # nothing was written
+    assert conn.execute(
+        "SELECT COUNT(*) n FROM companies WHERE id = 'newco'").fetchone()["n"] == 0
+
+
+def test_missing_suggested_tier_is_not_guessed(conn, wl):
+    """No advice in, no advice stored — but the agent is told it was missing."""
+    result = _add(_ctx(conn, wl), suggested_tier=None)
+    assert "added" in result
+    assert "NO suggested tier given" in result
+    row = conn.execute(
+        "SELECT suggested_tier FROM companies WHERE id = 'newco'").fetchone()
+    assert row["suggested_tier"] is None
+
+
+def test_tool_spec_requires_and_documents_the_tier():
+    spec = next(t for t in agent_tools.TOOLS_SPEC
+                if t["function"]["name"] == "add_company")
+    params = spec["function"]["parameters"]
+    assert "suggested_tier" in params["required"]
+    prop = params["properties"]["suggested_tier"]
+    assert prop["enum"] == ["A", "B", "C", "candidate"]
+    assert "A =" in prop["description"] and "candidate" in prop["description"]
+    assert "suggested_tier" in spec["function"]["description"]
+
+
+def test_prompts_all_teach_the_tier_rubric():
+    from jobscout.agent.brief import build_brief
+
+    for text in (agent_tools.SYSTEM_PROMPT,
+                 build_brief(None, PROFILE, SETTINGS)):
+        for tier in ("A", "B", "C", "candidate"):
+            assert tier in text, f"{tier} missing from the prompt"
+        assert "suggested_tier" in text
+        assert "profile" in text.lower()
+    # the brief must put the profile in front of the agent
+    assert "market-data" in build_brief(None, PROFILE, SETTINGS)
+
+
 def test_run_morning_full_loop(conn, wl, tmp_path, monkeypatch):
     from jobscout.core import paths as core_paths
 

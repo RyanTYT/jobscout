@@ -415,6 +415,30 @@ def rule_pass_for_rescore(conn: sqlite3.Connection, limit: int = 10_000) -> list
     ).fetchall()
 
 
+def update_company_tier(conn: sqlite3.Connection, company_id: str,
+                        tier: str) -> None:
+    """Move a company between watchlist tiers (A/B/C/candidate/dark)."""
+    conn.execute(
+        "UPDATE companies SET tier = ?, updated_at = ? WHERE id = ?",
+        (tier, _utcnow(), company_id),
+    )
+    conn.commit()
+
+
+def set_suggested_tier(conn: sqlite3.Connection, company_id: str,
+                       suggested_tier: str | None) -> None:
+    """Record (or clear) the agent's tier recommendation.
+
+    Deliberately does NOT touch `tier`: a suggestion is advice the owner
+    accepts or ignores from the report browser.
+    """
+    conn.execute(
+        "UPDATE companies SET suggested_tier = ?, updated_at = ? WHERE id = ?",
+        (suggested_tier, _utcnow(), company_id),
+    )
+    conn.commit()
+
+
 def count_unscored_at_hash(conn: sqlite3.Connection) -> int:
     """Eligible rule-pass postings with no live cache entry — the work left.
 
