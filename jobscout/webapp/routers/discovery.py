@@ -17,6 +17,25 @@ from jobscout.webapp.common import (
 from jobscout.webapp.runners import agent_runner
 
 
+def _sidecar_available() -> bool:
+    """True when the JobPilot sidecar is built and usable."""
+    try:
+        from jobscout.clients.sidecar import SidecarClient
+
+        return SidecarClient.available()
+    except Exception:                             # noqa: BLE001 — never break the page
+        return False
+
+
+def _sidecar_path() -> str:
+    try:
+        from jobscout.clients.sidecar import SidecarClient
+
+        return str(SidecarClient._default_path())
+    except Exception:                             # noqa: BLE001
+        return ""
+
+
 def register(app):
     @app.get("/discovery", response_class=HTMLResponse)
     def discovery_page(request: Request, ran: str = Query(""),
@@ -90,6 +109,11 @@ def register(app):
                 "profile_hash": scoring_summary["hash"],
                 "score_state": scoring_summary["state"],
                 "batch_size": settings.discovery.pipeline.llm_batch_size,
+                # the sidecar is what fills the bot-walled boards; without it
+                # LinkedIn / Indeed / Wellfound / YC silently return nothing,
+                # which looks like "no new jobs" rather than a broken source.
+                "sidecar_ok": _sidecar_available(),
+                "sidecar_path": _sidecar_path(),
                 "running": agent_runner.running(),
                 "run_out": agent_runner.state()["out"],
                 "run_error": agent_runner.state()["error"],

@@ -52,10 +52,21 @@ class SidecarClient:
         self._log_tail: list[str] = []
 
     @staticmethod
-    def _default_path() -> Path:
+    def _env() -> dict:
+        """os.environ overlaid with the app's .env — the convention every other
+        env reader in this codebase follows (llm.py, key_store, email_tracker,
+        ops/run.py). Reading os.environ alone meant a JOBSCOUT_SIDECAR_BIN set
+        in .env was silently ignored, which is how the packaged app ended up
+        looking for the sidecar in its own Application Support dir."""
         import os
 
-        env_bin = os.environ.get("JOBSCOUT_SIDECAR_BIN")
+        from jobscout.core.config import load_env
+
+        return {**os.environ, **load_env()}
+
+    @staticmethod
+    def _default_path() -> Path:
+        env_bin = SidecarClient._env().get("JOBSCOUT_SIDECAR_BIN")
         if env_bin:
             return Path(env_bin).expanduser()
         repo = core_paths.repo_root()
@@ -64,10 +75,9 @@ class SidecarClient:
     @staticmethod
     def available(sidecar_path: str | None = None) -> bool:
         """True when the sidecar binary is built and Node is present."""
-        import os
-
+        env = SidecarClient._env()
         path = Path(sidecar_path) if sidecar_path else SidecarClient._default_path()
-        node = os.environ.get("JOBSCOUT_NODE_BIN") or shutil.which("node")
+        node = env.get("JOBSCOUT_NODE_BIN") or shutil.which("node")
         return path.is_file() and node is not None
 
     # ── lifecycle ────────────────────────────────────────────────────────────

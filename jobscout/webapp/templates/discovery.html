@@ -20,6 +20,22 @@
      together (polls every 3s while a run is in flight) ────────────────── #}
 {% include "_run_status.html" %}
 
+{# ── sidecar warning: the bot-walled boards go quiet without it. This is
+     otherwise invisible — the sweep just reports no new postings from those
+     sources, which reads like "nothing new today" rather than "broken". ── #}
+{% if not sidecar_ok %}
+<div class="alert alert-warning small" role="alert">
+  <strong>JobPilot sidecar unavailable</strong> — LinkedIn, Indeed, Wellfound and
+  YC will return nothing until it is built.
+  <span class="d-block text-secondary mt-1">
+    looked for <code class="text-break">{{ sidecar_path }}</code>.
+    Build it in the JobPilot checkout, or point
+    <code>JOBSCOUT_SIDECAR_BIN</code> at the built
+    <code>scraper/dist/index.js</code> in <code>.env</code>.
+  </span>
+</div>
+{% endif %}
+
 <p class="text-secondary small mb-0">
   runs as a subprocess, bounded by the caps below — the button stays busy while
   it runs; there is no wall-clock limit, only the spend caps and row limits

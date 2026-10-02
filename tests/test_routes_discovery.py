@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 
 def test_discovery_page_shows_hunting_profile(client):
     r = client.get("/discovery")
@@ -273,3 +275,59 @@ def test_report_browser_partial_carries_both_tabs(client):
     assert r.status_code == 200
     assert "Run Reports" in r.text
     assert "Daily" in r.text and "Morning" in r.text
+
+
+# ── sidecar warning ──────────────────────────────────────────────────────────
+# Without the JobPilot sidecar the bot-walled boards return nothing, and the
+# sweep just looks quiet. The Discovery page has to say so.
+
+def test_discovery_warns_when_the_sidecar_is_missing(client, monkeypatch):
+    from jobscout.clients.sidecar import SidecarClient
+
+    monkeypatch.setattr(SidecarClient, "available", staticmethod(lambda: False))
+    monkeypatch.setattr(
+        SidecarClient, "_default_path",
+        staticmethod(lambda: Path("/nowhere/JobPilot/scraper/dist/index.js")))
+    r = client.get("/discovery")
+    assert r.status_code == 200
+    assert "sidecar unavailable" in r.text
+    for board in ("LinkedIn", "Indeed", "Wellfound", "YC"):
+        assert board in r.text
+    assert "/nowhere/JobPilot/scraper/dist/index.js" in r.text
+    assert "JOBSCOUT_SIDECAR_BIN" in r.text
+
+
+def test_discovery_quiet_when_the_sidecar_is_present(client, monkeypatch):
+    from jobscout.clients.sidecar import SidecarClient
+
+    monkeypatch.setattr(SidecarClient, "available", staticmethod(lambda: True))
+    r = client.get("/discovery")
+    assert r.status_code == 200
+    assert "sidecar unavailable" not in r.text
+
+
+def test_doctor_reports_the_real_sidecar_path(monkeypatch):
+    """doctor must ask the client, not guess <repo>/../JobPilot — the packaged
+    app relocates repo_root() via JOBSCOUT_HOME, so the guess was wrong."""
+    from jobscout.clients.sidecar import SidecarClient
+    from jobscout.ops import doctor as doctor_mod
+
+    monkeypatch.setattr(SidecarClient, "available", staticmethod(lambda: True))
+    monkeypatch.setattr(
+        SidecarClient, "_default_path",
+        staticmethod(lambda: Path("/elsewhere/JobPilot/scraper/dist/index.js")))
+    checks = {c.name: c for c in doctor_mod.run_checks()}
+    sc = checks["sidecar:jobpilot"]
+    assert sc.status == "ok"
+    assert "/elsewhere/JobPilot/scraper/dist/index.js" in sc.detail
+
+
+def test_doctor_warns_actionably_when_the_sidecar_is_missing(monkeypatch):
+    from jobscout.clients.sidecar import SidecarClient
+    from jobscout.ops import doctor as doctor_mod
+
+    monkeypatch.setattr(SidecarClient, "available", staticmethod(lambda: False))
+    checks = {c.name: c for c in doctor_mod.run_checks()}
+    sc = checks["sidecar:jobpilot"]
+    assert sc.status == "warn"
+    assert "LinkedIn" in sc.detail and "JOBSCOUT_SIDECAR_BIN" in sc.detail

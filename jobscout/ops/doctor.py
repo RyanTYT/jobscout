@@ -137,9 +137,22 @@ def run_checks() -> list[Check]:
         finally:
             conn.close()
 
-    # sidecar (P7) — informational only
-    sidecar = (root / "../JobPilot").resolve()
-    checks.append(Check("sidecar:jobpilot", "ok" if sidecar.is_dir() else "warn",
-                        f"{sidecar} {'present' if sidecar.is_dir() else 'not found (P7)'}"))
+    # sidecar (P7) — ask the client where it would actually look, rather than
+    # assuming <repo>/../JobPilot. The packaged app relocates repo_root() via
+    # JOBSCOUT_HOME, so the sibling guess was wrong there and this check
+    # reported "not found" even when a JOBSCOUT_SIDECAR_BIN was configured.
+    from jobscout.clients.sidecar import SidecarClient
+
+    sidecar_bin = SidecarClient._default_path()
+    if SidecarClient.available():
+        detail = f"{sidecar_bin} present"
+        status = "ok"
+    else:
+        status = "warn"
+        detail = (
+            f"{sidecar_bin} not built/usable — LinkedIn, Indeed, Wellfound and "
+            "YC return nothing. Build JobPilot, or set JOBSCOUT_SIDECAR_BIN in .env"
+        )
+    checks.append(Check("sidecar:jobpilot", status, detail))
 
     return checks
