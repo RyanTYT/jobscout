@@ -423,6 +423,13 @@ def test_sweep_batches_sidecar_once_per_role(monkeypatch):
     monkeypatch.setattr(
         sites_mod, "SITES",
         {})  # HTTP sites off — isolate the sidecar path
+    # sweep_sites gates on SidecarClient.available(), which resolves
+    # ../JobPilot/scraper/dist/index.js relative to the repo root. Without this
+    # the test silently passes only when that sibling checkout happens to be
+    # built, and fails on a fresh clone, in CI, or from any other directory.
+    from jobscout.clients.sidecar import SidecarClient
+
+    monkeypatch.setattr(SidecarClient, "available", staticmethod(lambda: True))
     profile = ProfileCfg(target=TargetCfg(
         roles=["backend engineer", "quant developer"],
         locations=["Singapore"]))
