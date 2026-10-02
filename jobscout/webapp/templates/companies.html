@@ -67,8 +67,14 @@
           </thead>
           <tbody>
             {% for r in rows %}
-            <tr {% if r.career_url or r.domain %}data-row-link="{{ r.career_url or ('https://' + r.domain) }}"{% endif %}
-                title="{{ 'open ' + (r.career_url or ('https://' + r.domain)) }}">
+            {# a company can have neither a careers page nor a domain (an
+               agent find with nothing resolved yet) — 133 of 238 rows did,
+               and concatenating 'https://' + None took the whole page down.
+               Both row-link attributes live inside the one guard. #}
+            <tr {% if r.career_url or r.domain %}
+                data-row-link="{{ r.career_url or ('https://' + r.domain) }}"
+                title="{{ 'open ' + (r.career_url or ('https://' + r.domain)) }}"
+                {% endif %}>
               <td class="fw-medium">
                 {{ r.name }}
                 {% if found_via.get(r.id) %}

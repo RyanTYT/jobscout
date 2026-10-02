@@ -83,3 +83,26 @@ def test_companies_page_renders_route_column(client):
     assert "apply route" in r.text and "email route" in r.text
     # acme has rule-pass postings in the seed → an apply badge
     assert "text-bg-success" in r.text
+
+
+def test_companies_survive_a_row_with_no_domain_and_no_careers_url(client, conn):
+    """An agent find with nothing resolved yet must not take the page down.
+
+    `'https://' + None` raised TypeError inside the row loop, so ONE such row
+    500'd the whole list (133 of 238 real rows).
+    """
+    conn.execute(
+        "INSERT INTO companies (id, name, domain, career_url, tier) "
+        "VALUES ('nodomain', 'No Domain Co', NULL, NULL, 'candidate')")
+    conn.commit()
+    r = client.get("/companies")
+    assert r.status_code == 200
+    assert "No Domain Co" in r.text
+    # no row-link attributes were invented for it
+    assert "https://None" not in r.text
+
+
+def test_companies_row_link_still_present_when_resolvable(client):
+    r = client.get("/companies")
+    assert r.status_code == 200
+    assert 'data-row-link="https://acme.com"' in r.text
