@@ -2,8 +2,9 @@
 <div id="results" data-skeleton-rows="{{ [pg.page_size, 10] | min }}">
 
   {# where "back to inbox" should return to: this exact page, with these
-     filters. Computed here so every row link can carry it — see _row.html. #}
-  {% set back_qs = pg.qs_page(pg.page) %}
+     filters. clamped_page, not page — a request for page 999 renders the last
+     page, so the backlink should name that page, not the impossible one. #}
+  {% set back_qs = pg.qs_page(pg.clamped_page) %}
 
   <div class="card">
     <div class="table-responsive">
