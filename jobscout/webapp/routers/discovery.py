@@ -216,3 +216,14 @@ def register(app):
         except targeting_store.TargetingError as e:
             return RedirectResponse(
                 f"/discovery?error={_q(str(e))}", status_code=303)
+
+    @app.post("/discovery/rescore")
+    def rescore_now():
+        """Rescore postings — batched LLM scoring only, no sweep and no agent.
+
+        scope="auto" inside score_unscored: a full pass when the profile hash
+        has moved since the last completed pass, otherwise only never-scored
+        postings. Resumable — an interrupted pass continues where it stopped.
+        """
+        agent_runner.launch("rescore")
+        return RedirectResponse("/discovery?started=1", status_code=303)

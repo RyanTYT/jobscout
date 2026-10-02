@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -63,6 +65,28 @@ def load_profile() -> ProfileCfg:
 def load_watchlist() -> Watchlist:
     return _load(_paths.config_dir() / "watchlist.yaml", Watchlist,
                  "watchlist.yaml")
+
+
+# ── the profile content hash ──────────────────────────────────────────────────
+# The LLM score cache is keyed on this, so it must change if and only if the
+# profile the scorer reads has changed. Canonicalisation: lists are sorted and
+# mappings key-sorted, so a reordered-but-identical profile hashes the same and
+# a no-op save does not throw away every cached score.
+
+_HASH_FIELDS = ("roles", "seniorities", "locations", "primary_locations",
+                "domains", "stack")
+
+
+def profile_hash(profile: ProfileCfg) -> str:
+    """sha256 over the canonicalised scoring-relevant profile. Order-stable."""
+    t = profile.target
+    canon: dict[str, Any] = {f: sorted(getattr(t, f)) for f in _HASH_FIELDS}
+    canon["weighting"] = {k: t.weighting[k] for k in sorted(t.weighting)}
+    canon["remote"] = {"allowed": t.remote.allowed,
+                       "preference": t.remote.preference}
+    canon["dealbreakers"] = sorted(profile.dealbreakers)
+    blob = json.dumps(canon, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
 def load_env() -> dict[str, str]:

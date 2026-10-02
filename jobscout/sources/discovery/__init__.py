@@ -29,10 +29,14 @@ def add_candidate(
     found_via: str,
     note: str = "",
     client: httpx.Client | None = None,
+    suggested_tier: str | None = None,
 ) -> tuple[bool, dict]:
     """Add a discovered company to watchlist `candidates` (live-probed).
 
-    Returns (added, ats_tokens). Existing companies are left untouched.
+    `suggested_tier` is the discoverer's recommendation (the agent's read of
+    the hunting profile), recorded separately from the tier so the owner's
+    promotion decision stays theirs. Returns (added, ats_tokens). Existing
+    companies are left untouched.
     """
     from jobscout.sources.postings.probe import probe_company
 
@@ -58,10 +62,12 @@ def add_candidate(
         found_via=found_via,
     )
     wlmod.add(wl, entry, "candidate")
-    db.upsert_company(
+    slug = db.upsert_company(
         conn, name=name, domain=domain, tier="candidate",
         ats_tokens=tokens or None, notes=entry.note,
     )
+    if suggested_tier:
+        db.set_suggested_tier(conn, slug, suggested_tier)
     return True, tokens
 
 

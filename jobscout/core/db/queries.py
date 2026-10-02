@@ -393,6 +393,45 @@ def unscored_rule_pass(conn: sqlite3.Connection, limit: int = 200) -> list[sqlit
     ).fetchall()
 
 
+_RULE_PASS_ORDER = (
+    "ORDER BY CASE c.tier WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 ELSE 3 END, "
+    "p.first_seen"
+)
+
+
+def rule_pass_for_rescore(conn: sqlite3.Connection, limit: int = 10_000) -> list[sqlite3.Row]:
+    """Every still-eligible rule-pass posting, scored or not — tier A first.
+
+    The full-rescore worklist. Rows already carrying a cache entry for the
+    current profile cost nothing: score_posting returns them from llm_cache,
+    so an interrupted pass resumes rather than restarting.
+    """
+    return conn.execute(
+        _POSTING_SELECT
+        + " WHERE p.status IN ('new', 'interested') AND p.rule_pass = 1 "
+        + _RULE_PASS_ORDER
+        + " LIMIT ?",
+        (limit,),
+    ).fetchall()
+
+
+def count_unscored_at_hash(conn: sqlite3.Connection) -> int:
+    """Eligible rule-pass postings with no live cache entry — the work left.
+
+    A posting counts as done when its stored llm_cache_key resolves in
+    llm_cache; that key already encodes the profile hash, so this is exactly
+    "not yet scored against the current profile". NULL keys never resolve,
+    which is the correct answer for a never-scored posting.
+    """
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM postings p "
+        "WHERE p.status IN ('new', 'interested') AND p.rule_pass = 1 "
+        "AND NOT EXISTS (SELECT 1 FROM llm_cache lc "
+        "                WHERE lc.cache_key = p.llm_cache_key)"
+    ).fetchone()
+    return int(row["n"])
+
+
 # ── outreach drafts (cold email / linkedin reachout) ──────────────────────
 
 
@@ -602,6 +641,40 @@ def set_state(conn: sqlite3.Connection, key: str, value: str) -> None:
         "INSERT INTO state (key, value, updated_at) VALUES (?, ?, datetime('now')) "
         "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
         (key, value),
+    )
+    conn.commit()
+
+
+# ── scoring progress (v10) ────────────────────────────────────────────────────
+
+
+def get_scoring_state(conn: sqlite3.Connection) -> dict:
+    """The single scoring_state row, as a plain dict (zeros if never written)."""
+    row = conn.execute("SELECT * FROM scoring_state WHERE id = 1").fetchone()
+    if row is None:
+        return {"scored_profile_hash": None, "pending_profile_hash": None,
+                "pending_remaining": 0, "pending_limit": None,
+                "full_passes": 0, "last_run_id": None}
+    return dict(row)
+
+
+def set_scoring_state(conn: sqlite3.Connection, **fields) -> None:
+    """Upsert the singleton scoring_state row. Only the named columns change."""
+    allowed = ("scored_profile_hash", "pending_profile_hash",
+               "pending_remaining", "pending_limit", "full_passes",
+               "last_run_id")
+    bad = set(fields) - set(allowed)
+    if bad:
+        raise ValueError(f"unknown scoring_state columns: {sorted(bad)}")
+    if not fields:
+        return
+    cols = ", ".join(fields)
+    placeholders = ", ".join("?" for _ in fields)
+    updates = ", ".join(f"{c} = excluded.{c}" for c in fields)
+    conn.execute(
+        f"INSERT INTO scoring_state (id, {cols}) VALUES (1, {placeholders}) "
+        f"ON CONFLICT(id) DO UPDATE SET {updates}, updated_at = datetime('now')",
+        tuple(fields.values()),
     )
     conn.commit()
 

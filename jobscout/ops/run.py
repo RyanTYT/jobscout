@@ -202,22 +202,13 @@ def run_daily(force: bool = False) -> int:
     # ── tier-1 bulk scoring (P2): cheap LLM on rule-pass, cap-respecting ─────
     scored_stats: dict | None = None
     try:
-        from jobscout.clients.llm import LlmClient
-        from jobscout.scoring import llm_bulk
+        from jobscout.scoring import score_run
 
-        llm = LlmClient(conn=conn)
-        if llm.available:
-            wanted = {r["id"] for r in filtered}
-            join_rows = [
-                r for r in db.unscored_rule_pass(conn, limit=10_000) if r["id"] in wanted
-            ]
-            if join_rows:
-                scored_stats = llm_bulk.score_postings(conn, join_rows, profile, llm)
-        else:
-            print(
-                "LLM scoring skipped (no API key) — rule-only digest "
-                "(set JOBSCOUT_LLM_API_KEY in .env)"
-            )
+        scored_stats = score_run.score_unscored(
+            conn, limit=10_000, scope="incremental",
+            ids={r["id"] for r in filtered},
+            profile=profile, record_run=False,
+        )
     except Exception as e:  # noqa: BLE001 — scoring must never break the digest
         print(f"LLM scoring failed: {e} — digest is rule-only")
 

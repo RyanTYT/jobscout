@@ -21,7 +21,7 @@ def db_path() -> Path:
     return core_paths.db_path()
 
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -107,6 +107,21 @@ CREATE TABLE IF NOT EXISTS state (
     key         TEXT PRIMARY KEY,            -- e.g. 'hn_last_story'
     value       TEXT NOT NULL,
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- v10: how far bulk scoring has got, per profile. Dedicated columns (not the
+-- state kv) so a full pass can record real progress: if a pass is cut short by
+-- the limit or the spend cap, the next run resumes from scored_profile_hash
+-- instead of restarting the whole profile.
+CREATE TABLE IF NOT EXISTS scoring_state (
+    id                    INTEGER PRIMARY KEY CHECK (id = 1),
+    scored_profile_hash   TEXT,             -- profile hash of the last pass to reach 'done'
+    pending_profile_hash  TEXT,             -- profile hash of an in-flight full pass
+    pending_remaining     INTEGER NOT NULL DEFAULT 0,  -- rows still unscored at pending_profile_hash
+    pending_limit         INTEGER,          -- the limit that pass is working under
+    full_passes           INTEGER NOT NULL DEFAULT 0,
+    last_run_id           INTEGER,
+    updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS llm_calls (

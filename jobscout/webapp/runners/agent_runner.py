@@ -27,7 +27,6 @@ from jobscout.core import db
 _state: dict = {"running": False, "out": "", "error": "", "focus": "",
                 "proc": None, "cancel": False}
 
-RUN_TIMEOUT_S = 900
 OUT_LIMIT = 8000
 
 
@@ -58,11 +57,14 @@ def _cli() -> str:
     return str(Path(sys.executable).parent / "jobscout")
 
 
+FOCUSES = ("", "profile", "rescore")
+
+
 def launch(focus: str = ""):
-    """Start a hunt in a background thread; returns immediately."""
+    """Start a run in a background thread; returns immediately."""
     if _state["running"]:
         return
-    focus = "profile" if focus == "profile" else ""
+    focus = focus if focus in FOCUSES else ""
     _state.update(running=True, out="", error="", focus=focus, cancel=False)
     threading.Thread(target=_run, args=(focus,), daemon=True).start()
 
@@ -78,7 +80,11 @@ def cancel():
 
 
 def _commands(cli: str, focus: str) -> list[list[str]]:
-    if focus:
+    if focus == "rescore":
+        # scoring only — no sweep, no agent. No --all: score_unscored's
+        # profile-hash gate picks full-vs-incremental on its own.
+        return [[cli, "score", "--limit", "10000"]]
+    if focus == "profile":
         return [[cli, "agent"]]
     return [[cli, "run", "--daily"], [cli, "agent"]]
 
@@ -96,16 +102,7 @@ def _run(focus: str) -> None:
                 text=True, env=env,
             )
             _state["proc"] = proc
-            try:
-                o, e = proc.communicate(timeout=RUN_TIMEOUT_S)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                o, e = proc.communicate()
-                _state["error"] = f"run timed out after {RUN_TIMEOUT_S}s"
-                _state["out"] = _strip_ansi(
-                    (out or "") + (err or "") + (o or "") + (e or "")
-                )[-OUT_LIMIT:]
-                return
+            o, e = proc.communicate()
             out += (o or "")
             err += (e or "")
             returncode = returncode or proc.returncode

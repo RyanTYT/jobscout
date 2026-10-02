@@ -14,12 +14,18 @@
         {% if running %}
         <button class="btn btn-primary btn-sm" type="button" disabled>
           <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-          {% if focus == "profile" %}profile hunt running…{% else %}full hunt running…{% endif %}
+          {% if focus == "profile" %}profile hunt running…{% else %}
+            {% if focus == "rescore" %}rescoring…{% else %}full hunt running…{% endif %}
+          {% endif %}
         </button>
         <span class="small text-secondary">
           {% if focus == "profile" %}
           profile-driven employer discovery only — the whole budget is on
           companies matching your hunting profile
+          {% elif focus == "rescore" %}
+          bulk LLM scoring only, {{ batch_size }} postings per call — a full
+          pass if your profile hash changed, otherwise just the postings this
+          profile has never been scored against. Resumable if interrupted.
           {% else %}
           the deterministic sweep + agent (profile-driven AND signal-driven
           searches) are running
@@ -47,6 +53,13 @@
           <button class="btn btn-outline-primary btn-sm" type="submit"
                   title="Profile-only hunt: the agent spends its whole budget searching for companies that match YOUR hunting profile (roles × stack × domains × locations, Singapore first) — no signal resolution, no funding chases. Needs CSE search keys.">
             {{ m.icon("search", 12) }} profile hunt only
+          </button>
+        </form>
+        <form method="post" action="/discovery/rescore" data-busy-submit
+              style="display: contents">
+          <button class="btn btn-outline-secondary btn-sm" type="submit"
+                  title="Rescore postings: batched LLM scoring ({{ batch_size }} postings per call), no crawling and no agent. Runs a full pass when your hunting-profile hash has changed, otherwise just the postings that have never been scored. Cached per posting, so an interrupted pass resumes where it stopped. Capped by the bulk spend cap in models.yaml.">
+            {{ m.icon("refresh", 12) }} rescore postings
           </button>
         </form>
         {% if run_out %}
@@ -88,6 +101,8 @@
         <span class="spinner-grow spinner-grow-sm" role="status"></span>
         {% if focus == "profile" %}
         hunting employers that match your profile —
+        {% elif focus == "rescore" %}
+        scoring postings in batches —
         {% else %}
         collecting + judging —
         {% endif %}

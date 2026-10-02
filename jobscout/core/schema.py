@@ -211,6 +211,10 @@ class PipelineCfg(BaseModel):
     rss: bool = True
     job_sites: bool = True        # keyword search on public job-site APIs
     rss_feeds: list[str] = Field(default_factory=list)  # empty -> rss.DEFAULT_FEEDS
+    # bulk scoring: postings per LLM call, and the per-posting description
+    # budget inside a batch prompt (a single-posting prompt may use more).
+    llm_batch_size: int = 20
+    llm_batch_desc_chars: int = 1200
 
 
 class DiscoveryCfg(BaseModel):

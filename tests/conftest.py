@@ -61,6 +61,15 @@ VALUES ('pk_w1', 'p_int_1', 'packet:ready', '{pkt_dir}');
 """)
 
 
+@pytest.fixture()
+def conn(db_file):
+    """A raw sqlite3 connection to the seeded test DB."""
+    c = sqlite3.connect(db_file)
+    c.row_factory = sqlite3.Row
+    yield c
+    c.close()
+
+
 def make_db_file(tmp_path: Path) -> Path:
     path = tmp_path / "test.db"
     conn = sqlite3.connect(path)

@@ -375,33 +375,34 @@ def serve(
 
 
 @app.command()
-def score(limit: int = typer.Option(500, "--limit", help="Max postings to score this invocation")) -> None:
-    """Bulk-score rule-pass postings (tier A first, cap-respecting, cached)."""
-    from jobscout.clients.llm import LlmClient
-    from jobscout.core.config import load_profile as _lp
-    from jobscout.scoring import llm_bulk
+def score(
+    limit: int = typer.Option(500, "--limit", help="Max postings to score this invocation"),
+    all_: bool = typer.Option(
+        False, "--all", help="Force a full pass over every eligible posting "
+                             "(otherwise only what this profile has not been scored against)"),
+) -> None:
+    """Bulk-score rule-pass postings (tier A first, batched, cap-respecting, cached)."""
+    from jobscout.scoring import score_run
 
-    profile = _lp()
-    llm = LlmClient()
-    if not llm.available:
-        console.print("[red]no API key — set JOBSCOUT_LLM_API_KEY in .env[/]")
-        raise typer.Exit(1)
     db.init_db()
     conn = db.connect()
     try:
-        rows = db.unscored_rule_pass(conn, limit=limit)
-        if not rows:
-            console.print("[green]nothing to score[/] — all eligible postings have final scores")
-            raise typer.Exit(0)
-        console.print(f"scoring {len(rows)} postings (tier {rows[0]['tier'] or '?'} first) …")
-        stats = llm_bulk.score_postings(conn, rows, profile, llm)
+        stats = score_run.score_unscored(
+            conn, limit=limit, scope="full" if all_ else "auto", verbose=False)
     finally:
         conn.close()
+
+    if stats.get("skipped"):
+        console.print(f"[green]nothing to score[/] — {stats['skipped']}")
+        raise typer.Exit(0)
     console.print(
-        f"[green]✓[/] scored {stats['scored']} ({stats['errors']} errors"
+        f"[green]✓[/] scored {stats['scored']} of {stats['batches']} batches "
+        f"({stats['cached']} already cached, {stats['fallback']} via fallback, "
+        f"{stats['errors']} errors"
         + (", [yellow]CAP HIT[/]" if stats["capped"] else "")
-        + ") · tokens metered in llm_calls (see `jobscout stats`)"
+        + f") · ${stats['cost']:.4f} · profile {stats['profile_hash'][:12]}"
     )
+    console.print("tokens metered in llm_calls (see `jobscout stats`)")
 
 
 @app.command()
