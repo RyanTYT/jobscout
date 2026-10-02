@@ -72,6 +72,10 @@
         {% endif %}
         <div class="flex-grow-1"></div>
         <div class="d-flex flex-wrap gap-3 mb-0">
+          {% if running and focus == "rescore" and score_state is defined %}
+          {{ m.stat("unscored left", score_state["pending_remaining"] | string,
+                     hint="live — recomputed every batch; a full pass only completes when this reaches 0, so a non-zero value here means there is more to do") }}
+          {% endif %}
           {{ m.stat("agent calls (30d)", agent_spend["calls"] | string) }}
           {{ m.stat("agent tokens", "{:,}".format(agent_spend["tokens"])) }}
           {{ m.stat("agent spend", "$%.4f" | format(agent_spend["cost"]),

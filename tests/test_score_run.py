@@ -211,7 +211,96 @@ def test_no_llm_is_a_clean_skip(conn):
     assert st.get("skipped") == "no api key"
 
 
+# ── a capped pass must be legible ─────────────────────────────────────────────
+
+
+def test_capped_pass_records_why_it_stopped(conn):
+    """`capped: True` alone is indistinguishable from a pass with nothing to
+    do — which is how a cap-stopped pass read as 'the scorer skipped it'."""
+    st = score_run.score_unscored(conn, profile=_profile(),
+                                  llm=FakeLlm(capped=True), verbose=False)
+    assert st["capped"] is True
+    assert "daily cap" in st["cap_reason"]
+
+
+def test_capped_reason_reaches_the_cli_summary(conn, capsys):
+    score_run.score_unscored(conn, profile=_profile(), llm=FakeLlm(capped=True),
+                             verbose=True)
+    assert "stopped:" in capsys.readouterr().out
+
+
+def test_uncapped_pass_has_no_reason(conn):
+    st = score_run.score_unscored(conn, profile=_profile(), llm=FakeLlm(),
+                                  verbose=False)
+    assert st["capped"] is False
+    assert st["cap_reason"] is None
+
+
+# ── progress ──────────────────────────────────────────────────────────────────
+
+
+def test_pending_remaining_tracks_progress_during_a_full_pass(conn, monkeypatch):
+    """It used to be written once at pass start (as the full worklist size) and
+    again at the end, so a panel polling mid-pass showed no movement."""
+    from jobscout.scoring import llm_bulk
+
+    seen: list[int] = []
+    real = llm_bulk.score_postings_batch
+
+    def wrapper(*a, on_progress=None, **kw):
+        def spy(stats, done, total):
+            if on_progress is not None:
+                on_progress(stats, done, total)
+            seen.append(core_db.get_scoring_state(conn)["pending_remaining"])
+        return real(*a, on_progress=spy, **kw)
+
+    monkeypatch.setattr(llm_bulk, "score_postings_batch", wrapper)
+    score_run.score_unscored(conn, profile=_profile(), llm=FakeLlm(),
+                             limit=100, verbose=False)
+
+    assert seen, "the progress callback never fired"
+    assert any(v < 6 for v in seen), (
+        f"pending_remaining never dipped below the worklist size: {seen}")
+    assert seen[-1] == 0
+
+
+def test_progress_callback_reports_position(conn):
+    """llm_bulk's on_progress fires before each batch and once at the end."""
+    from jobscout.scoring import llm_bulk
+
+    rows = [conn.execute(core_db._POSTING_SELECT +
+                         "WHERE p.id=?", (f"p{i}",)).fetchone() for i in range(6)]
+    snaps: list[tuple[int, int]] = []
+    llm_bulk.score_postings_batch(
+        conn, rows, _profile(), FakeLlm(), batch_size=2,
+        on_progress=lambda s, done, total: snaps.append((done, total)))
+    assert snaps[0] == (0, 6)
+    assert snaps[-1] == (6, 6), "the final snapshot must report the pass complete"
+    assert [d for d, _ in snaps] == [0, 2, 4, 6]
+
+
+def test_progress_is_not_sent_when_no_callback(conn):
+    from jobscout.scoring import llm_bulk
+
+    rows = [conn.execute(core_db._POSTING_SELECT +
+                         "WHERE p.id=?", (f"p{i}",)).fetchone() for i in range(2)]
+    st = llm_bulk.score_postings_batch(conn, rows, _profile(), FakeLlm(),
+                                       batch_size=2)
+    assert st["scored"] == 2
+
+
 def test_bad_scope_rejected(conn):
     with pytest.raises(ValueError):
         score_run.score_unscored(conn, profile=_profile(), llm=FakeLlm(),
                                  scope="nope")
+
+
+def test_rescore_button_uses_an_effectively_unbounded_limit():
+    """The button's --limit only bounds the worklist fetch; it must not be
+    tuned to today's backlog."""
+    from jobscout.webapp.runners import agent_runner
+
+    cmd = agent_runner._commands("/bin/jobscout", "rescore")[0]
+    limit = int(cmd[cmd.index("--limit") + 1])
+    assert limit >= 100_000, f"rescore limit {limit} is a real ceiling"
+

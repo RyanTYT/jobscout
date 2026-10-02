@@ -14,11 +14,16 @@ Caps: stops on tier 'bulk' daily cap, degrades to rule-only.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 
 from jobscout.clients.llm import CapExceeded, LlmClient, LlmError
 from jobscout.core import db
 from jobscout.core.config import profile_hash
 from jobscout.core.schema import ProfileCfg
+
+# (stats snapshot, rows finished, rows in this pass) — fired before each batch
+# and once at the end so a multi-hour pass can report position.
+ProgressCb = Callable[[dict, int, int], None]
 
 TIER_SCORES = {"A": 90, "B": 70, "C": 50, "candidate": 30}
 
@@ -316,6 +321,7 @@ def _write_score(conn, row, parsed: dict, key: str) -> None:
 def score_postings_batch(
     conn, rows, profile: ProfileCfg, llm: LlmClient,
     batch_size: int | None = None,
+    on_progress: ProgressCb | None = None,
 ) -> dict:
     """Score rows in batches — one LLM call per `batch_size` postings.
 
@@ -326,17 +332,23 @@ def score_postings_batch(
     A batch reply that is unusable, or that does not cover every posting in
     the chunk, falls back to the per-posting path for the rows it missed.
 
+    `on_progress(stats, done, total)` fires before each batch and once at the
+    end, so a caller can report position instead of looking stalled.
+
     Returns {"scored", "cached", "batches", "requests", "fallback", "cost",
-             "capped", "errors"}.
+             "capped", "cap_reason", "errors"}.
     """
     n = batch_size or BATCH_SIZE
     stats = {"scored": 0, "cached": 0, "batches": 0, "requests": 0,
-             "fallback": 0, "cost": 0.0, "capped": False, "errors": 0}
+             "fallback": 0, "cost": 0.0, "capped": False,
+             "cap_reason": None, "errors": 0}
     rows = list(rows)
     if not rows:
         return stats
 
+    total = len(rows)
     for start in range(0, len(rows), n):
+        _emit(on_progress, stats, start, total)
         chunk = rows[start:start + n]
         keys = {r["id"]: cache_key(profile, r) for r in chunk}
         pending = []
@@ -362,8 +374,11 @@ def score_postings_batch(
             ])
             stats["requests"] += 1
             stats["cost"] = round(stats["cost"] + resp.cost_usd, 6)
-        except CapExceeded:
+        except CapExceeded as e:
+            # Record *why* it stopped. A capped pass and a pass with nothing
+            # to do are otherwise indistinguishable in the stats.
             stats["capped"] = True
+            stats["cap_reason"] = str(e)
             break
         except LlmError:
             stats["errors"] += 1
@@ -394,7 +409,14 @@ def score_postings_batch(
             if stats["capped"] or stats["errors"] >= 5:
                 break
 
+    _emit(on_progress, stats, total, total)
     return stats
+
+
+def _emit(cb: ProgressCb | None, stats: dict, done: int, total: int) -> None:
+    """Hand a progress snapshot to the caller, if it wants one."""
+    if cb is not None:
+        cb(stats, done, total)
 
 
 def _fallback(conn, stats: dict, pending: list, profile: ProfileCfg,
@@ -408,8 +430,9 @@ def _fallback(conn, stats: dict, pending: list, profile: ProfileCfg,
         stats["fallback"] += 1
         try:
             parsed = score_posting(row, profile, llm, conn)
-        except CapExceeded:
+        except CapExceeded as e:
             stats["capped"] = True
+            stats["cap_reason"] = str(e)
             return
         except LlmError:
             stats["errors"] += 1

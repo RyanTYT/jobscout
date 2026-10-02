@@ -95,8 +95,22 @@ def score_unscored(
         )
 
     say(f"scoring {len(rows)} postings in batches of {batch_size} …")
+
+    def progress(st: dict, done: int, total: int) -> None:
+        # Printed unconditionally rather than through `say`. A pass that runs
+        # for hours and says nothing is indistinguishable from one that has
+        # stalled — that ambiguity is exactly why a cap-stopped pass read as
+        # "the scorer skipped it".
+        print(f"  [{done}/{total}] scored {st['scored']} · cached {st['cached']} "
+              f"· batches {st['batches']} · errors {st['errors']}"
+              + ("  [CAP HIT]" if st["capped"] else ""), flush=True)
+        if full:
+            # live work-left, not the once-written len(rows) taken at pass
+            # start: this is what the Discovery panel reads while running
+            db.set_scoring_state(conn, pending_remaining=max(0, total - done))
+
     stats = llm_bulk.score_postings_batch(
-        conn, rows, profile, llm, batch_size=batch_size)
+        conn, rows, profile, llm, batch_size=batch_size, on_progress=progress)
 
     say(
         f"scored {stats['scored']} · cached {stats['cached']} · "
@@ -105,6 +119,8 @@ def score_unscored(
         f"${stats['cost']:.4f}"
         + ("  [CAP HIT]" if stats["capped"] else "")
     )
+    if stats.get("cap_reason"):
+        say(f"  stopped: {stats['cap_reason']}")
 
     _mark_done(conn, phash, full, record_run, run_id, stats=stats,
                attempted=len(rows))
@@ -160,8 +176,8 @@ def _mark_done(conn, phash: str, full: bool, record_run: bool,
 
 def _result(scope: str, phash: str, skipped: str | None = None) -> dict:
     out = {"scored": 0, "cached": 0, "batches": 0, "requests": 0,
-           "fallback": 0, "cost": 0.0, "capped": False, "errors": 0,
-           "scope": scope, "profile_hash": phash}
+           "fallback": 0, "cost": 0.0, "capped": False, "cap_reason": None,
+           "errors": 0, "scope": scope, "profile_hash": phash}
     if skipped:
         out["skipped"] = skipped
     return out

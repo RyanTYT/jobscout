@@ -161,6 +161,9 @@ def register(app):
                 "FROM llm_calls WHERE tier = 'agent' "
                 "AND date(created_at) >= date('now', '-30 days')"
             ).fetchone()
+            # this partial re-renders every 3s while a run is in flight, so it
+            # is the only place live scoring progress can surface
+            score_state = db.get_scoring_state(conn)
         finally:
             conn.close()
         st = agent_runner.state()
@@ -169,7 +172,7 @@ def register(app):
             request, "_run_status.html",
             {"running": st["running"], "run_out": st["out"],
              "run_error": st["error"], "focus": st["focus"],
-             "agent_spend": agent_spend,
+             "agent_spend": agent_spend, "score_state": score_state,
              "batch_size": load_settings().discovery.pipeline.llm_batch_size},
         )
 

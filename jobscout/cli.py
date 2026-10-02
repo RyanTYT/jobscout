@@ -402,6 +402,13 @@ def score(
         + (", [yellow]CAP HIT[/]" if stats["capped"] else "")
         + f") · ${stats['cost']:.4f} · profile {stats['profile_hash'][:12]}"
     )
+    if stats.get("capped"):
+        console.print(f"[yellow]bulk cap reached[/] — "
+                      f"{stats.get('cap_reason') or 'tier spend cap'}")
+        console.print(
+            "raise `tiers.bulk.max_daily_usd` in config/models.yaml, or run "
+            "`jobscout score --limit N` in slices until it reports nothing to "
+            "score — scoring is cached per posting, so slices resume cleanly")
     console.print("tokens metered in llm_calls (see `jobscout stats`)")
 
 
