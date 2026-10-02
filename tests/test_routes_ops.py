@@ -88,3 +88,32 @@ def test_htmx_failure_toast_handler_present(client):
     assert "request failed" in r.text
 
 
+def test_source_health_card_uses_the_last_daily_run(client, db_file):
+    """The card is labelled "last daily run" — it must not show the agent run.
+
+    The agent run starts after the 06:30 sweep, so it is always the newer row;
+    reading runs[0] (newest of any kind) made this card permanently report the
+    agent's numbers under a "source health" heading.
+    """
+    import json
+    import sqlite3
+
+    conn = sqlite3.connect(db_file)
+    try:
+        conn.execute("DELETE FROM runs")
+        conn.execute(
+            "INSERT INTO runs (kind, started, stats) VALUES ('daily', '2026-10-02 06:30:00', ?)",
+            (json.dumps({"companies": 3, "postings_seen": 187, "errors": 0}),),
+        )
+        conn.execute(
+            "INSERT INTO runs (kind, started, stats) VALUES ('agent', '2026-10-02 07:00:00', ?)",
+            (json.dumps({"companies": 1, "postings_seen": 0, "steps": 31}),),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    r = client.get("/ops")
+    assert r.status_code == 200
+    assert "Source health (last daily run)" in r.text
+    assert "187" in r.text          # the sweep's postings_seen, not the agent's 0

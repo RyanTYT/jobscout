@@ -266,7 +266,10 @@ def register(app):
             status = db.db_status()
             runs = db.recent_runs(conn)
             spend = db.llm_spend_by_tier(conn, days=7)
-            last = runs[0] if runs else None
+            # the card is the SWEEP's health, so read the last daily run — the
+            # agent run starts after the sweep finishes and is always newer
+            daily = db.recent_runs(conn, limit=1, kind="daily")
+            last = daily[0] if daily else None
             last_stats = {}
             if last is not None and last["stats"]:
                 try:
