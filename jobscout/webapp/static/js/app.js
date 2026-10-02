@@ -99,9 +99,15 @@
   });
 
   // skeleton placeholders while results load (Bootstrap .placeholder)
+  // GET only. A POST (e.g. the row status buttons) also lives inside
+  // #results, so blanking it here destroyed the very row htmx was about to
+  // swap into — the swap then found no target and the skeleton never cleared.
   document.body.addEventListener("htmx:beforeRequest", function (e) {
     var target = e.detail.elt;
     if (!target || !target.closest) return;
+    if (e.detail.xhr && String(e.detail.xhr.method || "get").toLowerCase() !== "get") {
+      return;
+    }
     var results = target.closest("[data-skeleton-rows]");
     if (results && e.detail.xhr) {
       var n = parseInt(results.getAttribute("data-skeleton-rows") || "8", 10);

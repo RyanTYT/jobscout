@@ -18,6 +18,27 @@ from jobscout.webapp.common import (
 )
 
 
+def _ensure_packet(conn, posting_id: str) -> str | None:
+    """Surface an interested posting on the Applications board.
+
+    The board lists packets, so a posting only shows up there once a packet
+    row exists. Marking interested creates a bare 'packet:drafting' row — no
+    LLM call, no artefacts. The real packet (tailored resume, fill sheet,
+    claim check) is compiled later by prepare_packet, which upserts onto the
+    same deterministic id and fills in dir/model/cost.
+
+    Existing packets are left untouched: upsert_packet's ON CONFLICT
+    overwrites status, so calling this on a posting that is already filled or
+    applied would silently reset it back to drafting.
+    """
+    if db.get_packet_for_posting(conn, posting_id) is not None:
+        return None
+    packet_id = f"pk-{db.sha256(posting_id)[:12]}"
+    db.upsert_packet(conn, packet_id=packet_id, posting_id=posting_id,
+                     status="packet:drafting")
+    return packet_id
+
+
 def register(app):
     @app.get("/", response_class=HTMLResponse)
     def inbox(
@@ -106,6 +127,11 @@ def register(app):
         try:
             ok = db.set_posting_status(conn, pid, status)
             row = db.get_posting(conn, pid) if ok else None
+            # interested is the hand-off point into Applications: give the
+            # posting a packet row so it appears on that board, where the
+            # apply launcher and the state select live.
+            onboarded = _ensure_packet(conn, pid) if ok and status == "interested" \
+                else None
         finally:
             conn.close()
         is_htmx = request is not None and any(
@@ -120,6 +146,8 @@ def register(app):
                 msg = {"interested": f"Interested — {title}",
                        "dismissed": f"Dismissed — {title}",
                        "new": f"Reset to new — {title}"}.get(status, f"{status}: {title}")
+                if onboarded:
+                    msg += " · added to Applications"
                 tone = "danger" if status == "dismissed" else "success"
                 return toast(resp, msg, tone)
             return HTMLResponse("")

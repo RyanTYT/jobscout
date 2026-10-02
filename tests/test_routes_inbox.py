@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from jobscout.core import db
+
 
 def test_inbox_renders_with_results(client):
     r = client.get("/")
@@ -110,3 +112,78 @@ def test_prepare_failure_flashes_on_posting(client, monkeypatch):
     page = client.get(r.headers["location"])
     assert "packet preparation failed" in page.text
 
+
+
+# ── interested → the Applications board ──────────────────────────────────────
+# The board lists packets, so "Mark Interested" has to leave a packet row
+# behind or the entry never shows up there.
+
+
+def test_interested_creates_a_packet_row(client, conn):
+    client.post("/posting/p_new_001/status", data={"status": "interested"},
+                headers={"HX-Request": "true", "HX-Target": "#row-p_new_001"})
+    pk = conn.execute(
+        "SELECT * FROM packets WHERE posting_id = 'p_new_001'").fetchone()
+    assert pk is not None
+    assert pk["status"] == "packet:drafting"
+    # deterministic id, matching what prepare_packet will upsert onto
+    assert pk["id"] == f"pk-{db.sha256('p_new_001')[:12]}"
+    # no artefacts yet — the packet is a placeholder until it is prepared
+    assert pk["dir"] is None
+
+
+def test_interested_entry_appears_on_the_applications_board(client):
+    client.post("/posting/p_new_002/status", data={"status": "interested"},
+                headers={"HX-Request": "true", "HX-Target": "#row-p_new_002"})
+    r = client.get("/applications")
+    assert r.status_code == 200
+    assert "Software Engineer 2" in r.text
+    # the board says why there is no fill sheet yet
+    assert "no fill sheet yet" in r.text
+
+
+def test_interested_toast_mentions_applications(client):
+    r = client.post("/posting/p_new_003/status", data={"status": "interested"},
+                    headers={"HX-Request": "true", "HX-Target": "#row-p_new_003"})
+    from urllib.parse import unquote
+
+    assert "added to Applications" in unquote(r.headers["X-Toast"])
+
+
+def test_dismissed_does_not_create_a_packet(client, conn):
+    client.post("/posting/p_new_004/status", data={"status": "dismissed"},
+                headers={"HX-Request": "true", "HX-Target": "#row-p_new_004"})
+    n = conn.execute(
+        "SELECT COUNT(*) FROM packets WHERE posting_id = 'p_new_004'"
+    ).fetchone()[0]
+    assert n == 0
+
+
+def test_re_marking_interested_does_not_reset_an_applied_packet(client, conn):
+    """upsert_packet's ON CONFLICT overwrites status — the guard matters."""
+    conn.execute(
+        "INSERT INTO packets (id, posting_id, status, dir, applied_at) "
+        "VALUES ('pk_live', 'p_new_005', 'applied', 'applications/x', "
+        "'2026-09-28')")
+    conn.commit()
+    client.post("/posting/p_new_005/status", data={"status": "interested"},
+                headers={"HX-Request": "true", "HX-Target": "#row-p_new_005"})
+    pk = conn.execute(
+        "SELECT * FROM packets WHERE posting_id = 'p_new_005'").fetchone()
+    assert pk["status"] == "applied", "an in-flight application was reset"
+    assert pk["applied_at"] == "2026-09-28"
+    # and no second packet row was created alongside it
+    n = conn.execute(
+        "SELECT COUNT(*) FROM packets WHERE posting_id = 'p_new_005'"
+    ).fetchone()[0]
+    assert n == 1
+
+
+def test_interested_is_idempotent(client, conn):
+    for _ in range(3):
+        client.post("/posting/p_new_006/status", data={"status": "interested"},
+                    headers={"HX-Request": "true", "HX-Target": "#row-p_new_006"})
+    n = conn.execute(
+        "SELECT COUNT(*) FROM packets WHERE posting_id = 'p_new_006'"
+    ).fetchone()[0]
+    assert n == 1
