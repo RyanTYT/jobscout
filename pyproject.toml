@@ -20,11 +20,20 @@ web = [
     "jinja2>=3.1",
     "python-multipart>=0.0.9",
 ]
+# resume rendering (jobscout/core/resume_pdf.py): markdown -> styled HTML via
+# `markdown`, HTML -> PDF via WeasyPrint. Both are imported lazily inside the
+# functions, so the app and the rest of the CLI run without them — only
+# `jobscout resume pdf` / `render_docx` need this extra. Pandoc is optional
+# and external; render_docx falls back to HTML when it is absent.
+resume = [
+    "markdown>=3.6",
+    "weasyprint>=62",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
 ]
-all = ["jobscout[web,dev]"]
+all = ["jobscout[web,resume,dev]"]
 
 [project.scripts]
 jobscout = "jobscout.cli:app"

@@ -120,9 +120,9 @@ def render_pdf(tailored_md: str, output_path: Path) -> Path:
 def render_docx(tailored_md: str, output_path: Path) -> Path:
     """Render tailored resume markdown to a .docx file using pandoc if available,
     or fall back to a simple HTML → .docx conversion."""
+    import shutil
     import subprocess
     import tempfile
-    import shutil
 
     # Check if pandoc is available
     pandoc = shutil.which("pandoc")

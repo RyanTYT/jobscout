@@ -1,8 +1,14 @@
-"""core/resume_parser.py — LLM-based resume parsing and tailoring.
+"""core/resume_parser.py — LLM-based resume parsing.
 
-Master resume lives as markdown (config/master_resume.md). The LLM
-parses it into structured YAML for the profile store, and tailors a
-version for each job description.
+Master resume lives as markdown (config/master_resume.md). The LLM parses
+it into structured YAML (master_resume/resume.yaml), which is what the packet
+pipeline reads.
+
+Tailoring is NOT here. Per-posting tailoring is a selection plan produced by
+packets/tailor.py and rendered by packets/render.py — a plan rather than
+free-form prose, so every fact still traces to the structured resume and the
+typst PDF keeps a source. Generating resume/cover-letter prose with an external
+LLM is a deliberate future path.
 """
 
 from __future__ import annotations
@@ -62,26 +68,9 @@ MASTER RESUME:
 
 YAML:"""
 
-_TAILOR_SYSTEM = (
-    "You are a expert resume writer and career coach. Given a master "
-    "resume and a job description, produce a tailored resume markdown "
-    "(1 page max) that highlights the most relevant experience, projects, "
-    "and skills. Never invent facts — reorder, rephrase, and emphasize. "
-    "Output only valid markdown."
-)
-
-_TAILOR_TEMPLATE = """\
-Master Resume (YAML):
-{resume_yaml}
-
-Job Description:
-{job_description}
-
-Tailored Resume (markdown):"""
-
-
 def master_resume_path() -> Path:
-    return core_paths.config_dir() / "master_resume" / "resume.md"
+    """The free-form resume, beside the structured resume.yaml it parses into."""
+    return core_paths.master_resume_dir() / "resume.md"
 
 
 def load_master_resume() -> str:
@@ -101,8 +90,6 @@ def save_master_resume(text: str) -> Path:
 def parse_resume(text: str | None = None, llm: LlmClient | None = None) -> dict:
     """Parse the master resume markdown into structured YAML dict.
     Returns dict with 'parsed' (the structured data) or 'error' on failure."""
-    from jobscout.core.config import load_profile
-
     resume_text = text or load_master_resume()
     if not resume_text.strip():
         return {"error": "resume.md is empty. Write your resume in markdown first, then parse."}
@@ -148,7 +135,6 @@ def parse_resume(text: str | None = None, llm: LlmClient | None = None) -> dict:
 
     # Validate against MasterResume schema and add stable IDs where missing
     from jobscout.core.schema import MasterResume
-    from jobscout.core.db import sha256, slugify
 
     _next_id = 0
     def _gen_id(prefix: str) -> str:
@@ -167,7 +153,7 @@ def parse_resume(text: str | None = None, llm: LlmClient | None = None) -> dict:
     parsed.setdefault("extras", {})
 
     # Add stable IDs to experience entries
-    for i, exp in enumerate(parsed["experience"]):
+    for exp in parsed["experience"]:
         if not exp.get("id"):
             exp["id"] = _gen_id("EXP")
         if not exp.get("dates") and (exp.get("start") or exp.get("end")):
@@ -184,7 +170,7 @@ def parse_resume(text: str | None = None, llm: LlmClient | None = None) -> dict:
             exp["tech"] = []
 
     # Add stable IDs to project entries
-    for i, proj in enumerate(parsed.get("projects", [])):
+    for proj in parsed.get("projects", []):
         if not proj.get("id"):
             proj["id"] = _gen_id("PRJ")
         if "bullets" in proj and proj["bullets"]:
@@ -197,7 +183,7 @@ def parse_resume(text: str | None = None, llm: LlmClient | None = None) -> dict:
             proj["tech"] = []
 
     # Add stable IDs to education entries
-    for i, edu in enumerate(parsed.get("education", [])):
+    for edu in parsed.get("education", []):
         if not edu.get("id"):
             edu["id"] = _gen_id("EDU")
         if not edu.get("dates") and (edu.get("start") or edu.get("year")):
@@ -214,25 +200,3 @@ def parse_resume(text: str | None = None, llm: LlmClient | None = None) -> dict:
         return {"error": f"Schema validation failed: {e}", "raw": resp.text, "attempted": parsed}
 
     return {"parsed": validated_dict, "model": resp.model, "cost": resp.cost_usd}
-
-
-def tailor_resume(job_description: str, llm: LlmClient) -> str:
-    """Generate a tailored resume markdown for a specific job."""
-    from jobscout.core.resume import load_master_resume as load_structured
-
-    resume_yaml = load_structured().model_dump()
-    import yaml as _yaml
-
-    yaml_str = _yaml.dump(resume_yaml, default_flow_style=False)
-
-    try:
-        resp = llm.chat("bulk", [
-            {"role": "system", "content": _TAILOR_SYSTEM},
-            {"role": "user", "content": _TAILOR_TEMPLATE.format(
-                resume_yaml=yaml_str, job_description=job_description
-            )},
-        ])
-    except LlmError as e:
-        return f"# Tailoring failed\n\n{e}"
-
-    return resp.text
