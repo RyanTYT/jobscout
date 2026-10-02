@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import re
+
 from jobscout.core import db
 
 
@@ -92,6 +94,96 @@ def test_inbox_rows_carry_row_links(client):
     r = client.get("/")
     assert r.status_code == 200
     assert 'data-row-link="/posting/' in r.text
+
+
+
+# ── returning from a posting lands back on the page you left ────────────────
+
+
+def test_posting_links_carry_the_page_you_are_on(client):
+    r = client.get("/?page=3&page_size=25")
+    assert r.status_code == 200
+    links = re.findall(r'data-row-link="([^"]+)"', r.text)
+    assert links, "no rows rendered"
+    for href in links:
+        assert href.startswith("/posting/")
+        assert "page=3&amp;page_size=25" in href, href
+
+
+def test_posting_backlink_returns_to_the_same_page(client):
+    r = client.get("/posting/p_int_1?page=3&page_size=25")
+    assert r.status_code == 200
+    assert 'class="backlink" href="/?page=3&amp;page_size=25"' in r.text
+
+
+def test_posting_backlink_also_restores_filters(client):
+    """Page 3 of an unfiltered list is a different set of postings, so the
+    backlink carries the filters too."""
+    r = client.get("/posting/p_int_1?page=3&status=interested&sort=title")
+    assert r.status_code == 200
+    back = re.search(r'class="backlink" href="([^"]+)"', r.text).group(1)
+    assert back.startswith("/?")
+    for want in ("page=3", "status=interested", "sort=title"):
+        assert want in back, back
+
+
+def test_backlink_defaults_to_page_one_when_reached_without_state(client):
+    """Postings opened from Applications, search or a bookmark carry no inbox
+    params — that must still render a sane backlink, not a broken one."""
+    r = client.get("/posting/p_int_1")
+    assert r.status_code == 200
+    assert 'class="backlink" href="/?page=1&amp;page_size=50"' in r.text
+
+
+def test_backlink_rejects_a_hostile_page_param(client):
+    """The query string is re-parsed and re-emitted, never reflected — so a
+    crafted value cannot escape the href into another origin."""
+    r = client.get(
+        "/posting/p_int_1?page=3%22%20onmouseover=%22alert(1)"
+        "&sort=%3Cscript%3E&evil=//evil.example")
+    assert r.status_code == 200
+    back = re.search(r'class="backlink" href="([^"]+)"', r.text).group(1)
+    assert back == "/?page=1&amp;page_size=50", back
+    assert "evil.example" not in r.text
+    assert "onmouseover" not in back
+    assert "<script>" not in back
+
+
+def test_backlink_page_is_clamped_to_a_positive_int(client):
+    r = client.get("/posting/p_int_1?page=-5")
+    assert r.status_code == 200
+    assert 'class="backlink" href="/?page=1&amp;page_size=50"' in r.text
+
+
+def test_backlink_page_size_is_validated_against_page_sizes(client):
+    """An arbitrary page_size must not reach the inbox — Pagination clamps it
+    to a known size, so the backlink stays a URL the inbox will honour."""
+    r = client.get("/posting/p_int_1?page=2&page_size=9999")
+    assert r.status_code == 200
+    back = re.search(r'class="backlink" href="([^"]+)"', r.text).group(1)
+    assert back == "/?page=2&amp;page_size=50", back
+
+
+def test_status_buttons_post_the_page_context(client):
+    """The swapped-in row keeps the user's place: the buttons carry the inbox
+    query string, and the response re-renders the row with it intact."""
+    page = client.get("/?page=2&page_size=25&status=new")
+    pid = re.findall(r'data-row-link="/posting/([^?&"]+)', page.text)[0]
+
+    r = client.post(
+        f"/posting/{pid}/status?page=2&page_size=25",
+        data={"status": "interested"},
+        headers={"HX-Request": "true", "HX-Target": f"#row-{pid}"},
+    )
+    assert r.status_code == 200
+    assert f'data-row-link="/posting/{pid}?page=2&amp;page_size=25"' in r.text
+
+
+def test_inbox_status_buttons_include_the_page(client):
+    page = client.get("/?page=2&page_size=25")
+    posts = re.findall(r'hx-post="(/posting/[^"]+/status\?[^"]*)"', page.text)
+    assert posts, "status buttons lost their page context"
+    assert all("page=2&amp;page_size=25" in p for p in posts)
 
 
 

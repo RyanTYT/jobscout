@@ -1,6 +1,10 @@
 {% import "components/macros.html" as m %}
 <div id="results" data-skeleton-rows="{{ [pg.page_size, 10] | min }}">
 
+  {# where "back to inbox" should return to: this exact page, with these
+     filters. Computed here so every row link can carry it — see _row.html. #}
+  {% set back_qs = pg.qs_page(pg.page) %}
+
   <div class="card">
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">

@@ -39,6 +39,40 @@ def _ensure_packet(conn, posting_id: str) -> str | None:
     return packet_id
 
 
+def _int_or(raw: str | None, default: int) -> int:
+    try:
+        return int(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+
+
+def _back_qs(request: Request) -> str:
+    """Rebuild the inbox query string that produced this detail page.
+
+    The inbox pushes its filters and page into the URL (hx-push-url on the
+    filter controls and every page link), so a posting link can carry them
+    and the backlink can return to the exact page the user left — page
+    number *and* filters, since page 3 of an unfiltered list is meaningless.
+
+    Everything is re-parsed through the normal filter validators and
+    re-emitted by qs_page, so the incoming query string is never reflected
+    into the href: unknown params are dropped and hostile ones normalise to
+    a safe default rather than escaping into the URL.
+    """
+    qp = request.query_params
+    filters = ui.InboxFilters.from_query(
+        status=qp.get("status", ""), tier=qp.get("tier", ""), q=qp.get("q", ""),
+        min_score=qp.get("min_score", ""), all_postings=qp.get("all_postings", ""),
+        level=qp.get("level", ""), location=qp.get("location", ""),
+        company=qp.get("company", ""), source=qp.get("source", ""),
+        remote=qp.get("remote", ""), sort=qp.get("sort", ""),
+    )
+    # total=0 would clamp every page to 1 (pages == 1), so only use
+    # from_query for its page_size validation and supply the page directly.
+    base = ui.Pagination.from_query(0, "", qp.get("page_size", ""), filters)
+    return base.qs_page(max(1, _int_or(qp.get("page"), 1)))
+
+
 def register(app):
     @app.get("/", response_class=HTMLResponse)
     def inbox(
@@ -118,7 +152,8 @@ def register(app):
             "posting_detail.html",
             {**ctx, "p": row, "llm": llm_fields(row), "boards": boards(row),
              "prepare_error": error,
-             "packet": packet},
+             "packet": packet,
+             "back_qs": _back_qs(request)},
         )
 
     @app.post("/posting/{pid}/status")
@@ -139,8 +174,13 @@ def register(app):
         )
         if is_htmx:
             if row is not None:
+                # The swapped-in row must keep the page/filter context, or a
+                # status change silently drops the user back to page 1. The
+                # buttons post to /status?<inbox qs> so it can be rebuilt.
                 resp = TEMPLATES.TemplateResponse(
-                    request, "_row.html", {"request": request, "p": row}
+                    request, "_row.html",
+                    {"request": request, "p": row,
+                     "back_qs": _back_qs(request)},
                 )
                 title = (row["title"] or "")[:60]
                 msg = {"interested": f"Interested — {title}",

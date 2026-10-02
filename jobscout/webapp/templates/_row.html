@@ -1,8 +1,12 @@
 {% import "components/macros.html" as m %}
-<tr id="row-{{ p.id }}" data-row-link="/posting/{{ p.id }}">
+{% set detail_url = "/posting/" ~ p.id ~ "?" ~ back_qs %}
+{# the status buttons post to /status?<inbox qs> so the swapped-in row can
+   rebuild the same page/filter context (see routers/inbox.py set_status) #}
+{% set status_url = "/posting/" ~ p.id ~ "/status?" ~ back_qs %}
+<tr id="row-{{ p.id }}" data-row-link="{{ detail_url }}">
   <td class="font-monospace">{{ m.score(p.final_score) }}</td>
   <td class="text-truncate" style="max-width: 24rem;">
-    <a href="/posting/{{ p.id }}" class="text-decoration-none fw-medium">{{ p.title or "(untitled)" }}</a>
+    <a href="{{ detail_url }}" class="text-decoration-none fw-medium">{{ p.title or "(untitled)" }}</a>
   </td>
   <td class="text-nowrap">
     <span class="text-secondary">{{ p.company_name or p.company_id }}</span>
@@ -18,13 +22,13 @@
   <td class="text-end text-nowrap">
     {% if p.status == "new" %}
     <button class="btn btn-success btn-sm" title="Mark interested" type="button"
-            hx-post="/posting/{{ p.id }}/status"
+            hx-post="{{ status_url }}"
             hx-vals='{"status":"interested"}'
             hx-target="#row-{{ p.id }}" hx-swap="outerHTML">
       {{ m.icon("check", 12) }}
     </button>
     <button class="btn btn-outline-secondary btn-sm" title="Dismiss" type="button"
-            hx-post="/posting/{{ p.id }}/status"
+            hx-post="{{ status_url }}"
             hx-vals='{"status":"dismissed"}'
             hx-target="#row-{{ p.id }}" hx-swap="outerHTML">
       {{ m.icon("x", 12) }}
@@ -32,7 +36,7 @@
     {% elif p.status == "interested" %}
     {{ m.status(p.status) }}
     <button class="btn btn-outline-secondary btn-sm" title="Dismiss" type="button"
-            hx-post="/posting/{{ p.id }}/status"
+            hx-post="{{ status_url }}"
             hx-vals='{"status":"dismissed"}'
             hx-target="#row-{{ p.id }}" hx-swap="outerHTML">
       {{ m.icon("x", 12) }}
@@ -40,13 +44,13 @@
     {% elif p.status == "dismissed" %}
     {{ m.status(p.status) }}
     <button class="btn btn-outline-secondary btn-sm" title="Undo — back to new" type="button"
-            hx-post="/posting/{{ p.id }}/status"
+            hx-post="{{ status_url }}"
             hx-vals='{"status":"new"}'
             hx-target="#row-{{ p.id }}" hx-swap="outerHTML">undo</button>
     {% else %}
     {{ m.status(p.status) }}
     {% endif %}
-    <a class="btn btn-outline-secondary btn-sm" title="Open detail" href="/posting/{{ p.id }}">
+    <a class="btn btn-outline-secondary btn-sm" title="Open detail" href="{{ detail_url }}">
       {{ m.icon("arrow-right", 12) }}</a>
   </td>
 </tr>

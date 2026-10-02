@@ -6,7 +6,10 @@
 
 {% block content %}
 
-<a class="backlink" href="/">{{ m.icon("arrow-left", 12) }} back to inbox</a>
+{# back_qs carries the page + filters the inbox had when this posting was
+   opened, so "back" returns to the same list. It is rebuilt server-side from
+   validated params, never echoed from the URL. #}
+<a class="backlink" href="/?{{ back_qs }}">{{ m.icon("arrow-left", 12) }} back to inbox</a>
 
 {% if prepare_error %}
 {{ m.callout(prepare_error, "danger") }}
