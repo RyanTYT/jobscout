@@ -304,3 +304,91 @@ def test_rescore_button_uses_an_effectively_unbounded_limit():
     limit = int(cmd[cmd.index("--limit") + 1])
     assert limit >= 100_000, f"rescore limit {limit} is a real ceiling"
 
+
+# ── duplicate postings must not strand the gate ───────────────────────────────
+
+
+def _add_dup(conn, posting_id: str, content_hash: str) -> None:
+    """A second posting with the same content_hash — same ad, scraped twice."""
+    conn.execute(
+        "INSERT INTO postings (id, source, company_id, url, url_hash, title, "
+        "location, rule_pass, description, first_seen, last_seen, "
+        "content_hash, status) VALUES (?, 'ats:greenhouse:co', 'co', ?, ?, "
+        "'Quant Dev', 'Singapore', 1, 'rust quant', '2026-09-28T00:00:00Z', "
+        "'2026-09-28T00:00:00Z', ?, 'new')",
+        (posting_id, f"https://x/{posting_id}", f"h-{posting_id}", content_hash),
+    )
+    conn.commit()
+
+
+def test_duplicate_postings_do_not_strand_the_profile_gate(conn):
+    """Postings sharing a content_hash share a cache key. Whichever twin is
+    scored first pays for the entry; a twin scored in a *later* pass then looks
+    like a cache hit but keeps llm_cache_key NULL — and
+    count_unscored_at_hash reads a NULL key as unscored, so `remaining` never
+    hits 0 and the gate never latches. The pass was complete but could never
+    prove it, so every later rescore re-ran a full pass forever."""
+    conn.execute("UPDATE postings SET content_hash = 'shared' WHERE id = 'p0'")
+    _add_dup(conn, "p_dup", "shared")
+    conn.commit()
+    p = _profile()
+
+    # pass 1 scores p0 only (the daily sweep's shape: it passes its own ids)
+    first = score_run.score_unscored(conn, profile=p, llm=FakeLlm(),
+                                     ids={"p0"}, verbose=False)
+    assert first["scored"] == 1
+    assert first["hydrated"] == 0
+    # not complete yet, so nothing should latch
+    assert core_db.get_scoring_state(conn)["scored_profile_hash"] != profile_hash(p)
+
+    # pass 2 picks up the twin, which now hits the entry p0 paid for
+    st = score_run.score_unscored(conn, profile=p, llm=FakeLlm(), verbose=False)
+    assert st["hydrated"] == 1, "the twin must be hydrated from the paid-for score"
+    assert st["requests"] == 1, "only the four untouched rows need a call"
+
+    state = core_db.get_scoring_state(conn)
+    assert state["pending_remaining"] == 0
+    assert state["scored_profile_hash"] == profile_hash(p), (
+        "a fully scored profile must latch, or every later run is a full pass")
+
+    # both twins now carry their own score, and they agree
+    dup = conn.execute("SELECT final_score, llm_cache_key FROM postings "
+                       "WHERE id = 'p_dup'").fetchone()
+    orig = conn.execute("SELECT final_score FROM postings WHERE id = 'p0'").fetchone()
+    assert dup["llm_cache_key"] is not None
+    assert dup["final_score"] == orig["final_score"]
+
+
+def test_hydration_is_idempotent_and_costs_no_llm_call(conn):
+    """Re-running at the same profile must re-write nothing and pay nothing —
+    that is what makes a rescore button safe to press twice."""
+    conn.execute("UPDATE postings SET content_hash = 'shared' WHERE id = 'p0'")
+    _add_dup(conn, "p_dup", "shared")
+    conn.commit()
+    p = _profile()
+    score_run.score_unscored(conn, profile=p, llm=FakeLlm(),
+                             ids={"p0"}, verbose=False)
+    score_run.score_unscored(conn, profile=p, llm=FakeLlm(), verbose=False)
+
+    llm = FakeLlm()
+    st = score_run.score_unscored(conn, profile=p, llm=llm, verbose=False)
+    assert llm.calls == 0
+    assert st.get("skipped") == "nothing to score"
+    assert st["hydrated"] == 0, "nothing left to hydrate once keys are written"
+
+
+def test_hydration_ignores_a_corrupt_cache_entry(conn):
+    """A cache entry that will not parse must not be hydrated — and must not
+    count as work done."""
+    from jobscout.scoring import llm_bulk
+
+    row = conn.execute(core_db._POSTING_SELECT + " WHERE p.id='p0'").fetchone()
+    key = llm_bulk.cache_key(_profile(), row)
+    conn.execute("INSERT INTO llm_cache (cache_key, response, model) "
+                 "VALUES (?, 'not json', 'batch')", (key,))
+    conn.commit()
+    assert llm_bulk._hydrate(conn, row, key, "not json") is False
+    assert llm_bulk._hydrate(conn, row, key, '{"no_fit": 1}') is False
+    after = conn.execute("SELECT llm_cache_key FROM postings WHERE id='p0'").fetchone()
+    assert after["llm_cache_key"] is None
+

@@ -397,7 +397,8 @@ def score(
         raise typer.Exit(0)
     console.print(
         f"[green]✓[/] scored {stats['scored']} of {stats['batches']} batches "
-        f"({stats['cached']} already cached, {stats['fallback']} via fallback, "
+        f"({stats['cached']} already cached, {stats['hydrated']} hydrated from a "
+        f"duplicate, {stats['fallback']} via fallback, "
         f"{stats['errors']} errors"
         + (", [yellow]CAP HIT[/]" if stats["capped"] else "")
         + f") · ${stats['cost']:.4f} · profile {stats['profile_hash'][:12]}"

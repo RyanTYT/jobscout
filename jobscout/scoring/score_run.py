@@ -102,7 +102,8 @@ def score_unscored(
         # stalled — that ambiguity is exactly why a cap-stopped pass read as
         # "the scorer skipped it".
         print(f"  [{done}/{total}] scored {st['scored']} · cached {st['cached']} "
-              f"· batches {st['batches']} · errors {st['errors']}"
+              f"· hydrated {st['hydrated']} · batches {st['batches']} "
+              f"· errors {st['errors']}"
               + ("  [CAP HIT]" if st["capped"] else ""), flush=True)
         if full:
             # live work-left, not the once-written len(rows) taken at pass
@@ -119,6 +120,9 @@ def score_unscored(
         f"${stats['cost']:.4f}"
         + ("  [CAP HIT]" if stats["capped"] else "")
     )
+    if stats.get("hydrated"):
+        say(f"  hydrated {stats['hydrated']} duplicate posting(s) from a "
+            f"twin's cached score")
     if stats.get("cap_reason"):
         say(f"  stopped: {stats['cap_reason']}")
 
@@ -177,7 +181,7 @@ def _mark_done(conn, phash: str, full: bool, record_run: bool,
 def _result(scope: str, phash: str, skipped: str | None = None) -> dict:
     out = {"scored": 0, "cached": 0, "batches": 0, "requests": 0,
            "fallback": 0, "cost": 0.0, "capped": False, "cap_reason": None,
-           "errors": 0, "scope": scope, "profile_hash": phash}
+           "hydrated": 0, "errors": 0, "scope": scope, "profile_hash": phash}
     if skipped:
         out["skipped"] = skipped
     return out

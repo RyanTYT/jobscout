@@ -318,6 +318,35 @@ def _write_score(conn, row, parsed: dict, key: str) -> None:
     )
 
 
+def _hydrate(conn, row, key: str, response: str) -> bool:
+    """Write a posting's own score row from a cache entry a twin already paid for.
+
+    Postings with an identical `content_hash` share a cache key (the key is
+    profile hash + content hash). Whoever is scored first writes the llm_cache
+    entry and its own score row; every twin then looks like a cache hit and is
+    counted as cached — but nothing writes *its* llm_cache_key. Since
+    `count_unscored_at_hash` counts a NULL cache key as not-yet-scored, one
+    stranded twin pins `remaining` above 0 forever, so the profile-hash gate
+    never latches and every later rescore re-runs a "full pass" for a profile
+    that is in fact fully scored. Hydrating reuses the paid-for verdict; only
+    the per-company tier prior is recomputed.
+    """
+    try:
+        parsed = json.loads(response)
+    except ValueError:
+        return False
+    if not isinstance(parsed, dict) or "fit" not in parsed:
+        return False
+    scores = compute_final(parsed, row["tier"], row["non_ats"], _boards_count(row))
+    db.update_posting_scores(
+        conn, row["id"],
+        fit=scores["fit"], company_quality=scores["company_quality"],
+        opportunity=scores["opportunity"], final=scores["final"],
+        llm_json=json.dumps(parsed), cache_key=key,
+    )
+    return True
+
+
 def score_postings_batch(
     conn, rows, profile: ProfileCfg, llm: LlmClient,
     batch_size: int | None = None,
@@ -341,7 +370,7 @@ def score_postings_batch(
     n = batch_size or BATCH_SIZE
     stats = {"scored": 0, "cached": 0, "batches": 0, "requests": 0,
              "fallback": 0, "cost": 0.0, "capped": False,
-             "cap_reason": None, "errors": 0}
+             "cap_reason": None, "hydrated": 0, "errors": 0}
     rows = list(rows)
     if not rows:
         return stats
@@ -355,10 +384,17 @@ def score_postings_batch(
         for row in chunk:
             key = keys[row["id"]]
             hit = conn.execute(
-                "SELECT 1 FROM llm_cache WHERE cache_key = ?", (key,)
+                "SELECT response FROM llm_cache WHERE cache_key = ?", (key,)
             ).fetchone()
             if hit:
                 stats["cached"] += 1
+                # A twin may have earned this cache entry. Postings sharing a
+                # content_hash share a cache key, so the first one scored writes
+                # the entry and its own score row while the rest look like hits
+                # and keep llm_cache_key NULL — see _hydrate.
+                if not row["llm_cache_key"] or row["final_score"] is None:
+                    stats["hydrated"] += int(
+                        _hydrate(conn, row, key, hit["response"]))
             else:
                 pending.append((row, key))
 
