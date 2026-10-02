@@ -27,9 +27,122 @@
 {{ m.callout("Upload rejected: " ~ upload_error ~ " — nothing was changed.", "danger") }}
 {% endif %}
 
+{# ── the resume itself, as markdown: paste it, then let the LLM parse it
+     into the structured resume.yaml the form below edits. #}
+{% if just_parsed %}
+{{ m.callout("Parsed — master_resume/resume.yaml rebuilt from the markdown (" ~ uploaded_fields ~ " experience/project entries). Anything the parser could not read was dropped; check the YAML card below.", "success") }}
+{% endif %}
+{% if parse_error %}
+{{ m.callout("Parse failed: " ~ parse_error ~ " — resume.yaml was NOT changed. The model output is shown below so you can see what went wrong.", "danger") }}
+{% endif %}
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Resume (markdown)</h2>
+    <span class="text-secondary small">
+      <span class="font-monospace">master_resume/resume.md</span> · free-form source
+    </span>
+  </div>
+  <div class="card-body">
+    <form method="post" action="/profile/resume-md" data-busy-submit>
+      <label class="form-label" for="f-resume-md">
+        paste or edit your resume as plain markdown
+      </label>
+      <textarea class="form-control font-monospace" id="f-resume-md"
+                name="resume_md" rows="18"
+                placeholder="# Name&#10;&#10;## Experience&#10;### Company — Role (2023-05 → present)&#10;- what you did, with numbers&#10;&#10;## Education&#10;### Degree, School (year)&#10;&#10;## Skills&#10;rust, c++, python, kafka, postgresql">{{ resume_md }}</textarea>
+      <div class="form-text">
+        saved verbatim — no LLM, no validation. This is the scratchpad the
+        parse button reads.
+      </div>
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-outline-secondary btn-sm" type="submit">
+          {{ m.icon("check", 12) }} save markdown
+        </button>
+        {% if md_saved %}
+        <span class="small text-secondary align-self-center">saved</span>
+        {% endif %}
+      </div>
+    </form>
+
+    <hr class="my-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="small text-secondary">
+        {{ m.icon("magic", 12) }}
+        the LLM reads the markdown and rewrites
+        <span class="font-monospace">resume.yaml</span> from it — validated
+        against the schema first, so a bad parse changes nothing.
+      </div>
+      <form method="post" action="/profile/parse-resume" data-busy-submit
+            data-confirm="Rewrite resume.yaml from this markdown? The current one is kept as resume.yaml.bak.">
+        <button class="btn btn-primary btn-sm" type="submit">
+          {{ m.icon("spark", 12) }} parse into YAML
+        </button>
+      </form>
+    </div>
+
+    {% if parse_raw %}
+    <details class="mt-3">
+      <summary class="small text-secondary">model output from the failed parse</summary>
+      <pre class="small bg-light border rounded p-2 mt-2 mb-0"
+           style="white-space: pre-wrap; max-height: 20rem; overflow-y: auto;">{{ parse_raw }}</pre>
+    </details>
+    {% endif %}
+  </div>
+</div>
+
 {# ── full-resume round-trip: download the current YAML, fill it
      completely offline (every block: experience history, education,
      links, extras — beyond what the form above edits), re-upload. #}
+{# ── the profile detail dump: everything resume.yaml cannot hold.
+     Positioning guide, per-role "lead with" tables, the [V]/[EST]/[?]
+     claims ledger, the story bank, open items. Read by the agent and packet
+     harnesses for judgment; never parsed into resume.yaml, never
+     claim-checked, never rewritten by the app. #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="card-title mb-0 h6">Profile detail dump</h2>
+    <span class="text-secondary small">
+      <span class="font-monospace">master_resume/detail.md</span>
+      {% if detail_stats.exists %}· {{ detail_stats.chars }} chars, {{ detail_stats.lines }} lines{% else %}· not set yet{% endif %}
+    </span>
+  </div>
+  <div class="card-body">
+    <form method="post" action="/profile/detail" data-busy-submit>
+      <label class="form-label" for="f-detail">
+        everything you would want a reader to know — the reasoning behind the
+        resume, not just the claims
+      </label>
+      <textarea class="form-control font-monospace" id="f-detail"
+                name="detail_md" rows="18"
+                placeholder="# Positioning&#10;&#10;One-line profile, the roles you are open to, and what to lead with per role type.&#10;&#10;## Quantitative claims ledger&#10;| Claim | Status | Safe wording |&#10;|---|---|---|&#10;| order p99 ~400us | [V] | say &quot;to handoff to IBKR&quot; |&#10;&#10;## Story bank&#10;- S1 — the missed bars that fixed themselves&#10;&#10;## Open items&#10;1. resolve before applying">{{ detail_md }}</textarea>
+      <div class="form-text">
+        saved verbatim — no LLM, no validation. Conventions worth keeping:
+        <span class="font-monospace">[V]</span> measured or stated directly,
+        <span class="font-monospace">[EST]</span> your own estimate,
+        <span class="font-monospace">[?]</span> unconfirmed — do not use until
+        resolved. The harnesses read this for judgment; the resume pipeline does not.
+      </div>
+      {% if detail_stats.sections %}
+      <details class="mt-2">
+        <summary class="small text-secondary">{{ detail_stats.sections | length }} sections detected</summary>
+        <ul class="small text-secondary mt-1 mb-0 ps-3">
+          {% for sec in detail_stats.sections %}<li>{{ sec }}</li>{% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-outline-secondary btn-sm" type="submit">
+          {{ m.icon("check", 12) }} save detail dump
+        </button>
+        {% if detail_saved %}
+        <span class="small text-secondary align-self-center">saved</span>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center">
     <h2 class="card-title mb-0 h6">Full resume (YAML)</h2>

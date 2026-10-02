@@ -89,13 +89,34 @@ def _resume_path() -> Path:
     return master_resume_dir() / "resume.yaml"
 
 
+def _substantive(data: dict) -> str | None:
+    """Why this resume is too empty to save, or None if it is worth keeping.
+
+    Every field of MasterResume is optional, so the schema happily accepts
+    `{}`. Without this guard a truncated LLM reply (or an accidental upload of
+    a blank file) would pass validation and silently overwrite a real resume
+    with an empty one. Requires a name, or some history, or some skills.
+    """
+    ident = data.get("identity") or {}
+    if str(ident.get("full_name") or "").strip():
+        return None
+    for key in ("experience", "education", "projects"):
+        if data.get(key):
+            return None
+    skills = data.get("skills") or {}
+    if isinstance(skills, dict) and any(skills.get(k) for k in skills):
+        return None
+    return ("no name, no experience, education, projects, or skills — "
+            "that would wipe the master resume")
+
+
 def upload_resume(text: str) -> dict:
     """Replace master_resume/resume.yaml wholesale with a validated upload.
 
-    The incoming YAML must parse into the MasterResume schema — anything
-    else is rejected with the file untouched. The previous resume is kept
-    as resume.yaml.bak alongside (one rolling backup). Returns a summary
-    for the flash."""
+    The incoming YAML must parse into the MasterResume schema and carry
+    something — anything else is rejected with the file untouched. The
+    previous resume is kept as resume.yaml.bak alongside (one rolling
+    backup). Returns a summary for the flash."""
     import yaml
 
     from jobscout.core.resume import load_master_resume
@@ -112,6 +133,9 @@ def upload_resume(text: str) -> dict:
         MasterResume.model_validate(data)
     except Exception as e:                       # noqa: BLE001 — pydantic detail
         raise ProfileError(f"resume schema rejected it: {e}") from e
+    thin = _substantive(data)
+    if thin:
+        raise ProfileError(f"resume is empty ({thin}) — nothing was changed")
 
     if path.is_file():
         backup = path.with_suffix(".yaml.bak")
@@ -123,6 +147,66 @@ def upload_resume(text: str) -> dict:
     return {"fields": sum(
         1 for e in resume.experience or []) + len(resume.education or []),
             "backup": str(path.with_suffix(".yaml.bak"))}
+
+
+def resume_markdown() -> str:
+    """The free-form resume the LLM parses (master_resume/resume.md).
+
+    This is the input side of the master resume; resume.yaml is the structured
+    side everything else reads. They are edited independently on the Profile
+    page and reconciled by the parse button.
+    """
+    from jobscout.core.resume_parser import load_master_resume as load_md
+
+    return load_md()
+
+
+def save_resume_markdown(text: str) -> Path:
+    """Persist resume.md. The previous version is kept as resume.md.bak."""
+    from jobscout.core.resume_parser import master_resume_path
+
+    path = master_resume_path()
+    if path.is_file():
+        path.with_suffix(".md.bak").write_text(
+            path.read_text(encoding="utf-8"), encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text or "", encoding="utf-8")
+    return path
+
+
+def detail_markdown() -> str:
+    """The free-form profile dump (master_resume/detail.md).
+
+    Positioning guidance, the claims ledger, the story bank, open items — the
+    reasoning resume.yaml cannot hold. Read by the harnesses for judgment,
+    never parsed into resume.yaml.
+    """
+    from jobscout.core.resume import detail_dump
+
+    return detail_dump()
+
+
+def detail_stats() -> dict:
+    from jobscout.core.resume import detail_dump_stats
+
+    return detail_dump_stats()
+
+
+def save_detail_markdown(text: str) -> Path:
+    """Persist detail.md verbatim. The previous version is kept as .bak.
+
+    No LLM, no validation, same contract as save_resume_markdown: this is the
+    candidate's own words and the app must never rewrite them.
+    """
+    from jobscout.core.resume import detail_dump_path
+
+    path = detail_dump_path()
+    if path.is_file():
+        path.with_suffix(".md.bak").write_text(
+            path.read_text(encoding="utf-8"), encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text or "", encoding="utf-8")
+    return path
 
 
 def current_values() -> dict:

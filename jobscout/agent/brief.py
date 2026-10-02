@@ -9,6 +9,22 @@ import sqlite3
 
 def build_brief(conn: sqlite3.Connection, profile, settings) -> str:
     agent_cfg = settings.discovery.agent
+    from jobscout.core.resume import detail_dump_for_prompt
+
+    detail = detail_dump_for_prompt()
+    detail_block = ""
+    if detail:
+        detail_block = f"""CANDIDATE DETAIL (authoritative — outranks your priors)
+{detail}
+
+Use it to judge fit and pitch: the positioning guide says what to lead with per
+role type, the claims ledger marks what is safe to assert ([V] measured, [EST]
+estimate, [?] unconfirmed — do not use), and the open items are unresolved.
+Do NOT restate the candidate's claims back as your own findings, and do not
+propose a company whose roles contradict the positioning.
+
+"""
+
     target = profile.target
     levels = "/".join(target.seniorities) if target.seniorities else "any level"
     primary = ", ".join(target.primary_locations)
@@ -37,6 +53,7 @@ runners-up, not equal-priority. Remote roles are acceptable (preference:
 The deterministic collectors (ATS APIs, careers crawls, HN thread, RSS) have
 ALREADY run today. Your value-add is judgment and open-ended search.
 
+{detail_block}
 Steps:
 1. Call get_context() first. Note the unresolved funding mentions — resolving
    one of those (find its domain via web_search) is high value.

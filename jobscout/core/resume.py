@@ -212,3 +212,74 @@ def field_map(resume: MasterResume | None = None) -> list[FieldEntry]:
     for other in r.extras.other:
         entries.append(FieldEntry(f"other:{other.label}", other.value, f"extras.other[{other.id}]"))
     return entries
+
+
+# ── the profile detail dump ──────────────────────────────────────────────────
+# resume.yaml is the claim-checked, structured truth: short, stable IDs, and
+# nothing that is not defensible in an interview. It is also lossy — it cannot
+# hold the reasoning behind a claim, the story behind a project, the warnings
+# about what NOT to say, or the open questions.
+#
+# detail.md is the other half: a long-form, free-form dump of everything known
+# about the candidate (positioning guide, per-role "lead with" tables, the
+# quantitative-claims ledger with [V]/[EST]/[?] markers, the story bank, open
+# items). It is never parsed into resume.yaml and never claim-checked — it is
+# context for judgment calls: which companies fit, how to pitch, what to avoid
+# asserting. Harnesses read it; the packet pipeline does not.
+
+
+def detail_dump_path():
+    """master_resume/detail.md — the free-form profile dump."""
+    return master_resume_dir() / "detail.md"
+
+
+def detail_dump() -> str:
+    """The raw detail dump, or "" when absent. Never raises."""
+    p = detail_dump_path()
+    if not p.is_file():
+        return ""
+    try:
+        return p.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def detail_dump_stats() -> dict:
+    """Shape of the dump, for the Profile page header."""
+    text = detail_dump()
+    return {
+        "path": str(detail_dump_path()),
+        "exists": bool(text.strip()),
+        "chars": len(text),
+        "lines": len(text.splitlines()) if text else 0,
+        "sections": [
+            ln.lstrip("# ").strip()
+            for ln in text.splitlines()
+            if ln.startswith("## ")
+        ],
+    }
+
+
+def detail_dump_for_prompt(max_chars: int = 14000) -> str:
+    """The dump, framed for an LLM prompt and bounded.
+
+    A full dump runs to tens of thousands of characters; the harnesses get one
+    per run, so a cap keeps the call affordable. Truncation is announced rather
+    than silent, and the head is kept because the positioning guide and the
+    claims ledger live at the top — the parts that change a judgment call.
+    """
+    text = detail_dump().strip()
+    if not text:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    kept = text[:max_chars]
+    # prefer to cut at a section boundary so the text does not end mid-table
+    cut = kept.rfind("\n## ")
+    if cut > max_chars // 2:
+        kept = kept[:cut]
+    return (
+        f"{kept}\n\n[detail dump truncated at {len(kept)} of {len(text)} chars — "
+        f"the remainder covers later sections (story bank, open items). Treat "
+        f"what is above as the authoritative positioning and claims guidance.]"
+    )

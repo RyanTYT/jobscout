@@ -14,6 +14,32 @@ from jobscout.webapp.common import (
 )
 
 
+def _page_context(conn, **over) -> dict:
+    """The single profile.html context.
+
+    The GET and the two error paths all render the same template, so they must
+    all supply the same keys — a template that reads a key only the GET passes
+    turns an error page into a 500 (UndefinedError). Build it once.
+    """
+    from jobscout.webapp.stores import profile_store
+
+    base = {
+        "fields": profile_store.FIELDS,
+        "field_options": {
+            f.key: [(o, o, None) for o in f.options]
+            for f in profile_store.FIELDS
+        },
+        "values": profile_store.current_values(),
+        "missing": profile_store.missing_required(),
+        "custom": profile_store.custom_fields(),
+        "resume_md": profile_store.resume_markdown(),
+        "detail_md": profile_store.detail_markdown(),
+        "detail_stats": profile_store.detail_stats(),
+    }
+    base.update(over)
+    return base
+
+
 def register(app):
     @app.get("/profile/resume-download")
     def profile_resume_download():
@@ -67,8 +93,10 @@ def register(app):
     @app.get("/profile", response_class=HTMLResponse)
     def profile_page(request: Request, saved: str = Query(""),
                      uploaded: str = Query(""), upload_error: str = Query(""),
-                     fields: str = Query("")):
-        from jobscout.webapp.stores import profile_store
+                     fields: str = Query(""),
+                     md_saved: str = Query(""), parsed: str = Query(""),
+                     parse_error: str = Query(""), parse_raw: str = Query(""),
+                     detail_saved: str = Query("")):
 
         conn = db.connect()
         try:
@@ -79,21 +107,92 @@ def register(app):
             request, "profile.html",
             {
                 **ctx,
-                "fields": profile_store.FIELDS,
-                "field_options": {
-                    f.key: [(o, o, None) for o in f.options]
-                    for f in profile_store.FIELDS
-                },
-                "values": profile_store.current_values(),
-                "missing": profile_store.missing_required(),
-                "custom": profile_store.custom_fields(),
-                "just_saved": saved == "1",
-                "just_uploaded": uploaded == "1",
-                "upload_error": upload_error,
-                "uploaded_fields": fields,
-                "error": None,
+                **_page_context(conn,
+                    just_saved=saved == "1",
+                    just_uploaded=uploaded == "1",
+                    upload_error=upload_error,
+                    uploaded_fields=fields,
+                    md_saved=md_saved == "1",
+                    detail_saved=detail_saved == "1",
+                    just_parsed=parsed == "1",
+                    parse_error=parse_error,
+                    parse_raw=parse_raw,
+                    error=None,
+                ),
             },
         )
+
+    @app.post("/profile/resume-md")
+    async def profile_save_resume_md(request: Request):
+        """Persist the free-form resume (master_resume/resume.md) verbatim.
+
+        No LLM and no schema check: this is the scratchpad the parse button
+        reads from, so a half-finished paste must survive a save.
+        """
+        from jobscout.webapp.stores import profile_store
+
+        form = await request.form()
+        profile_store.save_resume_markdown(str(form.get("resume_md") or ""))
+        return RedirectResponse("/profile?md_saved=1", status_code=303)
+
+    @app.post("/profile/detail")
+    async def profile_save_detail(request: Request):
+        """Persist the free-form profile dump (master_resume/detail.md).
+
+        Same contract as resume.md: verbatim, no LLM, no schema check. This is
+        the candidate's own record of positioning, claim status and open
+        items — the app stores it and never rewrites it.
+        """
+        from jobscout.webapp.stores import profile_store
+
+        form = await request.form()
+        profile_store.save_detail_markdown(str(form.get("detail_md") or ""))
+        return RedirectResponse("/profile?detail_saved=1", status_code=303)
+
+    @app.post("/profile/parse-resume")
+    async def profile_parse_resume(request: Request):
+        """Parse resume.md into the structured resume.yaml fields (LLM).
+
+        Saves the markdown first so what was parsed is what is on disk, then
+        validates the LLM's YAML against MasterResume before it can overwrite
+        the structured resume — a bad parse leaves resume.yaml untouched.
+        """
+        from urllib.parse import quote as _q
+
+        from jobscout.core.resume_parser import parse_resume
+        from jobscout.webapp.stores import profile_store
+
+        form = await request.form()
+        text = str(form.get("resume_md") or "")
+
+        if text.strip():
+            profile_store.save_resume_markdown(text)
+
+        result = parse_resume(text)
+        if "error" in result:
+            # keep the model's raw output so a bad parse is diagnosable
+            raw = result.get("raw") or ""
+            return RedirectResponse(
+                "/profile?parse_error=" + _q(result["error"][:300])
+                + ("&parse_raw=" + _q(raw[:4000]) if raw else ""),
+                status_code=303)
+
+        import yaml
+
+        from jobscout.webapp.stores import profile_store as ps
+
+        dumped = yaml.safe_dump(result["parsed"], sort_keys=False,
+                                allow_unicode=True, width=100)
+        try:
+            ps.upload_resume(dumped)
+        except ps.ProfileError as e:
+            return RedirectResponse(
+                "/profile?parse_error=" + _q(str(e)[:300]), status_code=303)
+
+        n_exp = len(result["parsed"].get("experience") or [])
+        n_proj = len(result["parsed"].get("projects") or [])
+        return RedirectResponse(
+            f"/profile?parsed=1&fields={n_exp + n_proj}", status_code=303)
 
     @app.post("/profile/save")
     async def profile_save(request: Request):
@@ -111,18 +210,6 @@ def register(app):
                 conn.close()
             return TEMPLATES.TemplateResponse(
                 request, "profile.html",
-                {
-                    **ctx,
-                    "fields": profile_store.FIELDS,
-                    "field_options": {
-                        f.key: [(o, o, None) for o in f.options]
-                        for f in profile_store.FIELDS
-                    },
-                    "values": profile_store.current_values(),
-                    "missing": profile_store.missing_required(),
-                    "custom": profile_store.custom_fields(),
-                    "just_saved": False,
-                    "error": str(e),
-                },
+                {**ctx, **_page_context(conn, just_saved=False, error=str(e))},
                 status_code=422,
             )

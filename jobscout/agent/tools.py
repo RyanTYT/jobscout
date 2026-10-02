@@ -188,6 +188,17 @@ class AgentCtx:
 def _get_context(ctx: AgentCtx) -> str:
     conn = ctx.conn
     parts: list[str] = []
+    # Pointer, not a second copy: the full detail dump rides in the brief (one
+    # per run). Repeating it here would double the tokens for no new signal.
+    from jobscout.core.resume import detail_dump_stats
+
+    ds = detail_dump_stats()
+    if ds["exists"]:
+        parts.append(
+            f"candidate detail dump: set ({ds['chars']} chars, "
+            f"{len(ds['sections'])} sections) — it is in your brief above, "
+            f"including the claims ledger ([V]/[EST]/[?]) and the lead-with "
+            f"guide. Read it before judging fit or proposing a tier.")
     tiers = conn.execute(
         "SELECT tier, COUNT(*) AS n FROM companies GROUP BY tier ORDER BY tier"
     ).fetchall()
