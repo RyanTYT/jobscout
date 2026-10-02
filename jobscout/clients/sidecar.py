@@ -69,8 +69,35 @@ class SidecarClient:
         env_bin = SidecarClient._env().get("JOBSCOUT_SIDECAR_BIN")
         if env_bin:
             return Path(env_bin).expanduser()
+        # settings.sidecar.path — bundled and seeded by init_home(), so unlike a
+        # .env entry it survives a reinstall or a wiped runtime home. Resolved
+        # against the config dir when relative, which is what makes a bare
+        # "../JobPilot" work from a checkout.
+        cfg_path = SidecarClient._configured_path()
+        if cfg_path:
+            return cfg_path
         repo = core_paths.repo_root()
         return repo / ".." / "JobPilot" / "scraper" / "dist" / "index.js"
+
+    @staticmethod
+    def _configured_path() -> Path | None:
+        """The scraper binary implied by settings.sidecar.path, or None."""
+        try:
+            from jobscout.core.config import load_settings
+
+            raw = (load_settings().sidecar.path or "").strip()
+        except Exception:                         # noqa: BLE001 — optional config
+            return None
+        if not raw:
+            return None
+        p = Path(raw).expanduser()
+        # A path ending in .js is the binary itself. Anything else means "the
+        # JobPilot checkout" — decided on the NAME, not on is_dir(), so a path
+        # that does not exist yet (a fresh clone, a typo) still resolves to the
+        # binary inside it instead of being passed through as-is.
+        if p.suffix == ".js":
+            return p
+        return p / "scraper" / "dist" / "index.js"
 
     @staticmethod
     def available(sidecar_path: str | None = None) -> bool:

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def test_discovery_page_shows_hunting_profile(client):
@@ -331,3 +332,54 @@ def test_doctor_warns_actionably_when_the_sidecar_is_missing(monkeypatch):
     sc = checks["sidecar:jobpilot"]
     assert sc.status == "warn"
     assert "LinkedIn" in sc.detail and "JOBSCOUT_SIDECAR_BIN" in sc.detail
+
+
+# ── sidecar path resolution order ────────────────────────────────────────────
+# .env → settings.sidecar.path → <repo>/../JobPilot. settings matters because
+# it is bundled and seeded by init_home(), so unlike a .env entry it survives a
+# reinstall or a wiped runtime home.
+
+def _no_env(monkeypatch):
+    monkeypatch.setattr(
+        "jobscout.clients.sidecar.SidecarClient._env", staticmethod(lambda: {}))
+
+
+def test_sidecar_path_prefers_the_env_var(monkeypatch):
+    from jobscout.clients.sidecar import SidecarClient
+
+    monkeypatch.setattr(
+        SidecarClient, "_env",
+        staticmethod(lambda: {"JOBSCOUT_SIDECAR_BIN": "/from/env/index.js"}))
+    assert SidecarClient._default_path() == Path("/from/env/index.js")
+
+
+def test_sidecar_path_falls_back_to_settings(monkeypatch):
+    from jobscout.clients.sidecar import SidecarClient
+
+    _no_env(monkeypatch)
+    monkeypatch.setattr(
+        "jobscout.core.config.load_settings",
+        lambda: SimpleNamespace(sidecar=SimpleNamespace(path="/opt/JobPilot")))
+    # a directory means the checkout; the binary is scraper/dist/index.js inside
+    assert SidecarClient._default_path() == Path("/opt/JobPilot/scraper/dist/index.js")
+
+
+def test_sidecar_path_accepts_a_direct_binary_path(monkeypatch):
+    from jobscout.clients.sidecar import SidecarClient
+
+    _no_env(monkeypatch)
+    monkeypatch.setattr(
+        "jobscout.core.config.load_settings",
+        lambda: SimpleNamespace(sidecar=SimpleNamespace(path="/opt/built/index.js")))
+    assert SidecarClient._default_path() == Path("/opt/built/index.js")
+
+
+def test_sidecar_path_survives_an_empty_settings_value(monkeypatch):
+    """An unset sidecar.path must not break resolution."""
+    from jobscout.clients.sidecar import SidecarClient
+
+    _no_env(monkeypatch)
+    monkeypatch.setattr(
+        "jobscout.core.config.load_settings",
+        lambda: SimpleNamespace(sidecar=SimpleNamespace(path="")))
+    assert SidecarClient._default_path().name == "index.js"
