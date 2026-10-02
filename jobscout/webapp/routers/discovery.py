@@ -49,27 +49,26 @@ def register(app):
                 row = dict(r)
                 row["stats"] = st
                 recent_runs.append(row)
+            scoring_state = db.get_scoring_state(conn)
             ctx = page_ctx("discovery", conn)
         finally:
             conn.close()
-        from jobscout.core.config import load_profile
+        from jobscout.core.config import load_profile, profile_hash
 
         try:
-            target = load_profile().target
+            profile = load_profile()
+            target = profile.target
+            phash = profile_hash(profile)
         except Exception:                 # noqa: BLE001 — profile optional here
             from jobscout.core.schema import TargetCfg
 
             target = TargetCfg()
-        from jobscout.core import paths as core_paths
-
-        # morning_reports live under the runtime root (JOBSCOUT_HOME in the
-        # packaged app) — NOT relative to the webapp templates dir, which
-        # pointed inside the frozen bundle and showed an empty report list
-        reports = sorted(core_paths.morning_reports_dir().glob("*.md"))
-        latest_report = None
-        if reports:
-            latest_report = {"name": reports[-1].name,
-                             "content": reports[-1].read_text(encoding="utf-8")[:6000]}
+            phash = None
+        scoring_summary = {"hash": phash, "state": scoring_state}
+        # Run reports (daily + morning, with the promote table) render in the
+        # split-panel browser below — served by /discovery/reports off the
+        # runtime root. This page used to carry a second, read-only "Morning
+        # reports" card duplicating it; that is gone.
         return TEMPLATES.TemplateResponse(
             request,
             "discovery.html",
@@ -83,13 +82,14 @@ def register(app):
                 "targeting_error": error,
                 "agent_spend": agent_spend,
                 "last_agent_run": last_agent_run,
-                "reports": [r.name for r in reports[-10:]],
-                "latest_report": latest_report,
                 "recent_runs": recent_runs,
                 "just_started": started == "1",
                 "caps_saved": caps_saved == "1",
                 "sweep_saved": sweep_saved == "1",
                 "pipeline": settings.discovery.pipeline,
+                "profile_hash": scoring_summary["hash"],
+                "score_state": scoring_summary["state"],
+                "batch_size": settings.discovery.pipeline.llm_batch_size,
                 "running": agent_runner.running(),
                 "run_out": agent_runner.state()["out"],
                 "run_error": agent_runner.state()["error"],
@@ -140,12 +140,84 @@ def register(app):
         finally:
             conn.close()
         st = agent_runner.state()
+        from jobscout.core.config import load_settings
         return TEMPLATES.TemplateResponse(
             request, "_run_status.html",
             {"running": st["running"], "run_out": st["out"],
              "run_error": st["error"], "focus": st["focus"],
-             "agent_spend": agent_spend},
+             "agent_spend": agent_spend,
+             "batch_size": load_settings().discovery.pipeline.llm_batch_size},
         )
+
+    # ── the report browser ───────────────────────────────────────────────────
+    # _report_tabs.html / _report_viewer.html call these; without them the
+    # templates are dead files and the Discovery page shows no reports.
+
+    @app.get("/discovery/reports", response_class=HTMLResponse)
+    def report_list(request: Request):
+        """HTMX partial: the split-panel report browser (sidebar + viewer)."""
+        from jobscout.webapp import reports
+
+        conn = db.connect()
+        try:
+            ctx = reports.list_reports(conn)
+        finally:
+            conn.close()
+        return TEMPLATES.TemplateResponse(request, "_report_tabs.html", ctx)
+
+    @app.get("/discovery/reports/{kind}/{date}", response_class=HTMLResponse)
+    def report_view(request: Request, kind: str, date: str):
+        """HTMX partial: one report, loaded into #report-content."""
+        from jobscout.webapp import reports
+
+        conn = db.connect()
+        try:
+            try:
+                ctx = {"report": reports.load_report(conn, kind, date)}
+            except reports.ReportError as e:
+                ctx = {"kind": kind, "date": date, "error": str(e)}
+        finally:
+            conn.close()
+        name = ("_report_viewer.html" if "report" in ctx
+                else "_report_not_found.html")
+        return TEMPLATES.TemplateResponse(request, name, ctx)
+
+    @app.post("/discovery/reports/{kind}/{date}/promote",
+              response_class=HTMLResponse)
+    async def report_promote(kind: str, date: str, request: Request):
+        """Move checked companies into a watchlist tier. Writes watchlist.yaml
+        and the DB tier together; the reply lands in #promote-result."""
+        from jobscout.webapp.stores import watchlist_store
+
+        form = await request.form()
+        checked = form.getlist("company")
+        tiers = {
+            slug: (form.get(f"tier_{slug}") or "").strip()
+            for slug in checked
+        }
+        try:
+            result = watchlist_store.promote_many(
+                {db.slugify(slug): t for slug, t in tiers.items() if t})
+        except watchlist_store.WatchlistStoreError as e:
+            return TEMPLATES.TemplateResponse(
+                request, "_promote_result.html",
+                {"ok": False, "message": str(e)}, status_code=422)
+
+        return TEMPLATES.TemplateResponse(
+            request, "_promote_result.html",
+            {"ok": True, "promoted": result["promoted"],
+             "skipped": result["skipped"]})
+
+    @app.post("/discovery/rescore")
+    def rescore_now():
+        """Rescore postings — batched LLM scoring only, no sweep and no agent.
+
+        scope="auto" inside score_unscored: a full pass when the profile hash
+        has moved since the last completed pass, otherwise only never-scored
+        postings. Resumable — an interrupted pass continues where it stopped.
+        """
+        agent_runner.launch("rescore")
+        return RedirectResponse("/discovery?started=1", status_code=303)
 
     @app.post("/discovery/pipeline")
     async def discovery_pipeline_save(request: Request):
@@ -216,14 +288,3 @@ def register(app):
         except targeting_store.TargetingError as e:
             return RedirectResponse(
                 f"/discovery?error={_q(str(e))}", status_code=303)
-
-    @app.post("/discovery/rescore")
-    def rescore_now():
-        """Rescore postings — batched LLM scoring only, no sweep and no agent.
-
-        scope="auto" inside score_unscored: a full pass when the profile hash
-        has moved since the last completed pass, otherwise only never-scored
-        postings. Resumable — an interrupted pass continues where it stopped.
-        """
-        agent_runner.launch("rescore")
-        return RedirectResponse("/discovery?started=1", status_code=303)

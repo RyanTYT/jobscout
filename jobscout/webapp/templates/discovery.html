@@ -21,8 +21,8 @@
 {% include "_run_status.html" %}
 
 <p class="text-secondary small mb-0">
-  runs the deterministic sweep + agent harness (if key present) as a subprocess,
-  bounded by the caps below — the button stays busy while it runs (up to 15 min)
+  runs as a subprocess, bounded by the caps below — the button stays busy while
+  it runs; there is no wall-clock limit, only the spend caps and row limits
 </p>
 
 {# ── mode switch: Bootstrap segmented buttons + per-mode explanations ──── #}
@@ -172,9 +172,10 @@
 {# ── hunting profile: editable — every layer reads this one file ────────
      rules gate on seniorities/locations; the LLM rubric and the agent
      brief read the same file (config/profile.yaml, target: block).
-     Saving bumps profile_version → the LLM re-scores active postings. #}
+     The content hash below is the LLM score-cache key: change the profile
+     and it moves, and "rescore postings" does a full pass. #}
 {% if targeting_saved %}
-{{ m.callout("Hunting profile saved — profile_version bumped, so the LLM re-scores active postings against the new target.", "success") }}
+{{ m.callout("Hunting profile saved. If its content hash changed, the next rescore runs a full pass against the new target — if not, nothing needs re-scoring.", "success") }}
 {% endif %}
 {% if targeting_error %}
 {{ m.callout(targeting_error, "danger") }}
@@ -258,18 +259,57 @@
       </div>
 
       <div class="col-12 d-flex justify-content-end align-items-center gap-3">
-        <span class="small text-secondary">
-          saving bumps profile_version → LLM re-scores active postings
+        {% if profile_hash %}
+        <span class="small text-secondary" title="sha256 over the scoring-relevant profile (roles, levels, locations, stack, domains, weighting, remote, dealbreakers). This is the LLM score-cache key — a full rescore runs when it changes.">
+          content hash <code class="small">{{ profile_hash[:16] }}</code>
         </span>
+        {% endif %}
         <button class="btn btn-primary btn-sm" type="submit">
           {{ m.icon("check", 12) }} save target
         </button>
       </div>
 
     </div>
+
+    {% if profile_hash %}
+    <div class="row g-2 mt-1 pt-2 border-top small text-secondary">
+      <div class="col-12 col-md-6">
+        scoring state:
+        {% if score_state.scored_profile_hash == profile_hash %}
+          <span class="text-success">fully scored at this profile</span>
+          ({{ score_state.full_passes }} full {{ "pass" if score_state.full_passes == 1 else "passes" }} so far)
+        {% elif score_state.scored_profile_hash %}
+          last full pass was at <code>{{ score_state.scored_profile_hash[:12] }}</code>
+          — this profile has not had a complete pass yet
+        {% else %}
+          never fully scored
+        {% endif %}
+      </div>
+      <div class="col-12 col-md-6">
+        {% if score_state.pending_remaining %}
+          {{ score_state.pending_remaining }} posting{{ "" if score_state.pending_remaining == 1 else "s" }}
+          still unscored at this profile — press
+          <strong>rescore postings</strong> to continue (it resumes where the last run stopped).
+        {% else %}
+          batches of {{ batch_size }} postings per LLM call; already-scored postings are cached and cost nothing.
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
   </div>
 </form>
 
+
+{# ── the report browser: sidebar tree + HTMX viewer ──────────────────── #}
+<div id="report-tabs"
+     hx-get="/discovery/reports" hx-trigger="load" hx-swap="outerHTML">
+  <div class="card">
+    <div class="card-body text-center text-secondary py-4 small">
+      <span class="spinner-grow spinner-grow-sm me-2" role="status"></span>
+      loading run reports…
+    </div>
+  </div>
+</div>
 
 {# ── recent runs (the Ops view, scoped to the agent) ─────────────────── #}
 <div class="card">
@@ -300,30 +340,6 @@
   </div>
   {% else %}
   <div class="card-body">{{ m.empty("No runs yet", "The daily launchd job and agent runs land here.", "pulse") }}</div>
-  {% endif %}
-</div>
-
-{# ── morning reports ──────────────────────────────────────────────────── #}
-<div class="card">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <h2 class="card-title mb-0 h6">Morning reports</h2>
-    {% if reports %}<span class="text-secondary small">{{ reports | length }} archived</span>{% endif %}
-  </div>
-  {% if latest_report %}
-  <div class="card-body">
-    <div class="d-flex flex-wrap gap-1 mb-3">
-      {% for r in reports %}
-      <span class="badge text-bg-light">{{ r[:10] }}</span>
-      {% endfor %}
-    </div>
-    <pre class="mb-0 small">{{ latest_report.content }}</pre>
-  </div>
-  {% else %}
-  <div class="card-body">
-    {{ m.empty("No morning reports yet",
-               "Run `jobscout agent --morning` from a terminal, or press Run agent now.",
-               "doc") }}
-  </div>
   {% endif %}
 </div>
 

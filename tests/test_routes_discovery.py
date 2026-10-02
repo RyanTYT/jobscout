@@ -97,6 +97,55 @@ def test_run_panel_renders_both_hunt_buttons(client):
     assert "title=" in r.text                       # tooltips explain them
 
 
+def test_run_panel_renders_rescore_button(client):
+    r = client.get("/discovery/run-status")
+    assert "rescore postings" in r.text
+    assert 'action="/discovery/rescore"' in r.text
+    # the batch size is surfaced from settings, not hard-coded in the template
+    assert "20 postings per call" in r.text
+
+
+def test_rescore_runs_scoring_only(client, monkeypatch):
+    """The rescore button must not chain the sweep or the agent."""
+    import subprocess as sp
+
+    from jobscout.webapp.runners import agent_runner
+
+    seen = []
+
+    class FakePopen:
+        returncode = 0
+
+        def __init__(self, args, **kw):
+            seen.append(list(args))
+
+        def communicate(self, timeout=None):
+            return "scored", ""
+
+        def kill(self):
+            pass
+
+    monkeypatch.setattr(sp, "Popen", FakePopen)
+    r = client.post("/discovery/rescore", follow_redirects=False)
+    assert r.status_code == 303
+
+    # _run directly: the POST already spawned the background thread
+    agent_runner._run("rescore")
+    assert seen, "the rescore button must launch a subprocess"
+    for args in seen:
+        assert args[1] == "score", "no sweep, no agent"
+        assert "--all" not in args, (
+            "scope is decided by the profile-hash gate, not forced on the CLI")
+
+
+def test_discovery_page_shows_profile_hash_and_scoring_state(client):
+    r = client.get("/discovery")
+    assert "content hash" in r.text
+    assert "scoring state:" in r.text
+    # never fully scored yet on a fresh DB
+    assert "never fully scored" in r.text
+
+
 
 def test_run_agent_focus_flag_reaches_subprocess(client, monkeypatch):
     import subprocess as sp
@@ -170,15 +219,19 @@ def test_run_cancel_kills_and_labels(client, monkeypatch):
 
 def test_discovery_reports_read_from_runtime_root(client, monkeypatch, tmp_path):
     """Reports live under the runtime root (JOBSCOUT_HOME in the packaged
-    app) — the route must not look inside the frozen bundle's templates
-    dir, which showed an empty table."""
+    app) — the reader must not look inside the frozen bundle's templates
+    dir, which showed an empty table.
+
+    Asserted against /discovery/reports: that partial (webapp/reports.py) is
+    now the single report surface, since the duplicate read-only "Morning
+    reports" card was removed from the Discovery page."""
     from jobscout.core import paths as core_paths
 
     (tmp_path / "morning_reports").mkdir()
     (tmp_path / "morning_reports" / "2026-09-29.md").write_text(
         "# report", encoding="utf-8")
     monkeypatch.setattr(core_paths, "morning_reports_dir", lambda: tmp_path / "morning_reports")
-    r = client.get("/discovery")
+    r = client.get("/discovery/reports")
     assert "2026-09-29" in r.text
 
 
@@ -200,3 +253,23 @@ def test_mode_failure_flashes_on_page(client, monkeypatch):
 
 
 
+
+
+# ── no duplicate morning-reports section ─────────────────────────────────────
+# The split-panel browser (Daily + Morning tabs) is the report surface; the
+# page used to also carry a second read-only "Morning reports" card.
+
+def test_discovery_has_no_duplicate_morning_reports_card(client):
+    r = client.get("/discovery")
+    assert r.status_code == 200
+    assert "Morning reports" not in r.text
+    # the browser is still mounted, and recent runs are untouched
+    assert 'id="report-tabs"' in r.text
+    assert "Recent runs" in r.text
+
+
+def test_report_browser_partial_carries_both_tabs(client):
+    r = client.get("/discovery/reports")
+    assert r.status_code == 200
+    assert "Run Reports" in r.text
+    assert "Daily" in r.text and "Morning" in r.text

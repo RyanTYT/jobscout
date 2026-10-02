@@ -1,0 +1,24 @@
+{# _promote_result.html — the reply from a report promotion, swapped into
+   #promote-result by HTMX. #}
+{% import "components/macros.html" as m %}
+
+{% if ok %}
+  {% if promoted %}
+  <span class="text-success small">
+    {{ m.icon("check", 12) }}
+    promoted:
+    {% for name, tier in promoted %}
+      <strong>{{ name }}</strong> → {{ tier }}{% if not loop.last %},{% endif %}
+    {% endfor %}
+  </span>
+  {% else %}
+  <span class="text-secondary small">nothing promoted — tick a row and choose a tier</span>
+  {% endif %}
+  {% if skipped %}
+  <div class="small text-warning mt-1">
+    {% for s in skipped %}<div>{{ m.icon("alert-triangle", 10) }} {{ s }}</div>{% endfor %}
+  </div>
+  {% endif %}
+{% else %}
+  <span class="text-danger small">{{ m.icon("alert-triangle", 12) }} {{ message }}</span>
+{% endif %}

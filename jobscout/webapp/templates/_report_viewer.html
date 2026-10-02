@@ -35,6 +35,7 @@
             </th>
             <th>Company</th>
             <th>Domain</th>
+            <th style="width: 90px;">Current</th>
             <th>Suggested Tier</th>
             <th style="width: 160px;">Promote To</th>
             <th>Note</th>
@@ -49,11 +50,28 @@
             </td>
             <td class="fw-medium">{{ c.name }}</td>
             <td class="text-secondary small">{{ c.domain or '—' }}</td>
+            {# the tier this company already sits in, straight from the DB —
+               so the row shows where it is AND what was recommended for it #}
+            <td>
+              {% if c.tier and c.tier != 'candidate' %}
+              <span class="badge text-bg-secondary"
+                    title="already on the watchlist at tier {{ c.tier }}">{{ c.tier }}</span>
+              {% elif c.tier == 'candidate' %}
+              <span class="badge text-bg-light border text-secondary"
+                    title="watchlist candidate — not yet promoted to a tier">candidate</span>
+              {% else %}
+              {# tier is nullable: the add-URL seeder writes NULL. Say so
+                 plainly — a bare dash reads as "no company". #}
+              <span class="badge text-bg-warning"
+                    title="no tier set — needs a decision">un-tiered</span>
+              {% endif %}
+            </td>
             <td>
               {% if c.suggested_tier %}
               <span class="badge text-bg-info">{{ m.icon("magic", 8) }} {{ c.suggested_tier }}</span>
               {% else %}
-              <span class="text-secondary">—</span>
+              <span class="badge text-bg-warning"
+                    title="no suggestion recorded — needs a decision">needs tier</span>
               {% endif %}
             </td>
             <td>

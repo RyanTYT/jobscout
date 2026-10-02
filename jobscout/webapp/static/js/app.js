@@ -326,6 +326,23 @@
     autoEnableSorting(e.detail.target);
   });
 
+  /* ── report browser: mark the selected report in the sidebar ─────────── */
+  // Delegated on document.body, NOT bound inside _report_tabs.html. That
+  // partial arrives over HTMX (hx-trigger="load"), long after DOMContentLoaded
+  // has already fired — listeners attached in the partial never ran, so the
+  // selected date was never highlighted.
+  document.body.addEventListener("htmx:beforeRequest", function (e) {
+    var link = (e.detail.elt && e.detail.elt.closest)
+      ? e.detail.elt.closest(".report-link") : null;
+    if (!link) return;
+    [].forEach.call(document.querySelectorAll(".report-link"), function (l) {
+      l.classList.remove("active-report");
+      l.removeAttribute("aria-current");
+    });
+    link.classList.add("active-report");
+    link.setAttribute("aria-current", "true");
+  });
+
   document.addEventListener("click", function (e) {
     var th = e.target.closest("table[data-sortable] th[data-sort-key]");
     if (!th) return;

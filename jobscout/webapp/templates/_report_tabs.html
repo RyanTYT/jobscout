@@ -89,15 +89,3 @@
     color: var(--accent-text) !important;
   }
 </style>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    function highlight(el) {
-      document.querySelectorAll('.report-link').forEach(function(l) { l.classList.remove('active-report'); });
-      if (el) el.classList.add('active-report');
-    }
-    document.querySelectorAll('.report-link').forEach(function(link) {
-      link.addEventListener('htmx:beforeRequest', function() { highlight(this); });
-    });
-  });
-</script>

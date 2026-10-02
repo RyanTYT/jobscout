@@ -14,6 +14,7 @@ from urllib.parse import quote
 from fastapi.templating import Jinja2Templates
 
 from jobscout import __version__
+from jobscout.core import db
 from jobscout.webapp import ui
 from jobscout.webapp.runners import agent_runner
 
@@ -22,6 +23,8 @@ TEMPLATES = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 TEMPLATES.env.globals["linkify"] = ui.linkify
 TEMPLATES.env.globals["kind_meta"] = ui.signal_kind_meta
 TEMPLATES.env.globals["kind_desc"] = lambda k: ui.signal_kind_meta(k)["desc"]
+# the report browser keys its form fields on the company slug
+TEMPLATES.env.filters["slugify"] = db.slugify
 
 
 def _from_json(value):

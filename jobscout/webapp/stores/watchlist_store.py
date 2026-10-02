@@ -62,3 +62,56 @@ def save(slug: str, *, name: str, domain: str, tier: str, note: str,
                                   note=note, ats=ats)
     except wlmod.WatchlistError as e:
         raise WatchlistStoreError(str(e)) from e
+
+
+def promote_many(slug_tiers: dict[str, str]) -> dict:
+    """Move several companies into watchlist tiers from a report.
+
+    A company the agent surfaced may be in the DB but absent from
+    watchlist.yaml, so this adds it when it is not already listed and moves it
+    when it is. watchlist.yaml is written once at the end; the DB tier is
+    updated per company so the inbox and the reports agree afterwards.
+
+    Returns {"promoted": [(name, tier)], "skipped": [reason]}.
+    """
+    from jobscout.core import db
+    from jobscout.core.schema import WatchlistEntry
+
+    if not slug_tiers:
+        return {"promoted": [], "skipped": []}
+
+    wl = wlmod.load()
+    promoted: list[tuple[str, str]] = []
+    skipped: list[str] = []
+    db.init_db()
+    conn = db.connect()
+    try:
+        for slug, tier in slug_tiers.items():
+            if tier not in ("A", "B", "C"):
+                skipped.append(f"{slug}: no tier chosen")
+                continue
+            row = conn.execute(
+                "SELECT name, domain, notes FROM companies WHERE id = ?",
+                (slug,)).fetchone()
+            if row is None:
+                skipped.append(f"{slug}: not in the database")
+                continue
+            name = row["name"]
+            if wlmod.find(wl, name) is not None:
+                moved = wlmod.promote(wl, name, tier)
+                if not moved:
+                    skipped.append(f"{name}: already tier {tier}")
+                    continue
+            else:
+                wlmod.add(wl, WatchlistEntry(
+                    name=name, domain=row["domain"],
+                    note=row["notes"] or "promoted from a run report"), tier)
+            db.update_company_tier(conn, slug, tier)
+            promoted.append((name, tier))
+        if promoted:
+            wlmod.save(wl)
+    except wlmod.WatchlistError as e:
+        raise WatchlistStoreError(str(e)) from e
+    finally:
+        conn.close()
+    return {"promoted": promoted, "skipped": skipped}
