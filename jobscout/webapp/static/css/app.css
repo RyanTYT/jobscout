@@ -611,3 +611,66 @@ tr[data-row-link] { cursor: pointer; }
 
 /* skeletons (Bootstrap .placeholder) */
 .placeholder { background-color: var(--skeleton-base); }
+
+/* ── real-time log viewer (webapp/static/js/log-viewer.js + _log_viewer.html)
+   A fixed-height monospace stream with a pinned stats overlay. Restored
+   2026-10-02: these rules were lost when a `git filter-repo --force` reset
+   rolled app.css back to an earlier commit, leaving the viewer unstyled.
+   Tokens only, per the color rule at the top of this file. ─────────── */
+
+.log-viewer .log-chevron { transition: transform 0.15s ease; }
+
+.log-entries {
+  height: var(--panel-max-h);
+  overflow-y: auto;
+  background-color: var(--bg-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+}
+
+.log-entry {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-1) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.log-entry__time   { flex: 0 0 auto; color: var(--text-3); }
+.log-entry__level  { flex: 0 0 3.5rem; font-weight: 600; color: var(--text-2); }
+.log-entry__source { flex: 0 0 5.5rem; color: var(--accent-text); }
+.log-entry__message { flex: 1 1 auto; color: var(--text-1); }
+
+/* level colouring — warn/error carry the tone, info stays neutral */
+.log-entry--warn  { background-color: var(--warning-soft); }
+.log-entry--warn  .log-entry__level  { color: var(--warning-text); }
+.log-entry--warn  .log-entry__message { color: var(--warning-text); }
+
+.log-entry--error { background-color: var(--danger-soft); }
+.log-entry--error .log-entry__level  { color: var(--danger-text); }
+.log-entry--error .log-entry__message { color: var(--danger-text); }
+
+/* stats overlay: agent calls + spend, pinned over the stream's foot */
+.log-stats-overlay {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  background-color: var(--bg-raised);
+  border-top: 1px solid var(--border-strong);
+}
+
+.log-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+}
