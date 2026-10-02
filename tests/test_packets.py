@@ -142,9 +142,10 @@ def test_orchestrator_end_to_end_skeleton(conn, tmp_path, monkeypatch):
     for name in ("packet.yaml", "fill_sheet.yaml", "claim_check.yaml",
                  "tailor.yaml", "resume.md", "cover_letter.md"):
         assert (out / name).is_file(), name
-    # DB state
+    # DB state — the packet row carries the CANONICAL status, matching the
+    # posting row and the statuses the packet board filters on.
     pk = core_db.get_packet(conn, result["packet_id"])
-    assert pk is not None and pk["status"] == "needs_input"
+    assert pk is not None and pk["status"] == "packet:needs_input"
     posting = core_db.get_posting(conn, "p1")
     assert posting["status"] == "packet:needs_input"
     # claim check on dry-run (fact-free) content passes
@@ -278,3 +279,48 @@ def test_orchestrator_stores_portable_dir(conn, tmp_path, monkeypatch):
     pd = core_paths.resolve_packet_dir(row["dir"])
     assert pd is not None and pd.is_dir()
     assert (pd / "packet.yaml").is_file()
+
+
+def test_upsert_packet_stores_canonical_status(conn):
+    """upsert_packet must canonicalize the short alias.
+
+    The orchestrator passes "ready"/"needs_input"; the packet board filters on
+    "packet:ready"/"packet:needs_input". Storing the alias verbatim made a
+    freshly prepared packet render nowhere on /applications.
+    """
+    for alias, canonical in (("ready", "packet:ready"),
+                             ("needs_input", "packet:needs_input"),
+                             ("drafting", "packet:drafting")):
+        pid = f"pk_{alias}"
+        core_db.upsert_packet(conn, packet_id=pid, posting_id="p1", status=alias)
+        row = conn.execute("SELECT status FROM packets WHERE id = ?", (pid,)).fetchone()
+        assert row["status"] == canonical
+
+
+def test_upsert_packet_leaves_canonical_status_alone(conn):
+    core_db.upsert_packet(conn, packet_id="pk_a", posting_id="p1", status="applied")
+    core_db.upsert_packet(conn, packet_id="pk_b", posting_id="p1", status="interviewing")
+    core_db.upsert_packet(conn, packet_id="pk_c", posting_id="p1", status="offer")
+    for pid in ("pk_a", "pk_b", "pk_c"):
+        row = conn.execute("SELECT status FROM packets WHERE id = ?", (pid,)).fetchone()
+        assert not row["status"].startswith("packet:")
+
+
+def test_migrate_canonicalizes_legacy_packet_status(conn):
+    """Rows written before the fix keep working: the v12 migration backfills."""
+    for i, legacy in enumerate(("ready", "needs_input", "drafting", "applied")):
+        conn.execute(
+            "INSERT INTO packets (id, posting_id, status) VALUES (?, 'p1', ?)",
+            (f"pk_legacy{i}", legacy),
+        )
+    conn.commit()
+
+    core_db._migrate(conn)
+    conn.commit()
+
+    got = {r["id"]: r["status"] for r in conn.execute(
+        "SELECT id, status FROM packets WHERE id LIKE 'pk_legacy%'")}
+    assert got["pk_legacy0"] == "packet:ready"
+    assert got["pk_legacy1"] == "packet:needs_input"
+    assert got["pk_legacy2"] == "packet:drafting"
+    assert got["pk_legacy3"] == "applied"          # untouched

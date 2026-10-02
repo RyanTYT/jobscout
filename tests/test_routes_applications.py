@@ -471,3 +471,29 @@ def test_seniority_map_covers_sidecar_tokens():
         assert _SENIORITY_MAP.get(level) is not None or level == "mid"
     # unknown levels → None (unlabeled, passes to LLM)
     assert _SENIORITY_MAP.get("director") is None
+
+
+def test_packet_board_renders_a_freshly_prepared_packet(client, db_file, tmp_path):
+    """A packet written through upsert_packet with the SHORT status must show
+    up on the board.
+
+    Regression: upsert_packet stored the alias verbatim while the board filters
+    on the canonical form, so a packet prepared by the orchestrator (which
+    passes "ready"/"needs_input") rendered nowhere until it was manually moved
+    to filled/applied.
+    """
+    for alias in ("ready", "needs_input"):
+        pid = f"pk_{alias}"
+        conn = db.connect()
+        try:
+            db.upsert_packet(conn, packet_id=pid, posting_id="p_int_1",
+                             status=alias)
+        finally:
+            conn.close()
+
+    r = client.get("/applications")
+    assert r.status_code == 200
+    assert "Ready to fill" in r.text
+    assert "Needs input" in r.text
+    assert "pk_ready" in r.text
+    assert "pk_needs_input" in r.text

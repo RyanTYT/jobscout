@@ -21,7 +21,7 @@ def db_path() -> Path:
     return core_paths.db_path()
 
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS companies (
@@ -321,6 +321,19 @@ def _migrate(conn: sqlite3.Connection) -> None:
                 rel = "applications/" + d.split(marker, 1)[1]
                 conn.execute("UPDATE packets SET dir = ? WHERE id = ?",
                              (rel, pid))
+
+    # v12: packets.status → the canonical prefixed form. upsert_packet now
+    # canonicalizes on write, but rows written before that (and by anything
+    # that wrote the status directly) kept the short alias, and the packet
+    # board filters on "packet:ready"/"packet:needs_input" — so those
+    # packets rendered nowhere. Idempotent; the other statuses are unchanged.
+    for alias, canonical in (
+        ("drafting", "packet:drafting"),
+        ("needs_input", "packet:needs_input"),
+        ("ready", "packet:ready"),
+    ):
+        conn.execute("UPDATE packets SET status = ? WHERE status = ?",
+                     (canonical, alias))
 
 
 # ── P2: rule verdicts, scores, statuses ──────────────────────────────────────

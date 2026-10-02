@@ -610,7 +610,16 @@ def llm_spend_by_tier(conn: sqlite3.Connection, days: int = 7) -> list[sqlite3.R
     ).fetchall()
 
 
-def recent_runs(conn: sqlite3.Connection, limit: int = 10) -> list[sqlite3.Row]:
+def recent_runs(conn: sqlite3.Connection, limit: int = 10,
+                kind: str | None = None) -> list[sqlite3.Row]:
+    """Newest runs first. `kind` narrows to one kind (daily | agent |
+    manual | fill) — the Ops "source health" card needs the last DAILY run,
+    and the agent run that follows the sweep is always the newer row."""
+    if kind:
+        return conn.execute(
+            "SELECT * FROM runs WHERE kind = ? ORDER BY id DESC LIMIT ?",
+            (kind, limit),
+        ).fetchall()
     return conn.execute(
         "SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,)
     ).fetchall()
@@ -729,6 +738,12 @@ def upsert_packet(
     model: str | None = None,
     cost_usd: float = 0.0,
 ) -> None:
+    # Store the CANONICAL status. The orchestrator passes the short form
+    # ("ready"/"needs_input"), which is only an alias — the packet board
+    # filters on the prefixed form, so writing the alias verbatim left a
+    # freshly prepared packet invisible until something moved it on to
+    # "filled"/"applied".
+    status = canon_status(status)
     conn.execute(
         """
         INSERT INTO packets (id, posting_id, status, dir, model, cost_usd,
