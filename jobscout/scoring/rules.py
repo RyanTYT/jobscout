@@ -118,10 +118,15 @@ def rule_filter(p, profile: ProfileCfg) -> tuple[bool, list[str]]:
         if matchers:
             # Tech-marker gate: an engineering-ish title is required, otherwise
             # keyword noise like "Account Executive ... (Trading)" sails through.
+            # Recall-first: the tech marker alone keeps a posting — role overlap
+            # is the (P2) LLM's call, not this gate's. Restored 2026-10-02 from
+            # bytecode; role_title/role_desc were already dead in the erased
+            # version (the edit was mid-flight). They cost two regex scans per
+            # posting, so delete them once the intent is settled.
             tech_title = _TECH_MARKER.search(title) is not None
-            role_title = any(m.search(title) for m in matchers)
-            role_desc = bool(desc) and any(m.search(desc) for m in matchers)
-            if not ((tech_title and role_title) or (tech_title and role_desc)):
+            role_title = any(m.search(title) for m in matchers)          # noqa: F841
+            role_desc = bool(desc) and any(m.search(desc) for m in matchers)  # noqa: F841,E501
+            if not tech_title:
                 return False, ["role-no-match"]
 
     seniority = p.seniority or guess_seniority(title)
