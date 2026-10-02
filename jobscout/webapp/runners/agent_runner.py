@@ -59,6 +59,11 @@ def _cli() -> str:
 
 FOCUSES = ("", "profile", "rescore")
 
+# The button runs a full pass over every eligible posting. `score --limit` only
+# bounds the SQL fetch of that worklist, so keep it far above any real backlog
+# rather than tuning it to today's row count.
+RESCORE_LIMIT = 1_000_000
+
 
 def launch(focus: str = ""):
     """Start a run in a background thread; returns immediately."""
@@ -83,7 +88,7 @@ def _commands(cli: str, focus: str) -> list[list[str]]:
     if focus == "rescore":
         # scoring only — no sweep, no agent. No --all: score_unscored's
         # profile-hash gate picks full-vs-incremental on its own.
-        return [[cli, "score", "--limit", "10000"]]
+        return [[cli, "score", "--limit", str(RESCORE_LIMIT)]]
     if focus == "profile":
         return [[cli, "agent"]]
     return [[cli, "run", "--daily"], [cli, "agent"]]
