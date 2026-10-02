@@ -157,3 +157,248 @@ def write_daily(
 
     p.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return p
+
+
+# ── reading reports back ─────────────────────────────────────────────────────
+# write_daily emits markdown; these read it back into structured data. Restored
+# 2026-10-02 from surviving CPython 3.13 bytecode (the originals were uncommitted
+# and lost to a `git filter-repo --force` reset), then re-verified against that
+# bytecode: list_reports and parse_daily_report compile to an identical
+# instruction stream, parse_morning_report differs only by one redundant
+# JUMP_BACKWARD, and all three run identically over the real reports on disk.
+#
+# NOTE: the webapp report browser does NOT use these. It reads the database via
+# jobscout/webapp/reports.py, whose promotion-table "note" is the human-entered
+# companies.notes value. The "note" parsed here is the watchlist-coverage table's
+# per-company ATS note written by write_daily — a different thing. Don't swap
+# one for the other.
+
+
+def list_reports(kind: str, retention_days: int = 30) -> list[dict]:
+    """Return list of available report files, newest first.
+    kind: 'daily' -> digest/ dir, 'morning' -> brief/ dir
+    Deletes files older than retention_days."""
+    from datetime import UTC, datetime, timedelta
+
+    from jobscout.core.paths import digest_dir, morning_reports_dir
+
+    base = digest_dir() if kind == "daily" else morning_reports_dir()
+    if not base.exists():
+        return []
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+    files = sorted(base.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    out: list[dict] = []
+    for f in files:
+        # retention sweep — old reports get reaped on read
+        if datetime.fromtimestamp(f.stat().st_mtime, tz=UTC) < cutoff:
+            try:
+                f.unlink()
+            except OSError:
+                pass
+            continue
+        stat = f.stat()
+        out.append(
+            {
+                "date": f.stem,
+                "path": str(f),
+                "size": stat.st_size,
+                "mtime": stat.st_mtime,
+                "kind": kind,
+            }
+        )
+    return out
+
+
+def parse_daily_report(path: Path) -> dict:
+    """Parse a daily digest markdown into structured data for the viewer."""
+    import re
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return {
+            "date": path.stem,
+            "kind": "daily",
+            "new_postings": [],
+            "companies": [],
+            "errors": [],
+            "discovery": {},
+            "monitoring": {},
+            "raw": "",
+        }
+
+    lines = text.splitlines()
+
+    data = {
+        "date": path.stem,
+        "kind": "daily",
+        "new_postings": [],
+        "companies": [],
+        "candidates": [],
+        "errors": [],
+        "discovery": {},
+        "monitoring": {},
+        "raw": text,
+    }
+
+    section = None
+    for line in lines:
+        if line.startswith("## New today"):
+            section = "new"
+            continue
+        if line.startswith("## "):
+            section = line[3:].lower()
+            continue
+
+        if (
+            section == "new"
+            and line.startswith("|")
+            and not line.startswith("| #")
+            and not line.startswith("|---")
+        ):
+            parts = [p.strip() for p in line.split("|")[1:-1]]
+            if len(parts) >= 5:
+                title_cell = parts[1]
+                url_match = re.search(r"\]\(([^)]+)\)", title_cell)
+                title = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", title_cell)
+                data["new_postings"].append(
+                    {
+                        "title": title,
+                        "url": url_match.group(1) if url_match else "",
+                        "company": parts[2],
+                        "location": parts[3],
+                        "seniority": parts[4],
+                        "source": parts[5] if len(parts) > 5 else "",
+                    }
+                )
+                continue
+            continue
+
+        if (
+            section == "watchlist coverage"
+            and line.startswith("|")
+            and not line.startswith("| company")
+            and not line.startswith("|---")
+        ):
+            parts = [p.strip() for p in line.split("|")[1:-1]]
+            if len(parts) >= 6:
+                data["companies"].append(
+                    {
+                        "name": parts[0],
+                        "tier": parts[1],
+                        "ats": parts[2],
+                        "jobs": parts[3],
+                        "new": parts[4],
+                        "note": parts[5],
+                    }
+                )
+                continue
+            continue
+
+        if section == "discovery" and line.startswith("- candidate:"):
+            name = line[len("- candidate:") :].strip()
+            if name:
+                data["candidates"].append({"name": name, "found_via": "discovery"})
+                continue
+            continue
+
+        # write_daily emits "## Source errors (N)" — the count is part of the
+        # heading, so match the prefix rather than the whole section key.
+        if (section or "").startswith("source errors") and line.startswith("- "):
+            data["errors"].append(line[2:])
+
+    return data
+
+
+def parse_morning_report(path: Path) -> dict:
+    """Parse a morning brief markdown into structured data for the viewer."""
+    import re
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return {
+            "date": path.stem,
+            "kind": "morning",
+            "companies_added": [],
+            "signals_added": [],
+            "notes_written": [],
+            "final_summary": "",
+            "db_changes": [],
+            "raw": "",
+        }
+
+    lines = text.splitlines()
+
+    data = {
+        "date": path.stem,
+        "kind": "morning",
+        "companies_added": [],
+        "signals_added": [],
+        "notes_written": [],
+        "final_summary": "",
+        "db_changes": [],
+        "raw": text,
+    }
+
+    section = None
+    for line in lines:
+        if line.startswith("## Tool log"):
+            section = "tools"
+            continue
+        if line.startswith("## "):
+            section = line[3:].lower()
+            continue
+        if section == "tools":
+
+            if line.startswith("### step"):
+                tool_match = re.search(r"`([^`]+)`", line)
+                if tool_match:
+                    data["_current_tool"] = tool_match.group(1)
+                    continue
+                continue
+            if (
+                line.startswith("- args:")
+                and data.get("_current_tool") == "add_company"
+            ):
+
+                args_match = re.search(r"\{.*\}", line)
+                if args_match:
+                    try:
+                        import json as _json
+
+                        args = _json.loads(args_match.group(0))
+                        data["companies_added"].append(args)
+                    except Exception:
+                        continue
+                    continue
+                continue
+            if line.startswith("- args:") and data.get("_current_tool") == "add_signal":
+                args_match = re.search(r"\{.*\}", line)
+                if args_match:
+                    try:
+                        import json as _json
+
+                        args = _json.loads(args_match.group(0))
+                        data["signals_added"].append(args)
+                    except Exception:
+                        continue
+                    continue
+                continue
+            if line.startswith("- result:") and data.get("_current_tool") == "add_company":
+                # result echo — the - args: line above already captured it
+                continue
+            continue
+        # harness writes "## DB changes (auditable diff)" when the run changed
+        # something and a bare "## DB changes" when it did not — match the prefix.
+        if (section or "").startswith("db changes") and line.startswith("- "):
+            entry = line[2:].strip()
+            # the writer emits a literal "- none" when nothing changed
+            if entry and entry != "none":
+                data["db_changes"].append(entry)
+            continue
+        if section == "final summary":
+            data["final_summary"] += line + "\n"
+
+    data.pop("_current_tool", None)
+    return data
